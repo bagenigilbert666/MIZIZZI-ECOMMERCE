@@ -15,6 +15,7 @@ interface PaymentSelectionProps {
   cartData?: any
   shippingAddress?: any
   billingAddress?: any
+  isProcessingPayment?: boolean // Added prop to control loading state from parent
 }
 
 export function PaymentSelection({
@@ -24,6 +25,7 @@ export function PaymentSelection({
   cartData,
   shippingAddress,
   billingAddress,
+  isProcessingPayment = false, // Accept loading state from parent
 }: PaymentSelectionProps) {
   const [hoveredCard, setHoveredCard] = useState<string | null>(null)
   const [loadingMethod, setLoadingMethod] = useState<string | null>(null)
@@ -62,44 +64,109 @@ export function PaymentSelection({
     // Delay to show the loading animation
     setTimeout(() => {
       onMethodSelect(methodId)
-      // Reset loading state after a short delay
-      setTimeout(() => setLoadingMethod(null), 500)
     }, 100)
   }
+
+  const isLoading = isProcessingPayment || loadingMethod !== null
 
   return (
     <div className="max-w-4xl mx-auto space-y-10">
       <AnimatePresence>
-        {loadingMethod && (
+        {isLoading && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 backdrop-blur-sm"
+            transition={{ duration: 0.3 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-md"
           >
+            {/* Mizizzi Logo */}
             <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-              className="bg-white rounded-3xl shadow-2xl p-8 flex flex-col items-center gap-4"
+              initial={{ scale: 0.8, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: -10 }}
+              transition={{ duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
+              className="bg-white/95 backdrop-blur-xl rounded-[28px] shadow-2xl p-10 flex flex-col items-center gap-6 border border-white/20"
+              style={{
+                boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.1)",
+              }}
             >
-              {/* Apple-style spinner */}
-              <div className="relative w-16 h-16">
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{
-                    duration: 1,
-                    repeat: Number.POSITIVE_INFINITY,
-                    ease: "linear",
-                  }}
-                  className="w-16 h-16 rounded-full border-4 border-gray-200 border-t-[#7B1E1E]"
+              {/* Mizizzi Logo */}
+              <motion.div
+                initial={{ scale: 0.5, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.1, duration: 0.4, ease: [0.23, 1, 0.32, 1] }}
+                className="relative"
+              >
+                <Image
+                  src="/images/screenshot-20from-202025-02-18-2013-30-22.png"
+                  alt="Mizizzi"
+                  width={80}
+                  height={80}
+                  className="rounded-2xl"
                 />
+              </motion.div>
+
+              {/* Apple-style spinner with 12 bars */}
+              <div className="relative w-14 h-14">
+                {[...Array(12)].map((_, i) => (
+                  <motion.div
+                    key={i}
+                    className="absolute left-1/2 top-0 w-[3px] h-[10px] -ml-[1.5px] rounded-full bg-[#7B1E1E]"
+                    style={{
+                      transformOrigin: "center 28px",
+                      transform: `rotate(${i * 30}deg)`,
+                    }}
+                    animate={{
+                      opacity: [0.2, 1, 0.2],
+                    }}
+                    transition={{
+                      duration: 1,
+                      repeat: Number.POSITIVE_INFINITY,
+                      delay: i * (1 / 12),
+                      ease: "easeInOut",
+                    }}
+                  />
+                ))}
               </div>
-              <div className="text-center">
-                <p className="text-lg font-semibold text-gray-900">Opening Payment Gateway</p>
-                <p className="text-sm text-gray-500 mt-1">Please wait...</p>
+
+              <div className="text-center space-y-2">
+                <motion.p
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2, duration: 0.4 }}
+                  className="text-xl font-semibold text-gray-900"
+                >
+                  Opening Payment Gateway
+                </motion.p>
+                <motion.p
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.3, duration: 0.4 }}
+                  className="text-sm text-gray-500"
+                >
+                  Connecting to secure payment...
+                </motion.p>
+              </div>
+
+              {/* Progress dots */}
+              <div className="flex gap-2">
+                {[0, 1, 2].map((i) => (
+                  <motion.div
+                    key={i}
+                    className="w-2 h-2 rounded-full bg-[#7B1E1E]"
+                    animate={{
+                      scale: [1, 1.3, 1],
+                      opacity: [0.4, 1, 0.4],
+                    }}
+                    transition={{
+                      duration: 1.2,
+                      repeat: Number.POSITIVE_INFINITY,
+                      delay: i * 0.2,
+                      ease: "easeInOut",
+                    }}
+                  />
+                ))}
               </div>
             </motion.div>
           </motion.div>
@@ -144,7 +211,7 @@ export function PaymentSelection({
         {paymentMethods.map((method, index) => {
           const isSelected = selectedMethod === method.id
           const Icon = method.icon
-          const isLoading = loadingMethod === method.id
+          const isMethodLoading = isLoading && (loadingMethod === method.id || isProcessingPayment)
 
           return (
             <motion.div
@@ -213,7 +280,7 @@ export function PaymentSelection({
                       isLoading && "cursor-wait",
                     )}
                   >
-                    {isLoading ? (
+                    {isMethodLoading ? (
                       <span className="flex items-center justify-center gap-2">
                         <motion.div
                           animate={{ rotate: 360 }}

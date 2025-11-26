@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useCallback, useRef, memo } from "react"
-import { motion, useReducedMotion } from "framer-motion"
+import { motion, useReducedMotion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
 import Link from "next/link"
 import { productService } from "@/services/product"
@@ -11,23 +11,20 @@ import type { Product as BaseProduct } from "@/types"
 
 type Product = BaseProduct & { color_options?: string[]; stock?: number }
 
-// Branded placeholder while images load
-const MizizziPlaceholder = ({ productName }: { productName: string }) => (
-  <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-cherry-50 to-cherry-100">
+const LogoPlaceholder = () => (
+  <div className="absolute inset-0 flex items-center justify-center bg-white">
     <motion.div
       initial={{ scale: 0.9, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
-      className="text-center"
+      className="relative h-12 w-12 sm:h-16 sm:w-16"
     >
-      <div className="mb-2 text-lg font-bold tracking-wider text-cherry-700 sm:text-2xl">MIZIZZI</div>
-      <div className="text-[10px] font-medium text-cherry-600 sm:text-xs">Premium Fashion</div>
-      <motion.div
-        animate={{ rotate: 360 }}
-        transition={{ duration: 1.1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
-        className="mx-auto mt-3 h-4 w-4 rounded-full border-2 border-cherry-300 border-t-cherry-600 sm:h-5 sm:w-5"
+      <Image
+        src="/images/screenshot-20from-202025-02-18-2013-30-22.png"
+        alt="Loading"
+        fill
+        className="object-contain"
       />
-      <div className="mt-2 line-clamp-1 max-w-[140px] text-[10px] text-cherry-600/70 sm:text-xs">{productName}</div>
     </motion.div>
   </div>
 )
@@ -36,6 +33,7 @@ const MizizziPlaceholder = ({ productName }: { productName: string }) => (
 const ProductCard = memo(({ product }: { product: Product }) => {
   const [imageLoaded, setImageLoaded] = useState(false)
   const [imageError, setImageError] = useState(false)
+  const [showPlaceholder, setShowPlaceholder] = useState(true)
   const [isHovering, setIsHovering] = useState(false)
   const [canHover, setCanHover] = useState(false)
   const prefersReducedMotion = useReducedMotion()
@@ -61,11 +59,23 @@ const ProductCard = memo(({ product }: { product: Product }) => {
   const isOnSale = typeof product.sale_price === "number" && product.sale_price < product.price
   const discount = isOnSale ? Math.round(((product.price - (product.sale_price as number)) / product.price) * 100) : 0
 
-  // Reset load state when product changes
   useEffect(() => {
     setImageLoaded(false)
     setImageError(false)
+    setShowPlaceholder(true)
   }, [product.id])
+
+  const handleImageLoad = () => {
+    setImageLoaded(true)
+    setTimeout(() => {
+      setShowPlaceholder(false)
+    }, 400)
+  }
+
+  const handleImageError = () => {
+    setImageError(true)
+    setImageLoaded(false)
+  }
 
   const imageScale = canHover && !prefersReducedMotion && isHovering ? 1.012 : 1
 
@@ -80,16 +90,34 @@ const ProductCard = memo(({ product }: { product: Product }) => {
       className="h-full"
     >
       <Link href={`/product/${product.id}`} prefetch={false} className="block h-full">
-        <div
+        <motion.div
           className={[
-            "group relative h-full overflow-hidden rounded-md bg-white",
-            // Subtle, clean elevation on hover (no borders)
-            "transition-shadow duration-200 ease-out",
-            "hover:shadow-[0_6px_16px_rgba(0,0,0,0.06)]",
+            "group relative h-full overflow-hidden rounded-lg bg-white",
+            "transition-all duration-200 ease-out",
+            "hover:shadow-xl hover:border-cherry-200",
+            "border border-transparent",
           ].join(" ")}
+          whileHover={{ y: -4 }}
+          transition={{ duration: 0.2 }}
         >
           {/* Image */}
           <div className="relative aspect-[4/3] overflow-hidden bg-[#f5f5f7]">
+            <AnimatePresence>
+              {(showPlaceholder || imageError) && !imageLoaded && (
+                <motion.div
+                  initial={{ opacity: 1 }}
+                  exit={{
+                    opacity: 0,
+                    scale: 1.1,
+                    transition: { duration: 0.6, ease: "easeInOut" },
+                  }}
+                  className="absolute inset-0 z-10"
+                >
+                  <LogoPlaceholder />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
             <motion.div
               style={{ willChange: "transform" }}
               animate={{ scale: imageScale }}
@@ -107,11 +135,9 @@ const ProductCard = memo(({ product }: { product: Product }) => {
                 sizes="(max-width: 420px) 50vw, (max-width: 640px) 45vw, (max-width: 768px) 30vw, (max-width: 1024px) 25vw, (max-width: 1280px) 20vw, 16vw"
                 className={`object-cover transition-opacity duration-500 ${imageLoaded ? "opacity-100" : "opacity-0"}`}
                 loading="lazy"
-                onLoad={() => setImageLoaded(true)}
-                onError={() => setImageError(true)}
+                onLoad={handleImageLoad}
+                onError={handleImageError}
               />
-
-              {!imageLoaded && !imageError && <MizizziPlaceholder productName={product.name} />}
 
               {imageError && (
                 <div className="absolute inset-0 flex items-center justify-center bg-[#f5f5f7]">
@@ -149,29 +175,36 @@ const ProductCard = memo(({ product }: { product: Product }) => {
 
             {/* Sale Badge (subtle orange) */}
             {isOnSale && (
-              <div className="absolute left-2 top-2 rounded-full bg-[#f68b1e] px-1.5 py-0.5 text-[10px] font-semibold text-white shadow-sm sm:left-3 sm:top-3 sm:px-2">
+              <motion.div
+                className="absolute left-2 top-2 rounded-full bg-[#f68b1e] px-1.5 py-0.5 text-[10px] font-bold text-white shadow-md sm:left-3 sm:top-3 sm:px-2"
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                transition={{ delay: 0.1 }}
+              >
                 -{discount}%
-              </div>
+              </motion.div>
             )}
           </div>
 
           {/* Details */}
           <div className="p-2 sm:p-3">
-            <div className="space-y-1">
-              <h3 className="line-clamp-2 text-[13px] font-medium leading-tight text-gray-900 sm:text-sm">
+            <div className="space-y-1.5">
+              <h3 className="line-clamp-2 text-[13px] font-semibold leading-tight text-gray-900 sm:text-sm group-hover:text-cherry-900 transition-colors">
                 {product.name}
               </h3>
-              <div className="text-[13px] font-semibold text-gray-900 sm:text-sm">
-                {"KSh " +
-                  (
+              <div className="flex items-baseline gap-1.5">
+                <div className="text-[13px] font-bold text-cherry-700 sm:text-sm">
+                  KSh{" "}
+                  {(
                     (typeof product.sale_price === "number" ? product.sale_price : product.price) as number
                   ).toLocaleString()}
-              </div>
-              {isOnSale && (
-                <div className="text-[11px] text-gray-500 line-through sm:text-xs">
-                  KSh {product.price.toLocaleString()}
                 </div>
-              )}
+                {isOnSale && (
+                  <div className="text-[10px] text-gray-400 line-through sm:text-xs">
+                    {product.price.toLocaleString()}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* Colors */}
@@ -183,7 +216,7 @@ const ProductCard = memo(({ product }: { product: Product }) => {
                     initial={{ scale: 0 }}
                     animate={{ scale: 1 }}
                     transition={{ delay: 0.04 + idx * 0.04, duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
-                    className="h-2.5 w-2.5 rounded-full border border-gray-200 shadow-sm sm:h-3 sm:w-3"
+                    className="h-2.5 w-2.5 rounded-full border border-gray-200 shadow-sm ring-1 ring-gray-100 sm:h-3 sm:w-3 hover:ring-2 hover:ring-cherry-300 transition-all"
                     style={{ backgroundColor: color.toLowerCase() }}
                     aria-label={`Color ${color}`}
                     title={color}
@@ -194,7 +227,7 @@ const ProductCard = memo(({ product }: { product: Product }) => {
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 0.18, duration: 0.2 }}
-                    className="self-center text-[10px] text-gray-500"
+                    className="self-center text-[10px] font-medium text-gray-500"
                   >
                     +{additionalColors}
                   </motion.span>
@@ -204,19 +237,28 @@ const ProductCard = memo(({ product }: { product: Product }) => {
 
             {/* Availability */}
             {(product.stock ?? 0) > 0 && (
-              <div className="mt-2 flex items-center">
-                <div className="mr-1.5 h-1.5 w-1.5 rounded-full bg-green-500" />
-                <span className="text-[10px] text-gray-500">Available</span>
-              </div>
+              <motion.div
+                className="mt-2 flex items-center"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.2 }}
+              >
+                <motion.div
+                  className="mr-1.5 h-2 w-2 rounded-full bg-green-500 shadow-sm"
+                  animate={{ scale: [1, 1.2, 1] }}
+                  transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY }}
+                />
+                <span className="text-[10px] text-gray-600 font-medium">In Stock</span>
+              </motion.div>
             )}
             {(product.stock ?? 0) === 0 && (
               <div className="mt-2 flex items-center">
-                <div className="mr-1.5 h-1.5 w-1.5 rounded-full bg-gray-300" />
-                <span className="text-[10px] text-gray-500">Out of stock</span>
+                <div className="mr-1.5 h-2 w-2 rounded-full bg-gray-300" />
+                <span className="text-[10px] text-gray-400">Out of stock</span>
               </div>
             )}
           </div>
-        </div>
+        </motion.div>
       </Link>
     </motion.div>
   )

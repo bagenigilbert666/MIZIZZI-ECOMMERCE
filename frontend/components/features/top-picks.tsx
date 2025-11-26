@@ -6,27 +6,30 @@ import { motion, AnimatePresence, type PanInfo } from "framer-motion"
 import Link from "next/link"
 import { ChevronRight, ChevronLeft, Star } from "lucide-react"
 import Image from "next/image"
-import type { Product } from "@/types"
+import type { Product as BaseProduct } from "@/types"
 import { productService } from "@/services/product"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useRouter } from "next/navigation"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { cloudinaryService } from "@/services/cloudinary-service"
 
+type Product = BaseProduct & { color_options?: string[]; stock?: number }
+
 const LogoPlaceholder = () => (
-  <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#f5f5f7] to-[#e5e5e8]">
+  <div className="absolute inset-0 flex items-center justify-center bg-white">
     <motion.div
-      animate={{
-        scale: [1, 1.1, 1],
-        opacity: [0.5, 0.8, 0.5],
-      }}
-      transition={{
-        duration: 1.5,
-        repeat: Number.POSITIVE_INFINITY,
-        ease: "easeInOut",
-      }}
-      className="relative h-16 w-16 sm:h-20 sm:w-20 rounded-full bg-white/40 backdrop-blur-sm"
-    />
+      initial={{ scale: 0.9, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      className="relative h-12 w-12 sm:h-16 sm:w-16"
+    >
+      <Image
+        src="/images/screenshot-20from-202025-02-18-2013-30-22.png"
+        alt="Loading"
+        fill
+        className="object-contain"
+      />
+    </motion.div>
   </div>
 )
 
