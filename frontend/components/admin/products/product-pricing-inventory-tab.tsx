@@ -1,0 +1,584 @@
+"use client"
+
+import { Card, CardContent, CardFooter } from "@/components/ui/card"
+import { FormField, FormItem, FormLabel, FormControl, FormDescription, FormMessage } from "@/components/ui/form"
+import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
+import { Loader2, DollarSign, Package, Tag, Percent, Save } from "lucide-react"
+import { Button } from "@/components/ui/button"
+import type { UseFormReturn } from "react-hook-form"
+import type { ProductFormValues } from "@/hooks/use-product-form"
+import { useState, useEffect } from "react"
+import { toast } from "@/components/ui/use-toast"
+import { cn } from "@/lib/utils"
+import { inventoryService } from "@/services/inventory-service"
+
+interface ProductPricingInventoryTabProps {
+  form: UseFormReturn<ProductFormValues>
+  saveSectionChanges: (section: string) => Promise<boolean>
+  productId: number
+}
+
+export function ProductPricingInventoryTab({ form, saveSectionChanges, productId }: ProductPricingInventoryTabProps) {
+  const [isSaving, setIsSaving] = useState(false)
+  const [isLoadingInventory, setIsLoadingInventory] = useState(false)
+  const [realInventoryStock, setRealInventoryStock] = useState<number | null>(null)
+  const [autoSaveTimer, setAutoSaveTimer] = useState<NodeJS.Timeout | null>(null)
+  const [lastSaved, setLastSaved] = useState<string | null>(null)
+  const [hasChanges, setHasChanges] = useState(false)
+
+  // Watch for form changes
+  const price = form.watch("price")
+  const sale_price = form.watch("sale_price")
+  const stock = form.watch("stock")
+  const weight = form.watch("weight")
+  const is_featured = form.watch("is_featured")
+  const is_new = form.watch("is_new")
+  const is_flash_sale = form.watch("is_flash_sale")
+  const is_luxury_deal = form.watch("is_luxury_deal")
+  const is_daily_find = form.watch("is_daily_find")
+  const is_top_pick = form.watch("is_top_pick")
+  const is_trending = form.watch("is_trending")
+  const is_new_arrival = form.watch("is_new_arrival")
+
+  // Fetch real inventory data on mount
+  useEffect(() => {
+    const fetchInventory = async () => {
+      if (!productId) return
+
+      setIsLoadingInventory(true)
+      try {
+        console.log("[v0] Fetching inventory for product:", productId)
+        const inventoryItem = await inventoryService.getProductInventory(productId)
+
+        if (inventoryItem) {
+          const item = Array.isArray(inventoryItem) ? inventoryItem[0] : inventoryItem
+          if (item) {
+            console.log("[v0] Inventory data loaded:", item)
+            setRealInventoryStock(item.stock_level)
+
+            // Optional: Sync form with real inventory if they differ significantly?
+            // For now, we just store it to calculate adjustments later
+            // Or we could auto-update the form:
+            const currentFormStock = form.getValues("stock")
+            if (currentFormStock !== item.stock_level) {
+              console.log("[v0] Syncing form stock with inventory service:", currentFormStock, "->", item.stock_level)
+              form.setValue("stock", item.stock_level, { shouldDirty: false })
+            }
+          }
+        }
+      } catch (error) {
+        console.error("[v0] Error fetching inventory:", error)
+      } finally {
+        setIsLoadingInventory(false)
+      }
+    }
+
+    fetchInventory()
+  }, [productId, form])
+
+  // List of fields that should be mutually exclusive
+  const exclusiveFields: (keyof ProductFormValues)[] = [
+    "is_featured",
+    "is_new",
+    "is_flash_sale",
+    "is_luxury_deal",
+    "is_daily_find",
+    "is_top_pick",
+    "is_trending",
+    "is_new_arrival",
+  ]
+
+  const handleExclusiveChange = (
+    fieldName: keyof ProductFormValues,
+    value: boolean,
+    fieldOnChange: (value: boolean) => void,
+  ) => {
+    // Update the field that was changed
+    fieldOnChange(value)
+    setHasChanges(true)
+
+    // If setting to true, disable all other exclusive fields
+    if (value) {
+      exclusiveFields.forEach((field) => {
+        if (field !== fieldName) {
+          // @ts-ignore - dynamic field access is safe here given the typed array
+          form.setValue(field, false, {
+            shouldDirty: true,
+            shouldTouch: true,
+            shouldValidate: true,
+          })
+        }
+      })
+    }
+  }
+
+  // Handle save button click
+  const handleSave = async () => {
+    if (!hasChanges) {
+      toast({
+        description: "No changes to save",
+      })
+      return
+    }
+
+    setIsSaving(true)
+    try {
+      // 1. Handle Inventory Adjustment if stock changed
+      const currentStock = form.getValues("stock")
+      if (realInventoryStock !== null && currentStock !== realInventoryStock) {
+        const adjustment = currentStock - realInventoryStock
+        if (adjustment !== 0) {
+          console.log("[v0] Stock changed, performing inventory adjustment:", adjustment)
+          try {
+            await inventoryService.adjustInventory(
+              productId,
+              adjustment,
+              undefined, // variantId
+              "Manual update from Product Edit Page",
+            )
+            toast({
+              title: "Inventory Adjusted",
+              description: `Stock ${adjustment > 0 ? "increased" : "decreased"} by ${Math.abs(adjustment)} units.`,
+            })
+            // Update our reference to the new reality
+            setRealInventoryStock(currentStock)
+          } catch (invError) {
+            console.error("[v0] Failed to adjust inventory:", invError)
+            toast({
+              title: "Inventory Warning",
+              description: "Failed to update inventory history, but saving product data...",
+              variant: "destructive",
+            })
+          }
+        }
+      }
+
+      // 2. Save other product fields
+      const success = await saveSectionChanges("Pricing & Inventory")
+      if (success) {
+        setLastSaved(new Date().toLocaleTimeString())
+        setHasChanges(false)
+
+        // Dispatch custom event for product update
+        window.dispatchEvent(
+          new CustomEvent("product-pricing-updated", {
+            detail: { data: form.getValues() },
+          }),
+        )
+      }
+    } catch (error) {
+      console.error("Error saving pricing & inventory:", error)
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  // Set up auto-save functionality
+  useEffect(() => {
+    // Clear any existing timer when form values change
+    if (autoSaveTimer) {
+      clearTimeout(autoSaveTimer)
+    }
+
+    if (hasChanges) {
+      // Set a new timer to auto-save after 30 seconds of inactivity
+      const timer = setTimeout(() => {
+        handleSave()
+      }, 30000)
+
+      setAutoSaveTimer(timer)
+    }
+
+    return () => {
+      if (autoSaveTimer) {
+        clearTimeout(autoSaveTimer)
+      }
+    }
+  }, [
+    price,
+    sale_price,
+    stock,
+    weight,
+    is_featured,
+    is_new,
+    is_flash_sale,
+    is_luxury_deal,
+    is_daily_find,
+    is_top_pick,
+    is_trending,
+    is_new_arrival,
+    hasChanges,
+  ])
+
+  // Clean up timer on unmount
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimer) {
+        clearTimeout(autoSaveTimer)
+      }
+    }
+  }, [])
+
+  // Add a safety check to ensure the form is available before rendering form fields
+  if (!form || !form.control) {
+    return (
+      <Card className="border shadow-sm">
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-center h-40">
+            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <span className="ml-2 text-muted-foreground">Loading form...</span>
+          </div>
+        </CardContent>
+      </Card>
+    )
+  }
+
+  const stockLevel = () => {
+    if (stock > 50) {
+      return "text-green-500"
+    } else if (stock > 10) {
+      return "text-yellow-500"
+    } else {
+      return "text-red-500"
+    }
+  }
+
+  return (
+    <Card className="border shadow-sm bg-white">
+      <CardContent className="pt-6 space-y-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div className="space-y-6">
+            <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Pricing</h3>
+
+            <FormField
+              control={form.control}
+              name="price"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-base font-medium">Regular Price</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <DollarSign className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        className="pl-10 h-11"
+                        {...field}
+                        value={field.value || ""} // Prevent NaN values
+                        onChange={(e) => {
+                          const value = e.target.value === "" ? "" : Number(e.target.value)
+                          if (e.target.value !== "" && Number.isNaN(Number(e.target.value))) return
+                          field.onChange(value)
+                          setHasChanges(true)
+                        }}
+                      />
+                    </div>
+                  </FormControl>
+                  <FormDescription>Regular price of the product</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="sale_price"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-base font-medium">Sale Price</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <Percent className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+                      <Input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        placeholder="0.00"
+                        className="pl-10 h-11"
+                        {...field}
+                        value={field.value === null || field.value === undefined ? "" : field.value} // Prevent NaN values
+                        onChange={(e) => {
+                          const value = e.target.value === "" ? null : Number(e.target.value)
+                          if (e.target.value !== "" && Number.isNaN(Number(e.target.value))) return
+                          field.onChange(value)
+                          setHasChanges(true)
+                        }}
+                      />
+                    </div>
+                  </FormControl>
+                  <FormDescription>Discounted price (leave empty for no discount)</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+
+          <div className="space-y-6">
+            <FormField
+              control={form.control}
+              name="weight"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-base font-medium">Weight (kg)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="0.00"
+                      className="h-11"
+                      {...field}
+                      value={field.value === null || field.value === undefined ? "" : field.value} // Prevent NaN values
+                      onChange={(e) => {
+                        const value = e.target.value === "" ? null : Number(e.target.value)
+                        if (e.target.value !== "" && Number.isNaN(Number(e.target.value))) return
+                        field.onChange(value)
+                        setHasChanges(true)
+                      }}
+                    />
+                  </FormControl>
+                  <FormDescription>Product weight in kilograms</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="sku"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-base font-medium">SKU</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <Tag className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-500" />
+                      <Input
+                        placeholder="SKU123"
+                        className="pl-10 h-11 font-mono text-sm"
+                        {...field}
+                        value={field.value || ""}
+                        onChange={(e) => {
+                          field.onChange(e)
+                          setHasChanges(true)
+                        }}
+                      />
+                    </div>
+                  </FormControl>
+                  <FormDescription>Stock Keeping Unit</FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-6 pt-4">
+          <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Product Status</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <FormField
+              control={form.control}
+              name="is_featured"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm hover:border-orange-200 transition-colors">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">Featured Product</FormLabel>
+                    <FormDescription>Display this product on the featured section</FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={(checked) => {
+                        handleExclusiveChange("is_featured", checked, field.onChange)
+                      }}
+                      className="data-[state=checked]:bg-orange-500"
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="is_new"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm hover:border-orange-200 transition-colors">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">New Product</FormLabel>
+                    <FormDescription>Mark this product as new</FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={(checked) => {
+                        handleExclusiveChange("is_new", checked, field.onChange)
+                      }}
+                      className="data-[state=checked]:bg-orange-500"
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="is_flash_sale"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm hover:border-orange-200 transition-colors">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">Flash Sale</FormLabel>
+                    <FormDescription>Include this product in flash sales</FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={(checked) => {
+                        handleExclusiveChange("is_flash_sale", checked, field.onChange)
+                      }}
+                      className="data-[state=checked]:bg-orange-500"
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="is_luxury_deal"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm hover:border-orange-200 transition-colors">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">Luxury Deal</FormLabel>
+                    <FormDescription>Mark this product as a luxury deal</FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={(checked) => {
+                        handleExclusiveChange("is_luxury_deal", checked, field.onChange)
+                      }}
+                      className="data-[state=checked]:bg-orange-500"
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="is_daily_find"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm hover:border-orange-200 transition-colors">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">Daily Find</FormLabel>
+                    <FormDescription>Mark as a Daily Find (Today Only)</FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={(checked) => {
+                        handleExclusiveChange("is_daily_find", checked, field.onChange)
+                      }}
+                      className="data-[state=checked]:bg-orange-500"
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="is_top_pick"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm hover:border-orange-200 transition-colors">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">Top Pick</FormLabel>
+                    <FormDescription>Mark as a Top Pick</FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={(checked) => {
+                        handleExclusiveChange("is_top_pick", checked, field.onChange)
+                      }}
+                      className="data-[state=checked]:bg-orange-500"
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="is_trending"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm hover:border-orange-200 transition-colors">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">Trending</FormLabel>
+                    <FormDescription>Mark as Trending Now</FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={(checked) => {
+                        handleExclusiveChange("is_trending", checked, field.onChange)
+                      }}
+                      className="data-[state=checked]:bg-orange-500"
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="is_new_arrival"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 shadow-sm hover:border-orange-200 transition-colors">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">New Arrival</FormLabel>
+                    <FormDescription>Manually mark as New Arrival</FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={(checked) => {
+                        handleExclusiveChange("is_new_arrival", checked, field.onChange)
+                      }}
+                      className="data-[state=checked]:bg-orange-500"
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+          </div>
+
+          {lastSaved && <div className="text-sm text-gray-500 mt-2">Last saved: {lastSaved}</div>}
+        </div>
+      </CardContent>
+      <CardFooter className="flex justify-between border-t p-4 bg-gray-50">
+        <div className="text-sm text-gray-500">
+          {hasChanges && !isSaving && "Unsaved changes"}
+          {isSaving && "Saving changes..."}
+        </div>
+        <Button
+          onClick={handleSave}
+          disabled={isSaving || !hasChanges}
+          className={`bg-orange-500 hover:bg-orange-600 ${!hasChanges ? "opacity-70" : ""}`}
+        >
+          {isSaving ? (
+            <>
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Saving...
+            </>
+          ) : (
+            <>
+              <Save className="mr-2 h-4 w-4" /> Save Pricing & Inventory
+            </>
+          )}
+        </Button>
+      </CardFooter>
+    </Card>
+  )
+}
