@@ -146,11 +146,7 @@ export default function ProductDetailsEnhanced({
   const lastAddToCartTime = useRef(0)
   const imageRef = useRef<HTMLDivElement>(null)
   const reviewSectionRef = useRef<HTMLDivElement>(null)
-  // removed reviewFormRef, titleInputRef, commentTextareaRef
-  // const reviewFormRef = useRef<HTMLDivElement>(null)
-  // const titleInputRef = useRef<HTMLInputElement>(null)
-  // const commentTextareaRef = useRef<HTMLTextAreaElement>(null)
-
+ 
   // Contexts
   const { addToCart, items: cartItems } = useCart()
   const { isInWishlist, addToWishlist, removeProductFromWishlist } = useWishlist()
@@ -274,11 +270,7 @@ export default function ProductDetailsEnhanced({
         stock_status,
         last_updated: summary.items?.[0]?.last_updated,
       })
-      // console.log("[v0] Inventory data updated successfully:", {
-      //   available_quantity: available,
-      //   is_in_stock: summary.is_in_stock,
-      //   stock_status,
-      // })
+  
     } catch (error: any) {
       console.error("[v0] Inventory fetch error:", error)
       setInventoryError(error?.message || "Failed to load inventory data")
@@ -574,53 +566,6 @@ export default function ProductDetailsEnhanced({
     }
   }, [fetchReviews, product?.id])
 
-  // Removed handleSubmitReview
-  // const handleSubmitReview = async () => {
-  //   if (!product?.id || !reviewFormData.rating || !reviewFormData.comment.trim()) {
-  //     toast({
-  //       title: "Validation Error",
-  //       description: "Please provide a rating and comment",
-  //       variant: "destructive",
-  //     })
-  //     return
-  //   }
-  //   if (reviewFormData.comment.length < 10) {
-  //     toast({
-  //       title: "Validation Error",
-  //       description: "Comment must be at least 10 characters long",
-  //       variant: "destructive",
-  //     })
-  //     return
-  //   }
-  //   setIsSubmittingReview(true)
-  //   try {
-  //     console.log("[v0] Submitting review:", reviewFormData)
-  //     const reviewData: CreateReviewData = {
-  //       rating: reviewFormData.rating,
-  //       title: reviewFormData.title.trim() || undefined,
-  //       comment: reviewFormData.comment.trim(),
-  //     }
-  //     await reviewService.createReview(Number(product.id), reviewData)
-  //     toast({
-  //       title: "Review Submitted",
-  //       description: "Thank you for your review!",
-  //     })
-  //     setReviewFormData({ rating: 0, title: "", comment: "" })
-  //     setShowReviewForm(false)
-  //     setCanUserReview(false)
-  //     await fetchReviews()
-  //   } catch (error: any) {
-  //     console.error("[v0] Error submitting review:", error)
-  //     toast({
-  //       title: "Error",
-  //       description: error?.message || "Failed to submit review",
-  //       variant: "destructive",
-  //     })
-  //   } finally {
-  //     setIsSubmittingReview(false)
-  //   }
-  // }
-
   const handleMarkHelpful = useCallback(
     async (reviewId: number) => {
       // Prevent double-clicking during animation
@@ -682,52 +627,6 @@ export default function ProductDetailsEnhanced({
     console.warn(
       "[v0] handleLikeReview is called but logic is not fully defined or might be redundant with handleMarkHelpful.",
     )
-
-    // Optimistic UI update
-    // setLikedReviews((prev) => {
-    //   const newSet = new Set(prev)
-    //   if (newSet.has(reviewId)) {
-    //     // If already liked, remove and potentially trigger unlike animation
-    //     newSet.delete(reviewId)
-    //   } else {
-    //     // If not liked, add and trigger like animation
-    //     newSet.add(reviewId)
-    //     setAnimatingReviews((prevAnimating) => new Set(prevAnimating).add(reviewId))
-    //     setTimeout(() => {
-    //       setAnimatingReviews((prevAnimating) => {
-    //         const updatedSet = new Set(prevAnimating)
-    //         updatedSet.delete(reviewId)
-    //         return updatedSet
-    //       })
-    //     }, 500) // Animation duration
-    //   }
-    //   return newSet
-    // })
-
-    // try {
-    //   // Use markReviewHelpful for liking, assuming it's the intended API endpoint
-    //   await reviewService.markReviewHelpful(reviewId)
-    //   await fetchReviews() // Re-fetch to get updated like counts
-    // } catch (error: any) {
-    //   console.error("[v0] Error liking review:", error)
-    //   toast({
-    //     title: "Error",
-    //     description: error?.message || "Failed to like review",
-    //     variant: "destructive",
-    //   })
-    //   // Revert optimistic update on error
-    //   setLikedReviews((prev) => {
-    //     const newSet = new Set(prev)
-    //     newSet.delete(reviewId)
-    //     return newSet
-    //   })
-    //   setAnimatingReviews((prevAnimating) => {
-    //     const updatedSet = new Set(prevAnimating)
-    //     updatedSet.delete(reviewId)
-    //     return updatedSet
-    //   })
-    // }
-  }
 
   const handleAddToCart = async (): Promise<boolean> => {
     if (!inventoryData?.is_in_stock) {

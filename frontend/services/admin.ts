@@ -953,9 +953,8 @@ export const adminService = {
 
         // Notify about product deletion
         try {
-          const ps: any = productService as any
-          if (ps && typeof ps.notifyProductUpdate === "function") {
-            ps.notifyProductUpdate(id)
+          if (typeof productService !== "undefined" && typeof productService.notifyProductUpdate === "function") {
+            productService.notifyProductUpdate(id)
           }
         } catch (notifyError) {
           console.warn("Failed to notify about product deletion:", notifyError)
@@ -1038,10 +1037,7 @@ export const adminService = {
         // Notify about new product
         if (responseData && responseData.id) {
           try {
-            const ps: any = productService as any
-            if (ps && typeof ps.notifyProductUpdate === "function") {
-              ps.notifyProductUpdate(responseData.id.toString())
-            }
+            productService.notifyProductUpdate(responseData.id.toString())
           } catch (notifyError) {
             console.warn("Failed to notify about new product:", notifyError)
           }
