@@ -22,17 +22,17 @@ from sqlalchemy import or_, desc, func, and_, text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 # Extensions
-from ...configuration.extensions import db, ma
+from app.configuration.extensions import db, ma
 
 # Models
-from ...models.models import Category, Product, User, UserRole
+from app.models.models import Category, Product, User, UserRole
 
 # Schemas
-from ...schemas.schemas import category_schema, categories_schema
+from app.schemas.schemas import category_schema, categories_schema
 
 # Validations & Decorators
-from ...validations.validation import admin_required
-from ...websocket import broadcast_to_all
+from app.validations.validation import admin_required
+from app.websocket import broadcast_to_all
 
 # Setup logger
 logger = logging.getLogger(__name__)

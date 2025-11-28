@@ -13,11 +13,11 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import joinedload
 from marshmallow import ValidationError
 
-from ...models.models import (
+from app.models.models import (
     Cart, CartItem, User, Product, ProductVariant, Coupon,
     ShippingMethod, PaymentMethod, Address, db, CouponType, UserRole
 )
-from ...schemas.cart_schema import cart_schema, cart_item_schema, cart_items_schema
+from app.schemas.cart_schema import cart_schema, cart_item_schema, cart_items_schema
 
 # Set up logger
 logger = logging.getLogger(__name__)

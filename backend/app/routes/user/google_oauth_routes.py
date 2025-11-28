@@ -11,8 +11,8 @@ from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from flask_jwt_extended import create_access_token, create_refresh_token, set_access_cookies, set_refresh_cookies
 from flask_jwt_extended import get_csrf_token
-from ...models.models import User
-from ...configuration.extensions import db
+from app.models.models import User
+from app.configuration.extensions import db
 
 # Create blueprint
 google_oauth_routes = Blueprint('google_oauth', __name__, url_prefix='/api')

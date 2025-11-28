@@ -30,7 +30,7 @@ from sqlalchemy.exc import IntegrityError
 
 # Database & ORM
 from sqlalchemy import or_, desc, func
-from ...configuration.extensions import db, ma, mail, cache, cors
+from app.configuration.extensions import db, ma, mail, cache, cors
 
 # JWT
 import jwt
@@ -43,7 +43,7 @@ from google.auth.transport import requests as google_requests
 import requests
 
 # Models
-from ...models.models import (
+from app.models.models import (
     User, UserRole, Category, Product, ProductVariant, Brand, Review,
     CartItem, Order, OrderItem, WishlistItem, Coupon, Payment,
     OrderStatus, PaymentStatus, Newsletter, CouponType, Address, AddressType,
@@ -51,7 +51,7 @@ from ...models.models import (
 )
 
 # Schemas
-from ...schemas.schemas import (
+from app.schemas.schemas import (
     user_schema, users_schema, category_schema, categories_schema,
     product_schema, products_schema, brand_schema, brands_schema,
     review_schema, reviews_schema, cart_item_schema, cart_items_schema,
@@ -63,7 +63,7 @@ from ...schemas.schemas import (
 )
 
 # Validations & Decorators
-from ...validations.validation import (
+from app.validations.validation import (
     validate_user_registration, validate_user_login, validate_user_update,
     validate_address_creation, validate_address_update,
     validate_product_creation, validate_product_update,

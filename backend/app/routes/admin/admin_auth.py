@@ -38,7 +38,7 @@ from sqlalchemy.exc import IntegrityError
 
 # Database & ORM
 from sqlalchemy import or_, desc, func
-from ...configuration.extensions import db, ma, mail, cache, cors, limiter
+from app.configuration.extensions import db, ma, mail, cache, cors, limiter
 
 # JWT
 import jwt
@@ -47,7 +47,7 @@ import jwt
 import requests
 
 # Models
-from ...models.models import (
+from app.models.models import (
     User, UserRole, Category, Product, ProductVariant, Brand, Review,
     CartItem, Order, OrderItem, WishlistItem, Coupon, Payment,
     OrderStatus, PaymentStatus, Newsletter, CouponType, Address, AddressType,
@@ -55,7 +55,7 @@ from ...models.models import (
 )
 
 # Schemas
-from ...schemas.schemas import (
+from app.schemas.schemas import (
     user_schema, users_schema, category_schema, categories_schema,
     product_schema, products_schema, brand_schema, brands_schema,
     review_schema, reviews_schema, cart_item_schema, cart_items_schema,
@@ -67,7 +67,7 @@ from ...schemas.schemas import (
 )
 
 # Validations & Decorators
-from ...validations.validation import admin_required
+from app.validations.validation import admin_required
 
 # Setup logger
 logger = logging.getLogger(__name__)
