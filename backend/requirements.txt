@@ -149,8 +149,7 @@ proto-plus
 protobuf
 psutil
 psycopg
-psycopg
-psycopg-binary
+psycopg2-binary
 py
 py-cpuinfo
 pyasn1
