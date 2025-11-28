@@ -58,12 +58,72 @@ import werkzeug.utils
 from pathlib import Path
 from functools import wraps
 
+# new imports for robust dynamic importing and introspection
+import importlib
+import importlib.util
+import inspect
+import traceback
+
 # Setup logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s | %(levelname)s | %(name)s | %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+def safe_import_attr(module_path, attr_name, logger=None):
+    """
+    Safely import an attribute from a module path.
+    
+    Args:
+        module_path: Full module path (e.g., 'app.routes.admin.admin_auth')
+        attr_name: Attribute name to import (e.g., 'admin_auth_routes')
+        logger: Optional logger instance
+    
+    Returns:
+        The imported attribute or None if import fails
+    """
+    try:
+        module = importlib.import_module(module_path)
+        if hasattr(module, attr_name):
+            return getattr(module, attr_name)
+        else:
+            if logger:
+                logger.debug(f"Attribute {attr_name} not found in {module_path}")
+            return None
+    except Exception as e:
+        if logger:
+            logger.debug(f"Failed to import {attr_name} from {module_path}: {str(e)}")
+        return None
+
+def call_init_function(func, app, logger=None):
+    """
+    Safely call an initialization function with appropriate arguments.
+    
+    Args:
+        func: The function to call
+        app: Flask application instance
+        logger: Optional logger instance
+    
+    Returns:
+        True if successful, False otherwise
+    """
+    try:
+        sig = inspect.signature(func)
+        params = list(sig.parameters.keys())
+        
+        if len(params) == 0:
+            func()
+        elif len(params) == 1:
+            func(app)
+        else:
+            func(app)
+        
+        return True
+    except Exception as e:
+        if logger:
+            logger.error(f"Error calling initialization function {func.__name__}: {str(e)}")
+        return False
 
 def setup_app_environment():
     """Setup the app environment and paths."""
@@ -309,26 +369,25 @@ def create_app(config_name=None, enable_socketio=True):
             if file.filename == '':
                 return jsonify({"error": "No selected file"}), 400
             
-            # Read file to check size before seeking
+            # Preserve original filename before reading file bytes
+            original_filename = werkzeug.utils.secure_filename(file.filename)
+            
+            # Read file bytes and validate size
             file_content = file.read()
             if len(file_content) > 5 * 1024 * 1024:
                 return jsonify({"error": "File too large (max 5MB)"}), 400
             
-            # Re-create file-like object from content for subsequent operations
-            from io import BytesIO
-            file = BytesIO(file_content)
-            
             allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
-            if not ('.' in file.filename and file.filename.rsplit('.', 1)[1].lower() in allowed_extensions):
+            if not ('.' in original_filename and original_filename.rsplit('.', 1)[1].lower() in allowed_extensions):
                 return jsonify({"error": "File type not allowed. Only images are permitted."}), 400
             
-            original_filename = werkzeug.utils.secure_filename(file.filename)
             file_extension = original_filename.rsplit('.', 1)[1].lower() if '.' in original_filename else ''
             unique_filename = f"{uuid.uuid4().hex}.{file_extension}"
             
             file_path = os.path.join(product_images_dir, unique_filename)
-            file.seek(0) # Reset stream position for saving
-            file.save(file_path)
+            # Write bytes directly to disk
+            with open(file_path, 'wb') as out_f:
+                out_f.write(file_content)
             
             current_user_id = get_jwt_identity()
             app.logger.info(f"User {current_user_id} uploaded image: {unique_filename}")
@@ -348,6 +407,7 @@ def create_app(config_name=None, enable_socketio=True):
             
         except Exception as e:
             app.logger.error(f"Error uploading image: {str(e)}")
+            app.logger.debug(traceback.format_exc())
             return jsonify({"error": f"Failed to upload image: {str(e)}"}), 500
     
     @app.route('/api/uploads/product_images/<filename>', methods=['GET'])
@@ -800,7 +860,7 @@ def create_app(config_name=None, enable_socketio=True):
         ],
     }
     
-    # Import blueprints with clean logging
+    # Import blueprints with clean logging (replace direct __import__ usage)
     imported_blueprints = {}
     
     for blueprint_name, import_attempts in blueprint_imports.items():
@@ -815,42 +875,40 @@ def create_app(config_name=None, enable_socketio=True):
             
             try:
                 app.logger.debug(f"Attempting to import {attr_name} from {module_path}")
-                module = __import__(module_path, fromlist=[attr_name])
+                obj = safe_import_attr(module_path, attr_name, app.logger)
                 
-                if not hasattr(module, attr_name):
-                    app.logger.debug(f"Module {module_path} does not have attribute {attr_name}")
+                if obj is None:
+                    app.logger.debug(f"Could not locate attribute {attr_name} in {module_path}")
                     continue
                 
-                blueprint = getattr(module, attr_name)
+                blueprint = obj
                 
+                # ensure it's a Blueprint-like object (has 'name' attr)
                 if not hasattr(blueprint, 'name'):
-                    app.logger.debug(f"Object {attr_name} from {module_path} is not a Blueprint")
+                    app.logger.debug(f"Object {attr_name} from {module_path} is not a Blueprint-like object")
                     continue
                 
                 imported_blueprints[blueprint_name] = blueprint
                 app.logger.info(f"✅ Imported {blueprint_name} from {module_path}")
                 break
                 
-            except (ImportError, AttributeError, ValueError) as e:
+            except Exception as e:
                 app.logger.debug(f"Failed to import {attr_name} from {module_path}: {str(e)}")
                 continue
-            except Exception as e:
-                app.logger.warning(f"Unexpected error importing {attr_name} from {module_path}: {str(e)}")
-                continue
-    
-    # Import admin shop categories routes
+
+    # Import admin shop categories routes (use safe_import_attr)
     try:
-        from app.routes.admin.admin_categories_routes import admin_categories_bp
-        imported_blueprints['admin_shop_categories_routes'] = admin_categories_bp
-        app.logger.info("✅ admin_categories_routes → /api/admin/shop-categories")
-    except ImportError as e:
-        try:
-            from routes.admin.admin_categories_routes import admin_categories_bp
+        admin_categories_bp = safe_import_attr('app.routes.admin.admin_categories_routes', 'admin_categories_bp', app.logger)
+        if admin_categories_bp is None:
+            admin_categories_bp = safe_import_attr('routes.admin.admin_categories_routes', 'admin_categories_bp', app.logger)
+        if admin_categories_bp is not None:
             imported_blueprints['admin_shop_categories_routes'] = admin_categories_bp
             app.logger.info("✅ admin_categories_routes → /api/admin/shop-categories")
-        except ImportError:
-            app.logger.debug(f"Admin shop categories routes import failed: {e}")
-    
+        else:
+            app.logger.debug("Admin shop categories routes import failed: module not found")
+    except Exception as e:
+        app.logger.debug(f"Admin shop categories import unexpected error: {e}")
+
     # Use imported blueprints or fallbacks
     final_blueprints = {}
     for blueprint_name in fallback_blueprints:
@@ -1100,7 +1158,7 @@ def create_app(config_name=None, enable_socketio=True):
             app.logger.info("🔔 NOTIFICATION SYSTEM ENDPOINTS")
             app.logger.info("-" * 30)
             app.logger.info("User Notifications: /api/notifications")
-            app.logger.info(f"Notification System: {'✅' if 'notification_routes' in imported_blueprints else '⚠️'}")
+            app.logger.info(f"Notification System: {'✅' if 'notification_routes' in imported_blueprints else '❌'}")
             
             # Carousel System Endpoints
             app.logger.info("🎠 CAROUSEL SYSTEM ENDPOINTS")
@@ -1245,54 +1303,87 @@ def create_app(config_name=None, enable_socketio=True):
         with app.app_context():
             db.create_all()
             
+            # admin_auth
             try:
-                from .routes.admin.admin_auth import init_admin_auth_tables
-                init_admin_auth_tables()
-                app.logger.info("Admin authentication tables initialized successfully")
-            except ImportError:
+                f = None
                 try:
-                    from routes.admin.admin_auth import init_admin_auth_tables
-                    init_admin_auth_tables()
+                    from .routes.admin.admin_auth import init_admin_auth_tables as _f
+                    f = _f
+                except ImportError:
+                    try:
+                        from routes.admin.admin_auth import init_admin_auth_tables as _f
+                        f = _f
+                    except ImportError:
+                        f = None
+                if f:
+                    call_init_function(f, app, app.logger)
                     app.logger.info("Admin authentication tables initialized successfully")
-                except ImportError:
+                else:
                     app.logger.warning("Admin authentication tables initialization skipped - module not found")
-            
+            except Exception as e:
+                app.logger.warning(f"Admin auth init error: {e}")
+
+            # admin_google_auth
             try:
-                from .routes.admin.admin_google_auth import init_admin_google_auth_tables
-                init_admin_google_auth_tables()
-                app.logger.info("Admin Google authentication tables initialized successfully")
-            except ImportError:
+                f = None
                 try:
-                    from routes.admin.admin_google_auth import init_admin_google_auth_tables
-                    init_admin_google_auth_tables()
+                    from .routes.admin.admin_google_auth import init_admin_google_auth_tables as _f
+                    f = _f
+                except ImportError:
+                    try:
+                        from routes.admin.admin_google_auth import init_admin_google_auth_tables as _f
+                        f = _f
+                    except ImportError:
+                        f = None
+                if f:
+                    call_init_function(f, app, app.logger)
                     app.logger.info("Admin Google authentication tables initialized successfully")
-                except ImportError:
+                else:
                     app.logger.warning("Admin Google authentication tables initialization skipped - module not found")
+            except Exception as e:
+                app.logger.warning(f"Admin google auth init error: {e}")
 
+            # admin_email
             try:
-                from .routes.admin.admin_email_routes import init_admin_email_tables
-                init_admin_email_tables()
-                app.logger.info("Admin email tables initialized successfully")
-            except ImportError:
+                f = None
                 try:
-                    from routes.admin.admin_email_routes import init_admin_email_tables
-                    init_admin_email_tables()
+                    from .routes.admin.admin_email_routes import init_admin_email_tables as _f
+                    f = _f
+                except ImportError:
+                    try:
+                        from routes.admin.admin_email_routes import init_admin_email_tables as _f
+                        f = _f
+                    except ImportError:
+                        f = None
+                if f:
+                    call_init_function(f, app, app.logger)
                     app.logger.info("Admin email tables initialized successfully")
-                except ImportError:
+                else:
                     app.logger.warning("Admin email tables initialization skipped - module not found")
+            except Exception as e:
+                app.logger.warning(f"Admin email init error: {e}")
 
+            # footer
             try:
-                from .routes.footer.footer_routes import init_footer_tables
-                init_footer_tables()
-                app.logger.info("Footer tables initialized successfully")
-            except ImportError:
+                f = None
                 try:
-                    from routes.footer.footer_routes import init_footer_tables
-                    init_footer_tables()
-                    app.logger.info("Footer tables initialized successfully")
+                    from .routes.footer.footer_routes import init_footer_tables as _f
+                    f = _f
                 except ImportError:
+                    try:
+                        from routes.footer.footer_routes import init_footer_tables as _f
+                        f = _f
+                    except ImportError:
+                        f = None
+                if f:
+                    call_init_function(f, app, app.logger)
+                    app.logger.info("Footer tables initialized successfully")
+                else:
                     app.logger.warning("Footer tables initialization skipped - module not found")
+            except Exception as e:
+                app.logger.warning(f"Footer init error: {e}")
 
+            # side panel model
             try:
                 from .models.side_panel_model import SidePanel
                 app.logger.info("Side panel model imported successfully")
@@ -1303,36 +1394,67 @@ def create_app(config_name=None, enable_socketio=True):
                 except ImportError:
                     app.logger.warning("Side panel model not found - side panel system will not be available")
 
+            # contact_cta
             try:
-                from .routes.contact_cta.contact_cta_routes import init_contact_cta_tables
-                init_contact_cta_tables()
-                app.logger.info("Contact CTA tables initialized successfully")
-            except ImportError:
+                f = None
                 try:
-                    from routes.contact_cta.contact_cta_routes import init_contact_cta_tables
-                    init_contact_cta_tables()
-                    app.logger.info("Contact CTA tables initialized successfully")
+                    from .routes.contact_cta.contact_cta_routes import init_contact_cta_tables as _f
+                    f = _f
                 except ImportError:
+                    try:
+                        from routes.contact_cta.contact_cta_routes import init_contact_cta_tables as _f
+                        f = _f
+                    except ImportError:
+                        f = None
+                if f:
+                    call_init_function(f, app, app.logger)
+                    app.logger.info("Contact CTA tables initialized successfully")
+                else:
                     app.logger.warning("Contact CTA tables initialization skipped - module not found")
+            except Exception as e:
+                app.logger.warning(f"Contact CTA init error: {e}")
 
+            # featured routes
             try:
-                from .routes.products.featured_routes import init_featured_routes_tables
-                init_featured_routes_tables()
-                app.logger.info("Featured routes tables initialized successfully")
-            except ImportError:
-                app.logger.warning("Featured routes tables initialization skipped - module not found")
+                f = None
+                try:
+                    from .routes.products.featured_routes import init_featured_routes_tables as _f
+                    f = _f
+                except ImportError:
+                    f = None
+                if f:
+                    call_init_function(f, app, app.logger)
+                    app.logger.info("Featured routes tables initialized successfully")
+                else:
+                    app.logger.warning("Featured routes tables initialization skipped - module not found")
+            except Exception as e:
+                app.logger.warning(f"Featured init error: {e}")
                 
+            # meilisearch
             try:
-                from .routes.meilisearch.meilisearch_routes import init_meilisearch_tables
-                init_meilisearch_tables()
-                app.logger.info("Meilisearch tables initialized successfully")
-            except ImportError:
-                app.logger.warning("Meilisearch tables initialization skipped - module not found")
+                f = None
+                try:
+                    from .routes.meilisearch.meilisearch_routes import init_meilisearch_tables as _f
+                    f = _f
+                except ImportError:
+                    try:
+                        from routes.meilisearch.meilisearch_routes import init_meilisearch_tables as _f
+                        f = _f
+                    except ImportError:
+                        f = None
+                if f:
+                    call_init_function(f, app, app.logger)
+                    app.logger.info("Meilisearch tables initialized successfully")
+                else:
+                    app.logger.warning("Meilisearch tables initialization skipped - module not found")
+            except Exception as e:
+                app.logger.warning(f"Meilisearch init error: {e}")
 
             app.logger.info("Database tables created successfully")
     except Exception as e:
         app.logger.error(f"Error creating database tables: {str(e)}")
-    
+        app.logger.debug(traceback.format_exc())
+
     # Set up order completion hooks
     try:
         order_completion_handler = None
