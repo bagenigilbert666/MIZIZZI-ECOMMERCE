@@ -1,0 +1,35 @@
+# Docker Compose for FREE Self-Hosted Meilisearch
+# 
+# Usage:
+#   docker-compose -f docker-compose.meilisearch.yml up -d
+#
+# Or run directly with Docker:
+#   docker run -it --rm -p 7700:7700 -v meili_data:/meili_data getmeili/meilisearch:v1.10
+
+version: '3.8'
+
+services:
+  meilisearch:
+    image: getmeili/meilisearch:v1.10
+    container_name: meilisearch
+    ports:
+      - "7700:7700"
+    volumes:
+      - meili_data:/meili_data
+    environment:
+      # No master key = development mode (no authentication required)
+      # For production, uncomment and set a secure key:
+      # - MEILI_MASTER_KEY=your_secure_master_key_here
+      - MEILI_ENV=development
+      - MEILI_DB_PATH=/meili_data
+      - MEILI_LOG_LEVEL=INFO
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7700/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  meili_data:
+    driver: local

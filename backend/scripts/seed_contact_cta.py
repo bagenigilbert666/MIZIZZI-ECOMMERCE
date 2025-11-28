@@ -4,8 +4,11 @@ import logging
 from sqlalchemy import inspect, text
 from sqlalchemy.exc import ProgrammingError, SQLAlchemyError
 
-# Add the current directory to the Python path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Ensure the backend package directory is on sys.path so "import app" works.
+# scripts/ is inside backend/, so parent(dirname) is the backend directory.
+project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # .../backend
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 from app import create_app
 from app.configuration.extensions import db

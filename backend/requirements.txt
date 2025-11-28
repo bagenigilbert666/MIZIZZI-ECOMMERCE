@@ -192,7 +192,6 @@ pluggy
 numpy
 pandas
 nltk
-fuzzywuzzy
 Pillow
 pytz
 
@@ -201,8 +200,5 @@ pytz
 # --------------------------------------
 cloudinary
 
-# Optional ML / heavy packages (install separately):
-scikit-learn
-sentence-transformers
-faiss-cpu
-python-Levenshtein
+# Meilisearch dependencies for scripts
+meilisearch

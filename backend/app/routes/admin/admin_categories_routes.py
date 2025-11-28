@@ -1,5 +1,6 @@
 """
 Admin routes for managing categories including CRUD operations and image uploads.
+This file mirrors backend/routes/admin/admin_categories_routes.py for import compatibility.
 """
 from flask import Blueprint, request, jsonify, current_app, send_file
 from functools import wraps

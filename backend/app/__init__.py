@@ -8,8 +8,51 @@ import logging
 from datetime import datetime, timezone, timedelta
 from flask import Flask, jsonify, request, send_from_directory, g
 from flask_migrate import Migrate
-from flask_cors import CORS
-from flask_jwt_extended import JWTManager, get_jwt_identity, create_access_token, jwt_required, verify_jwt_in_request
+
+# Guard optional imports so scripts can run without an activated venv
+try:
+    from flask_cors import CORS as _CORS
+except Exception:
+    _CORS = None
+    def CORS(app=None, **kwargs):  # minimal no-op fallback
+        return None
+else:
+    CORS = _CORS
+
+try:
+    from flask_jwt_extended import (
+        JWTManager as _JWTManager,
+        get_jwt_identity,
+        create_access_token,
+        jwt_required,
+        verify_jwt_in_request
+    )
+except Exception:
+    # Provide lightweight fallbacks so create_app() can be called in environments
+    # where flask_jwt_extended isn't installed (e.g., running simple seed scripts).
+    class _JWTManager:
+        def __init__(self, app=None):
+            # no-op initializer
+            pass
+
+    def get_jwt_identity():
+        return None
+
+    def create_access_token(*args, **kwargs):
+        raise RuntimeError("flask_jwt_extended not installed")
+
+    def jwt_required(*args, **kwargs):
+        def decorator(fn):
+            return fn
+        return decorator
+
+    def verify_jwt_in_request(*args, **kwargs):
+        return None
+
+    JWTManager = _JWTManager
+else:
+    JWTManager = _JWTManager
+
 import uuid
 import werkzeug.utils
 from pathlib import Path
@@ -38,95 +81,6 @@ def setup_app_environment():
     logger.info(f"app directory: {app_dir}")
     logger.info(f"Python path updated with app paths")
     return app_dir
-
-def initialize_search_system():
-    """Initialize the search system with existing products."""
-    try:
-        from routes.search.embedding_service import get_embedding_service
-        from routes.search.search_service import get_search_service
-        from app.models.models import Product
-        from app.configuration.extensions import db
-        from app import create_app
-        
-        logger.info("Initializing search system with existing products...")
-        
-        # Create app context for database operations
-        app = create_app()
-        with app.app_context():
-            # Get embedding service
-            embedding_service = get_embedding_service()
-            if not embedding_service or not embedding_service.is_available():
-                logger.warning("Embedding service not available, skipping product indexing")
-                return False
-            
-            # Check if index is empty
-            stats = embedding_service.get_index_stats()
-            if stats.get('total_products', 0) > 0:
-                logger.info(f"Search index already contains {stats['total_products']} products")
-                return True
-            
-            # Get all active products
-            products = Product.query.filter_by(is_active=True).all()
-            if not products:
-                logger.warning("No active products found in database")
-                return False
-            
-            logger.info(f"Found {len(products)} active products, building search index...")
-            
-            # Convert products to dictionaries
-            product_dicts = []
-            for product in products:
-                try:
-                    product_dict = product.to_dict()
-                    # Add related data
-                    if product.category:
-                        product_dict['category'] = product.category.to_dict()
-                    if product.brand:
-                        product_dict['brand'] = product.brand.to_dict()
-                    product_dicts.append(product_dict)
-                except Exception as e:
-                    logger.error(f"Error processing product {product.id}: {str(e)}")
-                    continue
-            
-            # Build the index
-            success = embedding_service.rebuild_index(product_dicts)
-            if success:
-                final_stats = embedding_service.get_index_stats()
-                logger.info(f"✅ Search index built successfully with {final_stats.get('total_products', 0)} products")
-                return True
-            else:
-                logger.error("❌ Failed to build search index")
-                return False
-                
-    except Exception as e:
-        logger.error(f"Error initializing search system: {str(e)}")
-        return False
-
-def check_and_setup_search_index():
-    """Check if search index needs to be set up and do it if necessary."""
-    try:
-        # Import after environment setup
-        from routes.search.embedding_service import get_embedding_service
-        
-        embedding_service = get_embedding_service()
-        if not embedding_service or not embedding_service.is_available():
-            logger.warning("Search system not available - missing dependencies or configuration")
-            return False
-        
-        # Check index stats
-        stats = embedding_service.get_index_stats()
-        total_products = stats.get('total_products', 0)
-        
-        if total_products == 0:
-            logger.info("Search index is empty, attempting to populate...")
-            return initialize_search_system()
-        else:
-            logger.info(f"Search index contains {total_products} products")
-            return True
-            
-    except Exception as e:
-        logger.error(f"Error checking search index: {str(e)}")
-        return False
 
 # Setup environment when module is imported
 setup_app_environment()
@@ -207,32 +161,26 @@ def create_app(config_name=None, enable_socketio=True):
     limiter.init_app(app)
 
     # Disable strict slashes to avoid Flask redirecting requests which breaks CORS preflight
-    # When Flask issues a 301/308 redirect for a trailing slash mismatch, browsers reject
-    # the preflight (OPTIONS) request. Turning strict_slashes off reduces these redirects.
     try:
         app.url_map.strict_slashes = False
     except Exception:
-        # Older Werkzeug versions may not allow direct assignment; ignore safely
         pass
     
     if enable_socketio:
         try:
-            # Get CORS origins from config
             cors_origins = app.config.get('CORS_ORIGINS', ['http://localhost:3000', 'http://127.0.0.1:3000'])
             
-            # Initialize SocketIO with the app
             socketio.init_app(
                 app,
-                cors_allowed_origins=['http://localhost:3000', 'http://127.0.0.1:3000', 'http://192.168.0.118:3000'],  # Added 192.168.0.118:3000 to allowed origins
-                async_mode='threading',  # Use threading for better compatibility
+                cors_allowed_origins=['http://localhost:3000', 'http://127.0.0.1:3000', 'http://192.168.0.118:3000'],
+                async_mode='threading',
                 logger=True,
-                engineio_logger=False,  # Reduce log noise
+                engineio_logger=False,
                 ping_timeout=60,
                 ping_interval=25,
-                manage_session=False  # Let Flask handle sessions
+                manage_session=False
             )
             
-            # Attach socketio to app for easy access
             app.socketio = socketio
             
             app.logger.info("✅ SocketIO enabled and initialized successfully")
@@ -250,27 +198,23 @@ def create_app(config_name=None, enable_socketio=True):
     # Set up database migrations
     Migrate(app, db)
     
-    # Configure CORS properly - SINGLE CONFIGURATION ONLY
+    # Configure CORS properly
     CORS(
         app,
-        origins=['http://localhost:3000', 'http://127.0.0.1:3000'],  # Include both localhost variants
+        origins=['http://localhost:3000', 'http://127.0.0.1:3000'],
         supports_credentials=True,
         allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Cache-Control", "cache-control", "Pragma", "Expires", "X-MFA-Token", "Accept", "Origin"],
         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
         expose_headers=["Content-Range", "X-Content-Range"],
-        send_wildcard=False,  # Explicitly disable wildcard
-        vary_header=True  # Add Vary header for better caching
+        send_wildcard=False,
+        vary_header=True
     )
 
-    # Early OPTIONS handler: return a minimal 200 response with explicit CORS headers
-    # This helps when intermediate handlers or blueprint redirects interfere with
-    # Flask-CORS automatic OPTIONS handling (common in dev environments).
     @app.before_request
     def _handle_options_preflight():
         if request.method != 'OPTIONS':
             return None
 
-        # Build response
         from flask import make_response
         response = make_response(jsonify({'status': 'ok'}), 200)
 
@@ -281,25 +225,19 @@ def create_app(config_name=None, enable_socketio=True):
         else:
             response.headers['Access-Control-Allow-Origin'] = ','.join(allowed_origins)
 
-        # Allow common headers the frontend sends (case-insensitive)
         response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, X-MFA-Token, Accept, Origin, Cache-Control, cache-control, Pragma, Expires'
         response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH'
         response.headers['Access-Control-Allow-Credentials'] = 'true'
         response.headers['Vary'] = 'Origin'
 
         return response
-
-    # The CORS() initialization above automatically handles OPTIONS requests
-    # No need for manual handling that can override CORS headers
     
     # Initialize JWT
     jwt = JWTManager(app)
     
-    # JWT token callbacks with blacklist support
     @jwt.token_in_blocklist_loader
     def check_if_token_revoked(jwt_header, jwt_payload):
         try:
-            # Import here to avoid circular imports
             from .routes.admin.admin_auth import is_token_blacklisted
             jti = jwt_payload["jti"]
             revoked = is_token_blacklisted(jti)
@@ -320,7 +258,6 @@ def create_app(config_name=None, enable_socketio=True):
     @jwt.invalid_token_loader
     def invalid_token_callback(error):
         try:
-            # Log the invalid token reason for diagnostics (do not log token contents)
             app.logger.warning(f"Invalid token encountered on {request.path}: {error}")
         except Exception:
             pass
@@ -372,29 +309,30 @@ def create_app(config_name=None, enable_socketio=True):
             if file.filename == '':
                 return jsonify({"error": "No selected file"}), 400
             
-            # Check file size (5MB limit)
-            if len(file.read()) > 5 * 1024 * 1024:
+            # Read file to check size before seeking
+            file_content = file.read()
+            if len(file_content) > 5 * 1024 * 1024:
                 return jsonify({"error": "File too large (max 5MB)"}), 400
-            file.seek(0)
             
-            # Check file type
+            # Re-create file-like object from content for subsequent operations
+            from io import BytesIO
+            file = BytesIO(file_content)
+            
             allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
             if not ('.' in file.filename and file.filename.rsplit('.', 1)[1].lower() in allowed_extensions):
                 return jsonify({"error": "File type not allowed. Only images are permitted."}), 400
             
-            # Create secure filename
             original_filename = werkzeug.utils.secure_filename(file.filename)
             file_extension = original_filename.rsplit('.', 1)[1].lower() if '.' in original_filename else ''
             unique_filename = f"{uuid.uuid4().hex}.{file_extension}"
             
-            # Save file
             file_path = os.path.join(product_images_dir, unique_filename)
+            file.seek(0) # Reset stream position for saving
             file.save(file_path)
             
             current_user_id = get_jwt_identity()
             app.logger.info(f"User {current_user_id} uploaded image: {unique_filename}")
             
-            # Generate URL
             site_url = os.environ.get('SITE_URL', request.host_url.rstrip('/'))
             image_url = f"{site_url}/api/uploads/product_images/{unique_filename}"
             
@@ -412,7 +350,6 @@ def create_app(config_name=None, enable_socketio=True):
             app.logger.error(f"Error uploading image: {str(e)}")
             return jsonify({"error": f"Failed to upload image: {str(e)}"}), 500
     
-    # Route to serve uploaded images
     @app.route('/api/uploads/product_images/<filename>', methods=['GET'])
     def serve_product_image(filename):
         secure_name = werkzeug.utils.secure_filename(filename)
@@ -477,93 +414,11 @@ def create_app(config_name=None, enable_socketio=True):
     
     app.jwt_optional = jwt_optional
     
-    # Import search services and routes from the search package
-    search_service = None
-    embedding_service = None
-    user_search_routes = None
-    admin_search_routes = None
-    
-    try:
-        # Import from routes.search package (as specified)
-        from .routes.search import user_search_routes, admin_search_routes, SearchService, EmbeddingService
-        search_service = SearchService
-        embedding_service = EmbeddingService
-        app.logger.info("✅ Successfully imported all search components from .routes.search")
-    except ImportError as e1:
-        try:
-            # Fallback: Import from routes.search package (relative to app)
-            from routes.search import user_search_routes, admin_search_routes, SearchService, EmbeddingService
-            search_service = SearchService
-            embedding_service = EmbeddingService
-            app.logger.info("✅ Successfully imported all search components from routes.search")
-        except ImportError as e2:
-            try:
-                # Another fallback: Import from app.routes.search
-                from app.routes.search import user_search_routes, admin_search_routes, SearchService, EmbeddingService
-                search_service = SearchService
-                embedding_service = EmbeddingService
-                app.logger.info("✅ Successfully imported all search components from app.routes.search")
-            except ImportError as e3:
-                # Create fallback blueprints if imports fail
-                from flask import Blueprint
-                
-                user_search_routes = Blueprint('user_search_routes', __name__)
-                admin_search_routes = Blueprint('admin_search_routes', __name__)
-                
-                @user_search_routes.route('/health', methods=['GET'])
-                def user_search_health():
-                    return jsonify({"status": "ok", "message": "Fallback user search routes active"}), 200
-                
-                @admin_search_routes.route('/health', methods=['GET'])
-                def admin_search_health():
-                    return jsonify({"status": "ok", "message": "Fallback admin search routes active"}), 200
-                
-                # Create fallback service classes
-                class SearchService:
-                    def __init__(self):
-                        pass
-                    
-                    def search(self, query):
-                        return {"message": "Search service not available"}
-                
-                class EmbeddingService:
-                    def __init__(self):
-                        pass
-                    
-                    def generate_embedding(self, text):
-                        return {"message": "Embedding service not available"}
-                
-                search_service = SearchService
-                embedding_service = EmbeddingService
-                app.logger.error(f"❌ All search import attempts failed: {e1}, {e2}, {e3}")
-                app.logger.warning("⚠️ Using fallback search components")
-    
-    # Initialize search services with app context
-    try:
-        if search_service and embedding_service:
-            with app.app_context():
-                app.search_service = search_service()
-                app.embedding_service = embedding_service()
-                app.logger.info("✅ Search services initialized successfully")
-    except Exception as e:
-        app.logger.error(f"❌ Failed to initialize search services: {str(e)}")
-        
-        # Create minimal fallback services
-        class FallbackSearchService:
-            def search(self, query):
-                return []
-        
-        class FallbackEmbeddingService:
-            def generate_embedding(self, text):
-                return []
-        
-        app.search_service = FallbackSearchService()
-        app.embedding_service = FallbackEmbeddingService()
     
     # Import and register blueprints with clean error handling
     from flask import Blueprint
     
-    # Create fallback blueprints for other routes
+    # Create fallback blueprints for routes
     fallback_blueprints = {
         'validation_routes': Blueprint('validation_routes', __name__),
         'cart_routes': Blueprint('cart_routes', __name__),
@@ -577,12 +432,8 @@ def create_app(config_name=None, enable_socketio=True):
         'admin_cart_routes': Blueprint('admin_cart_routes', __name__),
         'admin_cloudinary_routes': Blueprint('admin_cloudinary_routes', __name__),
         'admin_category_routes': Blueprint('admin_category_routes', __name__),
-        # ADDED FALLBACK FOR ADMIN SHOP CATEGORIES ROUTES
-        'admin_shop_categories_routes': Blueprint('admin_shop_categories_routes', __name__),
+        'admin_shop_categories_routes': Blueprint('admin_categories_bp', __name__),
         'product_images_batch_bp': Blueprint('product_images_batch_bp', __name__),
-        # Payment routes fallbacks
-        'payment_routes': Blueprint('payment_routes', __name__),
-        'mpesa_routes': Blueprint('mpesa_routes', __name__),
         'pesapal_routes': Blueprint('pesapal_routes', __name__),
         'coupon_routes': Blueprint('coupon_routes', __name__),
         'user_review_routes': Blueprint('user_review_routes', __name__),
@@ -600,14 +451,14 @@ def create_app(config_name=None, enable_socketio=True):
         'admin_brand_routes': Blueprint('admin_brand_routes', __name__),
         'notification_routes': Blueprint('notification_routes', __name__),
         'carousel_routes': Blueprint('carousel_routes', __name__),
-        # Added theme routes fallback
         'theme_routes': Blueprint('theme_routes', __name__),
-        # ADDED FOOTERROUTES FALLBACK
         'footer_routes': Blueprint('footer_routes', __name__),
         'side_panel_routes': Blueprint('side_panel_routes', __name__),
         'topbar_routes': Blueprint('topbar_routes', __name__),
         'contact_cta_routes': Blueprint('contact_cta_routes', __name__),
         'featured_routes': Blueprint('featured_routes', __name__),
+        'meilisearch_routes': Blueprint('meilisearch_routes', __name__),
+        'admin_meilisearch_routes': Blueprint('admin_meilisearch_routes', __name__),
     }
     
     # Add basic routes to fallback blueprints
@@ -631,14 +482,6 @@ def create_app(config_name=None, enable_socketio=True):
     def fallback_health():
         return jsonify({"status": "ok", "message": "Fallback routes active"}), 200
     
-    @fallback_blueprints['payment_routes'].route('/health', methods=['GET'])
-    def fallback_payment_health():
-        return jsonify({"status": "ok", "message": "Fallback payment routes active"}), 200
-    
-    # Add fallback routes for payment blueprints
-    @fallback_blueprints['mpesa_routes'].route('/health', methods=['GET'])
-    def fallback_mpesa_health():
-        return jsonify({"status": "ok", "message": "Fallback M-PESA routes active"}), 200
     
     @fallback_blueprints['pesapal_routes'].route('/health', methods=['GET'])
     def fallback_pesapal_health():
@@ -660,7 +503,6 @@ def create_app(config_name=None, enable_socketio=True):
     def fallback_admin_categories_health():
         return jsonify({"status": "ok", "message": "Fallback admin categories routes active"}), 200
     
-    # ADDED FALLBACK ROUTE FOR SHOP CATEGORIES
     @fallback_blueprints['admin_shop_categories_routes'].route('/health', methods=['GET'])
     def fallback_admin_shop_categories_health():
         return jsonify({"status": "ok", "message": "Fallback admin shop categories routes active"}), 200
@@ -673,7 +515,6 @@ def create_app(config_name=None, enable_socketio=True):
     def fallback_admin_order_health():
         return jsonify({"status": "ok", "message": "Fallback admin order routes active"}), 200
     
-    # Add fallback routes for inventory blueprints
     @fallback_blueprints['user_inventory_routes'].route('/health', methods=['GET'])
     def fallback_user_inventory_health():
         return jsonify({"status": "ok", "message": "Fallback user inventory routes active"}), 200
@@ -682,12 +523,10 @@ def create_app(config_name=None, enable_socketio=True):
     def fallback_admin_inventory_health():
         return jsonify({"status": "ok", "message": "Fallback admin inventory routes active"}), 200
     
-    # Add fallback route for admin products
     @fallback_blueprints['admin_products_routes'].route('/health', methods=['GET'])
     def fallback_admin_products_health():
         return jsonify({"status": "ok", "message": "Fallback admin products routes active"}), 200
     
-    # Add fallback routes for review blueprints
     @fallback_blueprints['user_review_routes'].route('/health', methods=['GET'])
     def fallback_user_review_health():
         return jsonify({"status": "ok", "message": "Fallback user review routes active"}), 200
@@ -696,7 +535,6 @@ def create_app(config_name=None, enable_socketio=True):
     def fallback_admin_review_health():
         return jsonify({"status": "ok", "message": "Fallback admin review routes active"}), 200
     
-    # Add fallback routes for wishlist blueprints
     @fallback_blueprints['user_wishlist_routes'].route('/health', methods=['GET'])
     def fallback_user_wishlist_health():
         return jsonify({"status": "ok", "message": "Fallback user wishlist routes active"}), 200
@@ -721,7 +559,6 @@ def create_app(config_name=None, enable_socketio=True):
     def fallback_notification_health():
         return jsonify({"status": "ok", "message": "Fallback notification routes active"}), 200
     
-    # Add fallback route for carousel
     @fallback_blueprints['carousel_routes'].route('/health', methods=['GET'])
     def fallback_carousel_health():
         return jsonify({"status": "ok", "message": "Fallback carousel routes active"}), 200
@@ -730,7 +567,6 @@ def create_app(config_name=None, enable_socketio=True):
     def fallback_theme_health():
         return jsonify({"status": "ok", "message": "Fallback theme routes active"}), 200
     
-    # ADDED FALLBACK ROUTE FOR FOOTER
     @fallback_blueprints['footer_routes'].route('/health', methods=['GET'])
     def fallback_footer_health():
         return jsonify({"status": "ok", "message": "Fallback footer routes active"}), 200
@@ -739,7 +575,6 @@ def create_app(config_name=None, enable_socketio=True):
     def fallback_side_panel_health():
         return jsonify({"status": "ok", "message": "Fallback side panel routes active"}), 200
 
-    # ADDED FALLBACK ROUTE FOR TOPBAR
     @fallback_blueprints['topbar_routes'].route('/health', methods=['GET'])
     def fallback_topbar_health():
         return jsonify({"status": "ok", "message": "Fallback topbar routes active"}), 200
@@ -751,11 +586,16 @@ def create_app(config_name=None, enable_socketio=True):
     @fallback_blueprints['featured_routes'].route('/health', methods=['GET'])
     def fallback_featured_health():
         return jsonify({"status": "ok", "message": "Fallback featured routes active"}), 200
-
-    # Import blueprints with clean logging (no debug noise)
-    imported_blueprints = {}
     
-    # Define blueprint import mappings with payment routes
+    @fallback_blueprints['meilisearch_routes'].route('/health', methods=['GET'])
+    def fallback_meilisearch_health():
+        return jsonify({"status": "ok", "message": "Fallback Meilisearch routes active"}), 200
+    
+    @fallback_blueprints['admin_meilisearch_routes'].route('/health', methods=['GET'])
+    def fallback_admin_meilisearch_health():
+        return jsonify({"status": "ok", "message": "Fallback admin Meilisearch routes active"}), 200
+    
+    # Blueprint import paths dictionary
     blueprint_imports = {
         'validation_routes': [
             ('app.routes.user.user', 'validation_routes'),
@@ -814,28 +654,13 @@ def create_app(config_name=None, enable_socketio=True):
             ('routes.admin.admin_category_routes', 'admin_category_routes')
         ],
         'admin_shop_categories_routes': [
-            ('app.routes.admin.admin_categories_routes', 'admin_categories_bp'),
-            ('routes.admin.admin_categories_routes', 'admin_categories_bp'),
-            ('backend.app.routes.admin.admin_categories_routes', 'admin_categories_bp'),
-            ('backend.routes.admin.admin_categories_routes', 'admin_categories_bp')
+            ('app.routes.admin.admin_shop_categories_routes', 'admin_shop_categories_routes'),
+            ('routes.admin.admin_shop_categories_routes', 'admin_shop_categories_routes'),
+            ('routes.admin.admin_categories_routes', 'admin_categories_bp')
         ],
         'product_images_batch_bp': [
             ('app.routes.products.product_images_batch', 'product_images_batch_bp'),
             ('routes.products.product_images_batch', 'product_images_batch_bp')
-        ],
-        # ADDEDPAYMENT_ROUTES IMPORT PATHS FOR GENERAL PAYMENT ENDPOINTS
-        'payment_routes': [
-            ('app.routes.payment.payment_routes', 'payment_routes'),
-            ('routes.payment.payment_routes', 'payment_routes'),
-            ('backend.app.routes.payment.payment_routes', 'payment_routes'),
-            ('backend.routes.payment.payment_routes', 'payment_routes')
-        ],
-        # PAYMENTROUTES IMPORTS
-        'mpesa_routes': [
-            ('app.routes.payments.mpesa_routes', 'mpesa_routes'),
-            ('routes.payments.mpesa_routes', 'mpesa_routes'),
-            ('app.mpesa.mpesa_routes', 'mpesa_routes'),
-            ('mpesa.mpesa_routes', 'mpesa_routes')
         ],
         'pesapal_routes': [
             ('app.routes.payments.pesapal_routes', 'pesapal_routes'),
@@ -845,7 +670,6 @@ def create_app(config_name=None, enable_socketio=True):
             ('app.routes.coupon.coupon_routes', 'coupon_routes'),
             ('routes.coupon.coupon_routes', 'coupon_routes')
         ],
-        # REVIEW ROUTES IMPORTS
         'user_review_routes': [
             ('routes.reviews.user_review_routes', 'user_review_routes'),
             ('app.routes.reviews.user_review_routes', 'user_review_routes')
@@ -854,7 +678,6 @@ def create_app(config_name=None, enable_socketio=True):
             ('routes.reviews.admin_review_routes', 'admin_review_routes'),
             ('app.routes.reviews.admin_review_routes', 'admin_review_routes')
         ],
-        # WISHLISTROUTES IMPORTS
         'user_wishlist_routes': [
             ('routes.wishlist.user_wishlist_routes', 'user_wishlist_routes'),
             ('app.routes.wishlist.user_wishlist_routes', 'user_wishlist_routes')
@@ -871,17 +694,14 @@ def create_app(config_name=None, enable_socketio=True):
             ('app.routes.categories.categories_routes', 'categories_routes'),
             ('routes.categories.categories_routes', 'categories_routes')
         ],
-        # USER ADDRESSROUTES IMPORTS
         'user_address_routes': [
             ('routes.address.user_address_routes', 'user_address_routes'),
             ('app.routes.address.user_address_routes', 'user_address_routes')
         ],
-        # ADMIN ADDRESSROUTES IMPORTS  
         'admin_address_routes': [
             ('routes.address.admin_address_routes', 'admin_address_routes'),
             ('app.routes.address.admin_address_routes', 'admin_address_routes')
         ],
-        # INVENTORYROUTES IMPORTS
         'user_inventory_routes': [
             ('routes.inventory.user_inventory_routes', 'user_inventory_routes'),
             ('app.routes.inventory.user_inventory_routes', 'user_inventory_routes')
@@ -890,7 +710,6 @@ def create_app(config_name=None, enable_socketio=True):
             ('routes.inventory.admin_inventory_routes', 'admin_inventory_routes'),
             ('app.routes.inventory.admin_inventory_routes', 'admin_inventory_routes')
         ],
-        # ADMIN PRODUCTSROUTES IMPORTS
         'admin_products_routes': [
             ('app.routes.products.admin_products_routes', 'admin_products_routes'),
             ('routes.products.admin_products_routes', 'admin_products_routes')
@@ -921,7 +740,6 @@ def create_app(config_name=None, enable_socketio=True):
             ('backend.app.routes.theme.theme_routes', 'theme_routes'),
             ('backend.routes.theme.theme_routes', 'theme_routes')
         ],
-        # ADDED FOOTERROUTES IMPORT PATHS
         'footer_routes': [
             ('app.routes.footer.footer_routes', 'footer_routes'),
             ('routes.footer.footer_routes', 'footer_routes'),
@@ -941,49 +759,56 @@ def create_app(config_name=None, enable_socketio=True):
             ('backend.routes.topbar.topbar_routes', 'topbar_routes')
         ],
         'contact_cta_routes': [
-            # Primary (correct) paths where the contact_cta blueprint is defined
             ('app.routes.contact_cta.contact_cta_routes', 'contact_cta_routes'),
             ('routes.contact_cta.contact_cta_routes', 'contact_cta_routes'),
-            # Older/alternate locations (keep for backward compatibility)
             ('app.routes.content.contact_cta_routes', 'contact_cta_routes'),
             ('routes.content.contact_cta_routes', 'contact_cta_routes'),
             ('backend.app.routes.contact_cta.contact_cta_routes', 'contact_cta_routes'),
             ('backend.routes.contact_cta.contact_cta_routes', 'contact_cta_routes')
         ],
         'featured_routes': [
-            # Primary locations (common)
             ('app.routes.products.featured_routes', 'featured_routes'),
             ('routes.products.featured_routes', 'featured_routes'),
-            # Alternate attribute names used by some modules
             ('app.routes.products.featured_routes', 'featured_bp'),
             ('routes.products.featured_routes', 'featured_bp'),
             ('app.routes.products.featured_routes', 'featured'),
             ('routes.products.featured_routes', 'featured'),
-            # Alternate module names (shorter module, or different package layout)
             ('app.routes.products.featured', 'featured_routes'),
             ('routes.products.featured', 'featured_routes'),
             ('app.routes.products.featured', 'featured_bp'),
             ('routes.products.featured', 'featured_bp'),
-            # Backend/legacy locations
             ('backend.app.routes.products.featured_routes', 'featured_routes'),
             ('backend.routes.products.featured_routes', 'featured_routes'),
             ('backend.app.routes.products.featured_routes', 'featured_bp'),
             ('backend.routes.products.featured_routes', 'featured_bp'),
         ],
+        'meilisearch_routes': [
+            ('app.routes.meilisearch', 'meilisearch_routes'),
+            ('routes.meilisearch', 'meilisearch_routes'),
+            ('app.routes.meilisearch.meilisearch_routes', 'meilisearch_routes'),
+            ('routes.meilisearch.meilisearch_routes', 'meilisearch_routes'),
+            ('backend.app.routes.meilisearch', 'meilisearch_routes'),
+            ('backend.routes.meilisearch', 'meilisearch_routes'),
+        ],
+        'admin_meilisearch_routes': [
+            ('app.routes.meilisearch', 'admin_meilisearch_routes'),
+            ('routes.meilisearch', 'admin_meilisearch_routes'),
+            ('app.routes.meilisearch.meilisearch_routes', 'admin_meilisearch_routes'),
+            ('routes.meilisearch.meilisearch_routes', 'admin_meilisearch_routes'),
+            ('backend.app.routes.meilisearch', 'admin_meilisearch_routes'),
+            ('backend.routes.meilisearch', 'admin_meilisearch_routes'),
+        ],
     }
     
-    # Import blueprints with clean logging (no debug noise)
+    # Import blueprints with clean logging
     imported_blueprints = {}
     
-    # Try importing each blueprint with enhanced error handling
     for blueprint_name, import_attempts in blueprint_imports.items():
         for module_path, attr_name in import_attempts:
-            # Skip empty module paths
             if not module_path or not module_path.strip():
                 app.logger.warning(f"Skipping empty module path for {blueprint_name}")
                 continue
             
-            # Skip empty attribute names
             if not attr_name or not attr_name.strip():
                 app.logger.warning(f"Skipping empty attribute name for {blueprint_name}")
                 continue
@@ -992,26 +817,22 @@ def create_app(config_name=None, enable_socketio=True):
                 app.logger.debug(f"Attempting to import {attr_name} from {module_path}")
                 module = __import__(module_path, fromlist=[attr_name])
                 
-                # Check if the attribute exists in the module
                 if not hasattr(module, attr_name):
                     app.logger.debug(f"Module {module_path} does not have attribute {attr_name}")
                     continue
                 
                 blueprint = getattr(module, attr_name)
                 
-                # Verify it's actually a Blueprint
                 if not hasattr(blueprint, 'name'):
                     app.logger.debug(f"Object {attr_name} from {module_path} is not a Blueprint")
                     continue
                 
                 imported_blueprints[blueprint_name] = blueprint
-                # Only log successful imports
                 app.logger.info(f"✅ Imported {blueprint_name} from {module_path}")
                 break
                 
             except (ImportError, AttributeError, ValueError) as e:
                 app.logger.debug(f"Failed to import {attr_name} from {module_path}: {str(e)}")
-                # Silently continue to next import attempt
                 continue
             except Exception as e:
                 app.logger.warning(f"Unexpected error importing {attr_name} from {module_path}: {str(e)}")
@@ -1020,7 +841,6 @@ def create_app(config_name=None, enable_socketio=True):
     # Import admin shop categories routes
     try:
         from app.routes.admin.admin_categories_routes import admin_categories_bp
-        # Use the key 'admin_shop_categories_routes' for consistency with fallback_blueprints
         imported_blueprints['admin_shop_categories_routes'] = admin_categories_bp
         app.logger.info("✅ admin_categories_routes → /api/admin/shop-categories")
     except ImportError as e:
@@ -1038,67 +858,7 @@ def create_app(config_name=None, enable_socketio=True):
             final_blueprints[blueprint_name] = imported_blueprints[blueprint_name]
         else:
             final_blueprints[blueprint_name] = fallback_blueprints[blueprint_name]
-            if blueprint_name == "payment_routes":
-                app.logger.warning(f"⚠️ Using fallback for {blueprint_name}. "
-                                 f"Check that '{blueprint_name}' is defined as a Blueprint in the payment routes module."
-                                 )
-            elif blueprint_name in ["mpesa_routes", "pesapal_routes"]:
-                app.logger.warning(f"⚠️ Using fallback for {blueprint_name}. "
-                                 f"Check that '{blueprint_name}' is defined as a Blueprint in the payment routes module."
-                                 )
-            elif blueprint_name == "cart_routes":
-                app.logger.warning("⚠️ Using fallback for cart_routes. "
-                                 "Check that 'cart_routes' is defined as a Blueprint in 'app.routes.cart.cart_routes' or 'routes.cart.cart_routes'."
-                                 )
-            elif blueprint_name == "admin_auth_routes":
-                app.logger.warning("⚠️ Using fallback for admin_auth_routes. "
-                                 "Check that 'admin_auth_routes' is defined as a Blueprint in 'app.routes.admin.admin_auth' or 'routes.admin.admin_auth'."
-                                 )
-            elif blueprint_name == "admin_google_auth_routes":
-                app.logger.warning("⚠️ Using fallback for admin_google_auth_routes. "
-                                 "Check that 'admin_google_auth_routes' is defined as a Blueprint in 'app.routes.admin.admin_google_auth' or 'routes.admin.admin_google_auth'."
-                                 )
-            elif blueprint_name in ["user_wishlist_routes", "admin_wishlist_routes"]:
-                app.logger.warning(f"⚠️ Using fallback for {blueprint_name}. "
-                                 f"Check that '{blueprint_name}' is defined as a Blueprint in the wishlist routes module."
-                                 )
-            elif blueprint_name == "admin_email_routes":
-                app.logger.warning("⚠️ Using fallback for admin_email_routes. "
-                                 "Check that 'admin_email_routes' is defined as a Blueprint in the admin email routes module."
-                                 )
-            elif blueprint_name == "carousel_routes":
-                app.logger.warning(f"⚠️ Using fallback for carousel_routes. "
-                                 f"Check that 'carousel_routes' is defined as a Blueprint in the carousel routes module."
-                                 )
-            # Added warning for theme routes fallback
-            elif blueprint_name == "theme_routes":
-                app.logger.warning(f"⚠️ Using fallback for theme_routes. "
-                                 f"Check that 'theme_routes' is defined as a Blueprint in the theme routes module."
-                                 )
-            # ADDED WARNING FOR FOOTER ROUTES FALLBACK
-            elif blueprint_name == "footer_routes":
-                app.logger.warning(f"⚠️ Using fallback for footer_routes. "
-                                 f"Check that 'footer_routes' is defined as a Blueprint in the footer routes module."
-                                 )
-            elif blueprint_name == "side_panel_routes":
-                app.logger.warning(f"⚠️ Using fallback for side_panel_routes. "
-                                 f"Check that 'side_panel_routes' is defined as a Blueprint in the side panel routes module."
-                                 )
-            # ADDED WARNING FOR TOPBAR ROUTES FALLBACK
-            elif blueprint_name == "topbar_routes":
-                app.logger.warning(f"⚠️ Using fallback for topbar_routes. "
-                                 f"Check that 'topbar_routes' is defined as a Blueprint in the topbar routes module."
-                                 )
-            elif blueprint_name == "contact_cta_routes":
-                app.logger.warning(f"⚠️ Using fallback for contact_cta_routes. "
-                                 f"Check that 'contact_cta_routes' is defined as a Blueprint in the contact CTA routes module."
-                                 )
-            elif blueprint_name == "featured_routes":
-                app.logger.warning(f"⚠️ Using fallback for featured_routes. "
-                                 f"Check that 'featured_routes' is defined as a Blueprint in the featured routes module."
-                                 )
-            else:
-                app.logger.warning(f"⚠️ Using fallback for {blueprint_name}")
+            app.logger.warning(f"⚠️ Using fallback for {blueprint_name}")
     
     # Register blueprints
     try:
@@ -1111,7 +871,6 @@ def create_app(config_name=None, enable_socketio=True):
         app.register_blueprint(final_blueprints['admin_email_routes'], url_prefix='/api/admin')
         app.register_blueprint(final_blueprints['dashboard_routes'], url_prefix='/api/admin/dashboard')
         
-        # Register order routes
         app.register_blueprint(final_blueprints['order_routes'], url_prefix='/api/orders')
         app.register_blueprint(final_blueprints['admin_order_routes'], url_prefix='/api/admin')
         
@@ -1121,66 +880,43 @@ def create_app(config_name=None, enable_socketio=True):
         app.register_blueprint(final_blueprints['admin_shop_categories_routes'], url_prefix='/api/admin/shop-categories')
         app.register_blueprint(final_blueprints['product_images_batch_bp'])
         
-        # Register search routes
-        if user_search_routes and admin_search_routes:
-            app.register_blueprint(user_search_routes, url_prefix='/api/search')
-            app.register_blueprint(admin_search_routes, url_prefix='/api/admin/search')
-            app.logger.info("✅ Search routes registered successfully")
-        else:
-            app.logger.warning("⚠️ Search routes not available")
-        
-        # REGISTER GENERAL PAYMENT ROUTES BLUEPRINT
-        app.register_blueprint(final_blueprints['payment_routes'], url_prefix='/api/payment')
-        
-        # REGISTER PAYMENTROUTES
-        app.register_blueprint(final_blueprints['mpesa_routes'], url_prefix='/api/mpesa')
+        # Removed payment_routes registration
         app.register_blueprint(final_blueprints['pesapal_routes'], url_prefix='/api/pesapal')
         
         app.register_blueprint(final_blueprints['coupon_routes'], url_prefix='/api/coupons')
         
-        # REGISTER REVIEW ROUTES
         app.register_blueprint(final_blueprints['user_review_routes'], url_prefix='/api/reviews/user')
         app.register_blueprint(final_blueprints['admin_review_routes'], url_prefix='/api/admin/reviews')
         
-        # REGISTER BRANDROUTES
         app.register_blueprint(final_blueprints['user_brand_routes'], url_prefix='/api/brands')
         app.register_blueprint(final_blueprints['admin_brand_routes'], url_prefix='/api/admin/brands')
         
-        # REGISTER WISHLISTROUTES
         app.register_blueprint(final_blueprints['user_wishlist_routes'], url_prefix='/api/wishlist/user')
         app.register_blueprint(final_blueprints['admin_wishlist_routes'], url_prefix='/api/admin/wishlist')
         
         app.register_blueprint(final_blueprints['products_routes'], url_prefix='/api/products')
         app.register_blueprint(final_blueprints['categories_routes'], url_prefix='/api/categories')
         
-        # REGISTER ADDRESSROUTES
         app.register_blueprint(final_blueprints['user_address_routes'], url_prefix='/api/addresses/user')
         app.register_blueprint(final_blueprints['admin_address_routes'], url_prefix='/api/admin/addresses')
         
-        # REGISTER INVENTORYROUTES
         app.register_blueprint(final_blueprints['user_inventory_routes'], url_prefix='/api/inventory/user')
         app.register_blueprint(final_blueprints['admin_inventory_routes'], url_prefix='/api/inventory/admin')
         
-        # REGISTER ADMIN PRODUCTSROUTES
         app.register_blueprint(final_blueprints['admin_products_routes'], url_prefix='/api/admin/products')
         
         app.register_blueprint(final_blueprints['notification_routes'], url_prefix='/api/notifications')
-        
         app.register_blueprint(final_blueprints['carousel_routes'], url_prefix='/api/carousel')
-
         app.register_blueprint(final_blueprints['theme_routes'], url_prefix='/api/theme')
-
-        # REGISTER FOOTERROUTES
         app.register_blueprint(final_blueprints['footer_routes'], url_prefix='/api/footer')
-
         app.register_blueprint(final_blueprints['side_panel_routes'], url_prefix='/api/panels')
-
-        # REGISTER TOPBARROUTES
         app.register_blueprint(final_blueprints['topbar_routes'], url_prefix='/api/topbar')
-
         app.register_blueprint(final_blueprints['contact_cta_routes'], url_prefix='/api/contact-cta')
-
         app.register_blueprint(final_blueprints['featured_routes'], url_prefix='/api/products/featured')
+
+        app.register_blueprint(final_blueprints['meilisearch_routes'], url_prefix='/api/meilisearch')
+        app.register_blueprint(final_blueprints['admin_meilisearch_routes'], url_prefix='/api/admin/meilisearch')
+        app.logger.info("✅ Meilisearch routes registered successfully")
 
         try:
             app.logger.debug("Importing Google Auth routes...")
@@ -1190,7 +926,6 @@ def create_app(config_name=None, enable_socketio=True):
             imported_blueprints['google_auth_routes'] = google_auth_routes
         except ImportError as e:
             app.logger.error(f"Failed to import Google OAuth routes: {str(e)}")
-            # Create fallback blueprint
             fallback_google = Blueprint('google_auth_routes', __name__)
             
             @fallback_google.route('/google-config', methods=['GET'])
@@ -1203,20 +938,18 @@ def create_app(config_name=None, enable_socketio=True):
             app.register_blueprint(fallback_google, url_prefix='/api/auth')
             app.logger.warning("⚠️ Using fallback Google OAuth routes")
         
-        # Clean startup logging system
+        # Clean startup logging
         def log_startup_summary():
             """Generate and log a clean startup summary."""
             app.logger.info("=" * 60)
             app.logger.info("🚀 MIZIZZI E-COMMERCE PLATFORM - STARTUP COMPLETE")
             app.logger.info("=" * 60)
             
-            # Blueprint Registration Summary
             app.logger.info("📦 BLUEPRINT REGISTRATION SUMMARY")
             app.logger.info("-" * 40)
             fallback_count = 0
             success_count = 0
             
-            # Define the actual URL prefixes for each blueprint
             blueprint_url_prefixes = {
                 'validation_routes': '/api',
                 'cart_routes': '/api/cart',
@@ -1232,8 +965,6 @@ def create_app(config_name=None, enable_socketio=True):
                 'admin_category_routes': '/api/admin/categories',
                 'admin_shop_categories_routes': '/api/admin/shop-categories',
                 'product_images_batch_bp': '/',
-                'payment_routes': '/api/payment',
-                'mpesa_routes': '/api/mpesa',
                 'pesapal_routes': '/api/pesapal',
                 'coupon_routes': '/api/coupons',
                 'user_review_routes': '/api/reviews/user',
@@ -1253,13 +984,13 @@ def create_app(config_name=None, enable_socketio=True):
                 'carousel_routes': '/api/carousel',
                 'google_auth_routes': '/api/auth',
                 'theme_routes': '/api/theme',
-                # ADDED FOOTERROUTES URL PREFIX
                 'footer_routes': '/api/footer',
                 'side_panel_routes': '/api/panels',
-                # ADDED TOPBARROUTES URL PREFIX
                 'topbar_routes': '/api/topbar',
                 'contact_cta_routes': '/api/contact-cta',
                 'featured_routes': '/api/products/featured',
+                'meilisearch_routes': '/api/meilisearch',
+                'admin_meilisearch_routes': '/api/admin/meilisearch',
             }
             
             for blueprint_name in final_blueprints:
@@ -1270,7 +1001,6 @@ def create_app(config_name=None, enable_socketio=True):
                     status = "⚠️"
                     fallback_count += 1
                 
-                # Get the actual URL prefix
                 url_prefix = blueprint_url_prefixes.get(blueprint_name, "/")
                 app.logger.info(f"{status} {blueprint_name:<25} → {url_prefix}")
             
@@ -1279,18 +1009,10 @@ def create_app(config_name=None, enable_socketio=True):
             # Payment System Endpoints
             app.logger.info("💳 PAYMENT SYSTEM ENDPOINTS")
             app.logger.info("-" * 30)
-            app.logger.info("Payment Transactions: /api/payment/transactions")
-            app.logger.info("Payment Methods: /api/payment/methods")
-            app.logger.info("Payment Status: /api/payment/status")
-            app.logger.info("M-PESA STK Push: /api/mpesa/stk-push")
-            app.logger.info("M-PESA Callback: /api/mpesa/callback")
-            app.logger.info("M-PESA Status: /api/mpesa/status")
             app.logger.info("Pesapal Payment: /api/pesapal/payment")
             app.logger.info("Pesapal Callback: /api/pesapal/callback")
-            app.logger.info(f"Payment Routes: {'✅' if 'payment_routes' in imported_blueprints else '⚠️'}")
-            app.logger.info(f"M-PESA System: {'✅' if 'mpesa_routes' in imported_blueprints else '⚠️'}")
-            app.logger.info(f"Pesapal System: {'✅' if 'pesapal_routes' in imported_blueprints else '⚠️'}")
-            
+            app.logger.info(f"Payment System: {'✅' if 'pesapal_routes' in imported_blueprints else '❌'}")
+
             # Admin Authentication System Endpoints
             app.logger.info("🔐 ADMIN AUTHENTICATION ENDPOINTS")
             app.logger.info("-" * 35)
@@ -1316,14 +1038,14 @@ def create_app(config_name=None, enable_socketio=True):
             app.logger.info("Google OAuth Login: /api/auth/google")
             app.logger.info("Google OAuth Callback: /api/auth/google/callback")
             app.logger.info(f"Google Auth System: {'✅' if 'google_auth_routes' in imported_blueprints else '⚠️'}")
-            
-            # Search System Endpoints
-            app.logger.info("🔍 SEARCH SYSTEM ENDPOINTS")
+
+            # Meilisearch System Endpoints
+            app.logger.info("🔍 MEILISEARCH SYSTEM ENDPOINTS")
             app.logger.info("-" * 30)
-            app.logger.info("User Search: /api/search")
-            app.logger.info("Admin Search: /api/admin/search")
-            app.logger.info(f"Search Service: {'✅' if hasattr(app, 'search_service') else '❌'}")
-            app.logger.info(f"Embedding Service: {'✅' if hasattr(app, 'embedding_service') else '❌'}")
+            app.logger.info("User Meilisearch: /api/meilisearch")
+            app.logger.info("Admin Meilisearch: /api/admin/meilisearch")
+            app.logger.info(f"Meilisearch Routes: {'✅' if 'meilisearch_routes' in imported_blueprints else '⚠️'}")
+            app.logger.info(f"Admin Meilisearch Routes: {'✅' if 'admin_meilisearch_routes' in imported_blueprints else '⚠️'}")
             
             # Product System Endpoints
             app.logger.info("🛍️ PRODUCT SYSTEM ENDPOINTS")
@@ -1374,13 +1096,13 @@ def create_app(config_name=None, enable_socketio=True):
             app.logger.info(f"User Address System: {'✅' if 'user_address_routes' in imported_blueprints else '⚠️'}")
             app.logger.info(f"Admin Address System: {'✅' if 'admin_address_routes' in imported_blueprints else '⚠️'}")
             
-            # Added Notification System Endpoints
+            # Notification System Endpoints
             app.logger.info("🔔 NOTIFICATION SYSTEM ENDPOINTS")
             app.logger.info("-" * 30)
             app.logger.info("User Notifications: /api/notifications")
             app.logger.info(f"Notification System: {'✅' if 'notification_routes' in imported_blueprints else '⚠️'}")
             
-            # Added Carousel System Endpoints
+            # Carousel System Endpoints
             app.logger.info("🎠 CAROUSEL SYSTEM ENDPOINTS")
             app.logger.info("-" * 30)
             app.logger.info("Carousel Items: /api/carousel")
@@ -1394,7 +1116,6 @@ def create_app(config_name=None, enable_socketio=True):
             app.logger.info("Admin Apply Preset: /api/theme/admin/apply-preset/<preset_name>")
             app.logger.info(f"Theme System: {'✅' if 'theme_routes' in imported_blueprints else '⚠️'}")
 
-            # ADDED FOOTER SYSTEM ENDPOINTS
             app.logger.info("🦶 FOOTER SYSTEM ENDPOINTS")
             app.logger.info("-" * 30)
             app.logger.info("Get Footer Settings: /api/footer/settings")
@@ -1407,7 +1128,6 @@ def create_app(config_name=None, enable_socketio=True):
             app.logger.info("Admin Panels: /api/panels/admin/all")
             app.logger.info(f"Side Panel System: {'✅' if 'side_panel_routes' in imported_blueprints else '⚠️'}")
 
-            # ADDED TOPBAR SYSTEM ENDPOINTS
             app.logger.info("📢 TOPBAR SYSTEM ENDPOINTS")
             app.logger.info("-" * 30)
             app.logger.info("Get TopBar Slides: /api/topbar/slides")
@@ -1441,8 +1161,8 @@ def create_app(config_name=None, enable_socketio=True):
             app.logger.info(f"Admin Google Auth System: {'✅' if 'admin_google_auth_routes' in imported_blueprints else '❌'}")
             app.logger.info(f"Admin Email System: {'✅' if 'admin_email_routes' in imported_blueprints else '❌'}")
             app.logger.info(f"Google Auth System: {'✅' if 'google_auth_routes' in imported_blueprints else '❌'}")
-            app.logger.info(f"Search System: {'✅' if hasattr(app, 'search_service') else '❌'}")
-            app.logger.info(f"Payment System: {'✅' if 'payment_routes' in imported_blueprints and 'mpesa_routes' in imported_blueprints and 'pesapal_routes' in imported_blueprints else '❌'}")
+            app.logger.info(f"Meilisearch System: {'✅' if ('meilisearch_routes' in imported_blueprints and 'admin_meilisearch_routes' in imported_blueprints) else '❌'}")
+            app.logger.info(f"Payment System: {'✅' if 'pesapal_routes' in imported_blueprints else '❌'}")
             app.logger.info(f"Order System: ✅")
             app.logger.info(f"Inventory System: ✅")
             app.logger.info(f"Product System: ✅")
@@ -1452,7 +1172,6 @@ def create_app(config_name=None, enable_socketio=True):
             app.logger.info(f"Notification System: {'✅' if 'notification_routes' in imported_blueprints else '❌'}")
             app.logger.info(f"Carousel System: {'✅' if 'carousel_routes' in imported_blueprints else '❌'}")
             app.logger.info(f"Theme System: {'✅' if 'theme_routes' in imported_blueprints else '❌'}")
-            # ADDED FOOTER SYSTEM STATUS
             app.logger.info(f"Footer System: {'✅' if 'footer_routes' in imported_blueprints else '❌'}")
             app.logger.info(f"Side Panel System: {'✅' if 'side_panel_routes' in imported_blueprints else '❌'}")
             app.logger.info(f"Topbar System: {'✅' if 'topbar_routes' in imported_blueprints else '❌'}")
@@ -1477,11 +1196,10 @@ def create_app(config_name=None, enable_socketio=True):
             app.logger.info(f"Admin Login: {base_url}/api/admin/login")
             app.logger.info(f"Admin Dashboard: {base_url}/api/admin/dashboard/stats")
             app.logger.info(f"Payment Transactions: {base_url}/api/payment/transactions")
-            app.logger.info(f"M-PESA STK Push: {base_url}/api/mpesa/stk-push")
             app.logger.info(f"Pesapal Payment: {base_url}/api/pesapal/payment")
             app.logger.info(f"Google Auth Login: {base_url}/api/auth/google")
             app.logger.info(f"Admin Google Auth Login: {base_url}/api/admin/auth/google")
-            app.logger.info(f"Search: {base_url}/api/search")
+            app.logger.info(f"Meilisearch: {base_url}/api/meilisearch")
             app.logger.info(f"Products: {base_url}/api/products")
             app.logger.info(f"Cart: {base_url}/api/cart")
             app.logger.info(f"Orders: {base_url}/api/orders")
@@ -1490,10 +1208,8 @@ def create_app(config_name=None, enable_socketio=True):
             app.logger.info(f"Carousel Items: {base_url}/api/carousel")
             app.logger.info(f"Active Theme: {base_url}/api/theme/active")
             app.logger.info(f"Admin Theme Manager: {base_url}/api/theme/admin/themes")
-            # ADDED FOOTER QUICK ACCESS
             app.logger.info(f"Footer Settings: {base_url}/api/footer/settings")
             app.logger.info(f"Side Panels: {base_url}/api/panels/admin/all")
-            # ADDED TOPBAR QUICK ACCESS
             app.logger.info(f"Topbar Items: {base_url}/api/topbar/items")
             app.logger.info(f"Contact CTA Slides: {base_url}/api/contact-cta/slides")
             app.logger.info(f"Featured Products: {base_url}/api/products/featured")
@@ -1505,22 +1221,19 @@ def create_app(config_name=None, enable_socketio=True):
             app.logger.info(f"🌍 Listening on: http://0.0.0.0:5000")
             app.logger.info(f"📝 Config: {config_name}")
             app.logger.info(f"🔐 Admin Auth: Enhanced Security Enabled")
-            app.logger.info(f"💳 Payment Systems: M-PESA & Pesapal Enabled")
+            app.logger.info(f"💳 Payment Systems: Pesapal Enabled")
             app.logger.info(f"💝 Wishlist: Split User/Admin Routes Enabled")
             app.logger.info(f"📧 Admin Email: {'Integrated' if 'admin_email_routes' in imported_blueprints else 'Fallback'}")
             app.logger.info(f"🔔 Notifications: {'Integrated' if 'notification_routes' in imported_blueprints else 'Fallback'}")
             app.logger.info(f"🎠 Carousel: {'Integrated' if 'carousel_routes' in imported_blueprints else 'Fallback'}")
             app.logger.info(f"💻 Google Auth: {'Integrated' if 'google_auth_routes' in imported_blueprints else 'Fallback'}")
-            # ADDED FOOTER SYSTEM LOGGING IN FINAL SUMMARY
             app.logger.info(f"🦶 Footer System: {'Integrated' if 'footer_routes' in imported_blueprints else 'Fallback'}")
             app.logger.info(f"🖼️ Side Panel System: {'Integrated' if 'side_panel_routes' in imported_blueprints else 'Fallback'}")
             app.logger.info(f"💡 Topbar System: {'Integrated' if 'topbar_routes' in imported_blueprints else 'Fallback'}")
             app.logger.info(f"📞 Contact CTA System: {'Integrated' if 'contact_cta_routes' in imported_blueprints else 'Fallback'}")
             app.logger.info(f"⭐ Featured System: {'Integrated' if 'featured_routes' in imported_blueprints else 'Fallback'}")
-            
-            app.logger.info("=" * 60)
+            app.logger.info(f"🔍 Meilisearch System: {'Integrated' if ('meilisearch_routes' in imported_blueprints and 'admin_meilisearch_routes' in imported_blueprints) else 'Fallback'}")
         
-        # Execute the clean logging
         log_startup_summary()
         app.logger.info("All blueprints registered successfully")
         
@@ -1532,7 +1245,6 @@ def create_app(config_name=None, enable_socketio=True):
         with app.app_context():
             db.create_all()
             
-            # Initialize admin authentication tables
             try:
                 from .routes.admin.admin_auth import init_admin_auth_tables
                 init_admin_auth_tables()
@@ -1545,7 +1257,6 @@ def create_app(config_name=None, enable_socketio=True):
                 except ImportError:
                     app.logger.warning("Admin authentication tables initialization skipped - module not found")
             
-            # Initialize admin Google authentication tables
             try:
                 from .routes.admin.admin_google_auth import init_admin_google_auth_tables
                 init_admin_google_auth_tables()
@@ -1558,7 +1269,6 @@ def create_app(config_name=None, enable_socketio=True):
                 except ImportError:
                     app.logger.warning("Admin Google authentication tables initialization skipped - module not found")
 
-            # Initialize admin email tables
             try:
                 from .routes.admin.admin_email_routes import init_admin_email_tables
                 init_admin_email_tables()
@@ -1571,7 +1281,6 @@ def create_app(config_name=None, enable_socketio=True):
                 except ImportError:
                     app.logger.warning("Admin email tables initialization skipped - module not found")
 
-            # INITIALIZE FOOTER TABLES
             try:
                 from .routes.footer.footer_routes import init_footer_tables
                 init_footer_tables()
@@ -1606,21 +1315,26 @@ def create_app(config_name=None, enable_socketio=True):
                 except ImportError:
                     app.logger.warning("Contact CTA tables initialization skipped - module not found")
 
-            # Initialize featured routes tables
             try:
                 from .routes.products.featured_routes import init_featured_routes_tables
                 init_featured_routes_tables()
                 app.logger.info("Featured routes tables initialized successfully")
             except ImportError:
                 app.logger.warning("Featured routes tables initialization skipped - module not found")
+                
+            try:
+                from .routes.meilisearch.meilisearch_routes import init_meilisearch_tables
+                init_meilisearch_tables()
+                app.logger.info("Meilisearch tables initialized successfully")
+            except ImportError:
+                app.logger.warning("Meilisearch tables initialization skipped - module not found")
 
             app.logger.info("Database tables created successfully")
     except Exception as e:
         app.logger.error(f"Error creating database tables: {str(e)}")
     
-    # Set up order completion hooks with clean error handling
+    # Set up order completion hooks
     try:
-        # Try multiple import paths for order completion handler
         order_completion_handler = None
         import_paths = [
             'app.routes.order.order_completion_handler',
@@ -1643,7 +1357,6 @@ def create_app(config_name=None, enable_socketio=True):
         else:
             app.logger.warning("Order completion handler not found - creating basic inventory sync endpoint")
             
-            # Create a basic inventory sync endpoint as fallback
             @app.route('/api/admin/inventory/sync', methods=['POST'])
             @jwt_required()
             def sync_inventory_fallback():
@@ -1660,7 +1373,6 @@ def create_app(config_name=None, enable_socketio=True):
     except Exception as e:
         app.logger.error(f"Error setting up order completion hooks: {str(e)}")
         
-        # Create fallback inventory sync endpoint
         @app.route('/api/admin/inventory/sync', methods=['POST'])
         @jwt_required()
         def sync_inventory_error_fallback():
@@ -1709,15 +1421,16 @@ def create_app(config_name=None, enable_socketio=True):
             "order_system": "active",
             "product_system": "active",
             "payment_system": {
-                "payment_routes": "active" if 'payment_routes' in imported_blueprints else "inactive",
-                "mpesa": "active" if 'mpesa_routes' in imported_blueprints else "inactive",
                 "pesapal": "active" if 'pesapal_routes' in imported_blueprints else "inactive"
             },
             "admin_auth_system": "active" if 'admin_auth_routes' in imported_blueprints else "inactive",
             "admin_google_auth_system": "active" if 'admin_google_auth_routes' in imported_blueprints else "inactive",
             "admin_email_system": "active" if 'admin_email_routes' in imported_blueprints else "inactive",
             "google_auth_system": "active" if 'google_auth_routes' in imported_blueprints else "inactive",
-            "search_system": "active" if hasattr(app, 'search_service') else "inactive",
+            "meilisearch_system": {
+                "routes": "active" if 'meilisearch_routes' in imported_blueprints else "inactive",
+                "admin_routes": "active" if 'admin_meilisearch_routes' in imported_blueprints else "inactive"
+            },
             "wishlist_system": {
                 "user_routes": "active" if 'user_wishlist_routes' in imported_blueprints else "inactive",
                 "admin_routes": "active" if 'admin_wishlist_routes' in imported_blueprints else "inactive"
@@ -1726,25 +1439,21 @@ def create_app(config_name=None, enable_socketio=True):
                 "user_routes": "active" if 'user_brand_routes' in imported_blueprints else "inactive",
                 "admin_routes": "active" if 'admin_brand_routes' in imported_blueprints else "inactive"
             },
-            # Added notification system status
             "notification_system": {
                 "routes": "active" if 'notification_routes' in imported_blueprints else "inactive"
             },
-            # Added carousel system status
             "carousel_system": {
                 "routes": "active" if 'carousel_routes' in imported_blueprints else "inactive"
             },
             "theme_system": {
                 "routes": "active" if 'theme_routes' in imported_blueprints else "inactive"
             },
-            # ADDED FOOTER SYSTEM STATUS TO HEALTH CHECK
             "footer_system": {
                 "routes": "active" if 'footer_routes' in imported_blueprints else "inactive"
             },
             "side_panel_system": {
                 "routes": "active" if 'side_panel_routes' in imported_blueprints else "inactive"
             },
-            # ADDED TOPBAR SYSTEM STATUS TO HEALTH CHECK
             "topbar_system": {
                 "routes": "active" if 'topbar_routes' in imported_blueprints else "inactive"
             },
@@ -1801,34 +1510,26 @@ def create_app(config_name=None, enable_socketio=True):
                 "cart": "/api/cart",
                 "orders": "/api/orders",
                 "admin": "/api/admin",
-                "search": "/api/search",
+                "meilisearch": "/api/meilisearch",
                 "auth": "/api/auth",
                 "admin_auth": "/api/admin/auth"
             }
         }), 200
     
-    # Ensure CORS credentials header is explicitly set to 'true' for all responses
-    # and mirror the Origin header when it is allowed. This prevents cases where
-    # intermediate handlers or manual OPTIONS responses may leave the
-    # Access-Control-Allow-Credentials header empty which breaks preflight checks
-    # when the frontend uses credentials: 'include'.
     @app.after_request
     def ensure_cors_credentials(response):
         try:
             origin = request.headers.get('Origin')
             allowed = app.config.get('CORS_ORIGINS', []) or []
 
-            # If origin is allowed (or wildcard allowed), mirror it and set credentials
             if origin:
                 if '*' in allowed or origin in allowed:
                     response.headers['Access-Control-Allow-Origin'] = origin
                     response.headers['Access-Control-Allow-Credentials'] = 'true'
 
-            # Always ensure the header exists and is 'true' for credentialed requests
             if 'Access-Control-Allow-Credentials' not in response.headers:
                 response.headers['Access-Control-Allow-Credentials'] = 'true'
         except Exception:
-            # Do not raise errors from the after_request handler
             pass
         return response
 
@@ -1837,27 +1538,20 @@ def create_app(config_name=None, enable_socketio=True):
 
 # Initialize Flask app factory
 def create_app_with_search():
-    """Create Flask app and initialize search system."""
+    """Create Flask app (Meilisearch handles search)."""
     try:
         from app import create_app
         
-        # Create the Flask app
         app = create_app()
         
-        # Setup search index in app context
         with app.app_context():
-            search_ready = check_and_setup_search_index()
-            if search_ready:
-                logger.info("✅ Search system ready")
-            else:
-                logger.warning("⚠️ Search system not fully ready - will use fallback search")
+            app.logger.info("✅ App initialized - Meilisearch handles search.")
         
         return app
         
     except Exception as e:
-        logger.error(f"Error creating app with search: {str(e)}")
+        logger.error(f"Error creating app: {str(e)}")
         
-        # Fallback to basic app creation
         try:
             from app import create_app
             return create_app()
@@ -1866,6 +1560,6 @@ def create_app_with_search():
             raise
 
 # Export the app factory
-__all__ = ['create_app_with_search', 'setup_app_environment', 'initialize_search_system']
+__all__ = ['create_app_with_search', 'setup_app_environment']
 
 logger.info("app package initialized successfully with enhanced admin authentication, payment systems, and split wishlist routes")

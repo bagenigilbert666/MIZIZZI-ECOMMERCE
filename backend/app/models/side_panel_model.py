@@ -4,7 +4,7 @@ Used for Product Showcase and Premium Customer Experience panels
 """
 
 from datetime import datetime, timezone
-from app.configuration.extensions import db
+from ..configuration.extensions import db
 
 class SidePanel(db.Model):
     """Side panel model for managing carousel side panels."""
