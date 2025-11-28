@@ -21,7 +21,6 @@ passlib
 PyJWT
 itsdangerous
 phonenumbers
-
 cryptography
 
 # --------------------------------------
@@ -181,28 +180,11 @@ importlib_resources
 pluggy
 
 # --------------------------------------
-# Machine Learning & Text Processing
-# --------------------------------------
-# NOTE: Heavy ML packages that often need local compilation (scikit-learn,
-# sentence-transformers, faiss, python-Levenshtein, etc.) have been moved to
-# optional install to avoid build failures on hosts without prebuilt wheels.
-# Install them separately in an environment that supports building/wheels:
-#   pip install -r backend/requirements-ml.txt
-#
 numpy
 pandas
 nltk
+fuzzywuzzy
 Pillow
 pytz
-
-# --------------------------------------
-# Cloudinary Image Hosting
-# --------------------------------------
 cloudinary
 
-# Meilisearch dependencies for scripts
-meilisearch
-
-google-auth
-google-auth-oauthlib
-google-api-python-client

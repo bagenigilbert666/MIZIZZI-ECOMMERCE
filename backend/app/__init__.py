@@ -8,51 +8,8 @@ import logging
 from datetime import datetime, timezone, timedelta
 from flask import Flask, jsonify, request, send_from_directory, g
 from flask_migrate import Migrate
-
-# Guard optional imports so scripts can run without an activated venv
-try:
-    from flask_cors import CORS as _CORS
-except Exception:
-    _CORS = None
-    def CORS(app=None, **kwargs):  # minimal no-op fallback
-        return None
-else:
-    CORS = _CORS
-
-try:
-    from flask_jwt_extended import (
-        JWTManager as _JWTManager,
-        get_jwt_identity,
-        create_access_token,
-        jwt_required,
-        verify_jwt_in_request
-    )
-except Exception:
-    # Provide lightweight fallbacks so create_app() can be called in environments
-    # where flask_jwt_extended isn't installed (e.g., running simple seed scripts).
-    class _JWTManager:
-        def __init__(self, app=None):
-            # no-op initializer
-            pass
-
-    def get_jwt_identity():
-        return None
-
-    def create_access_token(*args, **kwargs):
-        raise RuntimeError("flask_jwt_extended not installed")
-
-    def jwt_required(*args, **kwargs):
-        def decorator(fn):
-            return fn
-        return decorator
-
-    def verify_jwt_in_request(*args, **kwargs):
-        return None
-
-    JWTManager = _JWTManager
-else:
-    JWTManager = _JWTManager
-
+from flask_cors import CORS
+from flask_jwt_extended import JWTManager, get_jwt_identity, create_access_token, jwt_required, verify_jwt_in_request
 import uuid
 import werkzeug.utils
 from pathlib import Path
@@ -309,14 +266,9 @@ def create_app(config_name=None, enable_socketio=True):
             if file.filename == '':
                 return jsonify({"error": "No selected file"}), 400
             
-            # Read file to check size before seeking
-            file_content = file.read()
-            if len(file_content) > 5 * 1024 * 1024:
+            if len(file.read()) > 5 * 1024 * 1024:
                 return jsonify({"error": "File too large (max 5MB)"}), 400
-            
-            # Re-create file-like object from content for subsequent operations
-            from io import BytesIO
-            file = BytesIO(file_content)
+            file.seek(0)
             
             allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
             if not ('.' in file.filename and file.filename.rsplit('.', 1)[1].lower() in allowed_extensions):
@@ -327,7 +279,6 @@ def create_app(config_name=None, enable_socketio=True):
             unique_filename = f"{uuid.uuid4().hex}.{file_extension}"
             
             file_path = os.path.join(product_images_dir, unique_filename)
-            file.seek(0) # Reset stream position for saving
             file.save(file_path)
             
             current_user_id = get_jwt_identity()
@@ -655,8 +606,7 @@ def create_app(config_name=None, enable_socketio=True):
         ],
         'admin_shop_categories_routes': [
             ('app.routes.admin.admin_shop_categories_routes', 'admin_shop_categories_routes'),
-            ('routes.admin.admin_shop_categories_routes', 'admin_shop_categories_routes'),
-            ('routes.admin.admin_categories_routes', 'admin_categories_bp')
+            ('routes.admin.admin_shop_categories_routes', 'admin_shop_categories_routes')
         ],
         'product_images_batch_bp': [
             ('app.routes.products.product_images_batch', 'product_images_batch_bp'),
