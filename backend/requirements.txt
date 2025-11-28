@@ -100,7 +100,7 @@ iniconfig
 invoke
 isort
 itsdangerous
-Jinja
+Jinja2
 jmespath
 joblib
 json-logging
@@ -200,8 +200,9 @@ retry
 rich
 rpds-py
 rsa
-ruamelyaml
-ruamelyamlclib
+ruamel.yaml
+ruamel.yaml.clib
+sib-api-v3-sdk
 s3transfer
 safetensors
 safety
@@ -214,7 +215,6 @@ sentence-transformers
 sentry-sdk
 setuptools
 shellingham
-sib-api-v-sdk
 simple-websocket
 six
 smmap
@@ -249,7 +249,7 @@ typer
 typing_extensions
 tzdata
 uritemplate
-urllib
+urllib3
 vine
 wcwidth
 webargs
