@@ -57,13 +57,18 @@ class Config:
 
     # Updated CORS configuration for secure cross-domain requests
     # Allow listing a frontend URL (or comma-separated list) via FRONTEND_URL env var.
-    _frontend_env = os.environ.get('FRONTEND_URL', 'https://mizizzi-ecommerce-3-xny1.vercel.app')
+    # Include both deployed frontend URLs by default; can be overridden via FRONTEND_URL env var.
+    _frontend_env = os.environ.get(
+        'FRONTEND_URL',
+        'https://mizizzi-ecommerce-3-xny1.vercel.app,https://mizizzi-ecommerce-87pr.vercel.app,https://mizizzi-ecommerce-87pr.vercel.app/dd'
+    )
     _frontend_list = [u.strip() for u in _frontend_env.split(',') if u.strip()]
 
     CORS_ORIGINS = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:5000",
+        "https://mizizzi-ecommerce-1.onrender.com",
         "http://127.0.0.1:5000",
     ] + _frontend_list
     CORS_METHODS = ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"]

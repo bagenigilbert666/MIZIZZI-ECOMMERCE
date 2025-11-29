@@ -2,7 +2,7 @@ import path from 'path';
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Ensure Next uses the repository root (one level up from frontend) for output tracing
+  // point output tracing to repo root if needed
   outputFileTracingRoot: path.resolve(process.cwd(), '..'),
   eslint: {
     ignoreDuringBuilds: true,
@@ -11,9 +11,9 @@ const nextConfig = {
     ignoreBuildErrors: true,
   },
   env: {
-    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000',
+    NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL || 'https://mizizzi-ecommerce-1.onrender.com',
     NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000',
-    NEXT_PUBLIC_WEBSOCKET_URL: process.env.NEXT_PUBLIC_WEBSOCKET_URL || 'ws://localhost:5000',
+    NEXT_PUBLIC_WEBSOCKET_URL: process.env.NEXT_PUBLIC_WEBSOCKET_URL || 'wss://mizizzi-ecommerce-1.onrender.com',
     NEXT_PUBLIC_ENABLE_WEBSOCKET: process.env.NEXT_PUBLIC_ENABLE_WEBSOCKET || 'true',
   },
   images: {
@@ -49,9 +49,8 @@ const nextConfig = {
         hostname: 'upload.wikimedia.org',
       },
       {
-        protocol: 'http',
-        hostname: 'localhost',
-        port: '5000',
+        protocol: 'https',
+        hostname: 'mizizzi-ecommerce-1.onrender.com',
         pathname: '/api/uploads/**',
       },
     ],
@@ -68,11 +67,11 @@ const nextConfig = {
     return [
       {
         source: '/api/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/:path*`,
+        destination: `${process.env.NEXT_PUBLIC_API_URL || 'https://mizizzi-ecommerce-1.onrender.com'}/api/:path*`,
       },
       {
         source: '/api/mizizzi_admin/:path*',
-        destination: `${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'}/api/admin/:path*`,
+        destination: `${process.env.NEXT_PUBLIC_API_URL || 'https://mizizzi-ecommerce-1.onrender.com'}/api/admin/:path*`,
       },
     ];
   },
