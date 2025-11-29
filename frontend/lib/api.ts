@@ -1,5 +1,53 @@
 import axios, { type InternalAxiosRequestConfig, type AxiosResponse } from "axios"
 
+// Runtime patch: rewrite any runtime calls from localhost to the Render host.
+// This helps when some modules still use hard-coded "http://localhost:5000" or "ws://localhost:5000".
+if (typeof window !== "undefined") {
+  try {
+    const RENDER_HOST = (process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com").replace(/\/+$/, "")
+    const RENDER_WS = (process.env.NEXT_PUBLIC_WEBSOCKET_URL || RENDER_HOST.replace(/^https?/, "wss")).replace(/\/+$/, "")
+
+    // Patch fetch to rewrite URLs
+    const originalFetch = (window as any).fetch?.bind(window)
+    if (originalFetch) {
+      (window as any).fetch = (input: RequestInfo, init?: RequestInit) => {
+        try {
+          if (typeof input === "string") {
+            input = input.replace("http://localhost:5000", RENDER_HOST).replace("ws://localhost:5000", RENDER_WS)
+          } else if (input instanceof Request) {
+            const newUrl = input.url.replace("http://localhost:5000", RENDER_HOST).replace("ws://localhost:5000", RENDER_WS)
+            input = new Request(newUrl, input)
+          }
+        } catch (e) {
+          // ignore rewrite errors
+        }
+        return originalFetch(input, init)
+      }
+    }
+
+    // Patch WebSocket constructor to rewrite localhost WS urls
+    const OriginalWebSocket = (window as any).WebSocket
+    if (OriginalWebSocket) {
+      (window as any).WebSocket = function (url: string | URL, protocols?: string | string[]) {
+        try {
+          let u = typeof url === "string" ? url : String(url)
+          u = u.replace("ws://localhost:5000", RENDER_WS).replace("http://localhost:5000", RENDER_WS)
+          // @ts-ignore
+          return new OriginalWebSocket(u, protocols)
+        } catch (e) {
+          // Fallback to original if something goes wrong
+          // @ts-ignore
+          return new OriginalWebSocket(url as any, protocols)
+        }
+      }
+      ;(window as any).WebSocket.prototype = OriginalWebSocket.prototype
+    }
+  } catch (e) {
+    // safe-fail
+    console.warn("[v0] runtime localhost -> Render patch failed:", e)
+  }
+}
+
 // Default to Render backend (fall back to env values)
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ||
