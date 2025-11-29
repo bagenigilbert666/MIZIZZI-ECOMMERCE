@@ -1,5 +1,9 @@
+import path from 'path';
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Ensure Next uses the repository root (one level up from frontend) for output tracing
+  outputFileTracingRoot: path.resolve(process.cwd(), '..'),
   eslint: {
     ignoreDuringBuilds: true,
   },
