@@ -68,6 +68,7 @@ class Config:
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://localhost:5000",
+        "https://mizizzi-ecommerce-87pr-ffh57x9o6-jons-projects-a41f528c.vercel.app/",
         "https://mizizzi-ecommerce-1.onrender.com",
         "http://127.0.0.1:5000",
     ] + _frontend_list
