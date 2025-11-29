@@ -3,7 +3,7 @@
  * Handles all API calls related to side panel management
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
 
 export interface SidePanelItem {
   id: number

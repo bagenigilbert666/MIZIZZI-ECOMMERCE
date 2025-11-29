@@ -1,9 +1,12 @@
 import { io } from "socket.io-client"
-import { getBackendUrl } from "@/lib/api"
+import getBackendUrl from "@/lib/api"
 
 // Build ws/wss base URL and socket.io path from backend base URL
-function buildWebSocketOptions() {
-  const backend = getBackendUrl() // e.g. https://mizizzi-ecommerce-1.onrender.com
+async function buildWebSocketOptions() {
+  // getBackendUrl may return a Promise<AxiosResponse> or a string; await and extract string
+  // e.g. "https://mizizzi-ecommerce-1.onrender.com"
+  const resp = await getBackendUrl({})
+  const backend = typeof resp === "string" ? resp : (resp && (resp as any).data) || ""
 
   try {
     const u = new URL(backend)
@@ -22,7 +25,9 @@ function buildWebSocketOptions() {
     }
   } catch (err) {
     // Fallback: assume Render domain without pathname
-    const fallbackHost = getBackendUrl().replace(/^https?:\/\//, "").replace(/\/$/, "")
+    const fallbackResp = await getBackendUrl({}).catch(() => null)
+    const fallback = fallbackResp ? (typeof fallbackResp === "string" ? fallbackResp : (fallbackResp as any).data) : ""
+    const fallbackHost = fallback ? fallback.replace(/^https?:\/\//, "").replace(/\/$/, "") : ""
     return {
       url: `wss://${fallbackHost}`,
       path: "/socket.io",
@@ -30,8 +35,8 @@ function buildWebSocketOptions() {
   }
 }
 
-export function createSocket() {
-  const { url, path } = buildWebSocketOptions()
+export async function createSocket() {
+  const { url, path } = await buildWebSocketOptions()
   // Use websocket transport explicitly to avoid polling attempts to localhost
   return io(url, {
     path,

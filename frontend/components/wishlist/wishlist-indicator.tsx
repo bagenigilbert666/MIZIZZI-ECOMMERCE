@@ -30,6 +30,9 @@ export function WishlistIndicator({ trigger }: { trigger?: React.ReactNode }) {
   const [successMessage, setSuccessMessage] = useState("")
   const [removingItems, setRemovingItems] = useState<Set<number>>(new Set())
 
+  // API error state to surface server issues (eg. 500 on /api/wishlist/user)
+  const [apiError, setApiError] = useState<string | null>(null)
+
   // Auto-open the wishlist when a new item is added
   const [prevCount, setPrevCount] = useState(wishlistState.itemCount)
 
@@ -61,6 +64,34 @@ export function WishlistIndicator({ trigger }: { trigger?: React.ReactNode }) {
       events.forEach((event) => {
   document.removeEventListener(event, handleWishlistEvents as unknown as EventListener)
       })
+    }
+  }, [])
+
+  // Listen for global errors/unhandled promise rejections so we can surface wishlist API failures
+  useEffect(() => {
+    const onError = (e: ErrorEvent) => {
+      // inspect message / filename for wishlist api path
+      const msg = e.message || ""
+      const file = e.filename || ""
+      if (msg.includes("/api/wishlist/user") || file.includes("/api/wishlist/user") || msg.toLowerCase().includes("wishlist")) {
+        setApiError(msg || "Wishlist API error")
+        toast({ title: "Wishlist Error", description: "There was a problem loading your wishlist. Tap retry.", variant: "destructive" })
+      }
+    }
+
+    const onRejection = (e: PromiseRejectionEvent) => {
+      const reason = (e.reason && (e.reason.message || String(e.reason))) || ""
+      if (reason.includes("/api/wishlist/user") || reason.toLowerCase().includes("wishlist")) {
+        setApiError(reason || "Wishlist API error")
+        toast({ title: "Wishlist Error", description: "There was a problem loading your wishlist. Tap retry.", variant: "destructive" })
+      }
+    }
+
+    window.addEventListener("error", onError)
+    window.addEventListener("unhandledrejection", onRejection)
+    return () => {
+      window.removeEventListener("error", onError)
+      window.removeEventListener("unhandledrejection", onRejection)
     }
   }, [])
 
@@ -98,8 +129,12 @@ export function WishlistIndicator({ trigger }: { trigger?: React.ReactNode }) {
     setIsRefreshing(true)
     try {
       await refreshWishlist()
-    } catch (error) {
+      // clear any previously detected API error on success
+      setApiError(null)
+    } catch (error: unknown) {
       console.error("Error refreshing wishlist:", error)
+      const message = error instanceof Error ? error.message : String(error) || "Failed to refresh wishlist"
+      setApiError(message)
     } finally {
       setIsRefreshing(false)
     }
@@ -247,6 +282,25 @@ export function WishlistIndicator({ trigger }: { trigger?: React.ReactNode }) {
               <RefreshCw className={`h-4 w-4 text-gray-500 ${isRefreshing ? "animate-spin" : ""}`} />
             </Button>
           </div>
+          {/* API error banner (shows when we detect server failures for wishlist fetch) */}
+          {apiError && (
+            <div className="mt-4 rounded-md border border-red-200 bg-red-50 dark:bg-red-900/30 p-3 flex items-center justify-between gap-3">
+              <div className="text-sm text-red-700 dark:text-red-200 truncate">
+                Error loading wishlist — {apiError}
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={async () => {
+                    await handleRefresh()
+                  }}
+                >
+                  Retry
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Content */}

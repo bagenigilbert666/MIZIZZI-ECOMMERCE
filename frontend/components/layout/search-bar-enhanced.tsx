@@ -15,7 +15,8 @@ interface EnhancedSearchBarProps {
   containerClassName?: string
 }
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"
+const BACKEND_URL =
+  process.env.NEXT_PUBLIC_BACKEND_URL || process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
 
 const JumiaSearchInput = memo(
   ({

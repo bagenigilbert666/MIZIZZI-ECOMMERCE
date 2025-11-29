@@ -248,7 +248,7 @@ class DashboardService {
   private baseURL: string
 
   constructor() {
-    this.baseURL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+    this.baseURL = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
   }
 
   private getAuthHeaders() {

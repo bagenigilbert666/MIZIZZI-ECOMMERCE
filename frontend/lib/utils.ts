@@ -25,7 +25,7 @@ export const getAuthToken = (): string | null => {
  * @returns The base URL string.
  */
 export const getBaseUrl = (): string => {
-  return process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+  return process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
 }
 
 type LogLevel = "debug" | "info" | "warn" | "error" | "log"

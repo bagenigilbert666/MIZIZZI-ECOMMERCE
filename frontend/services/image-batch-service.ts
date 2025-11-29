@@ -200,7 +200,7 @@ export const imageBatchService = {
 
     try {
       // Use the working endpoint
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
       const url = `${API_BASE_URL}${state.workingEndpoint}`
 
       // Create a controller for timeout
@@ -278,7 +278,7 @@ export const imageBatchService = {
     console.log("Testing batch endpoint availability...")
     state.hasTestedBatchEndpoint = true
 
-    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+    const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
     console.log(`[v0] API Base URL: ${API_BASE_URL}`)
 
     // Try each possible endpoint
@@ -381,7 +381,9 @@ export const imageBatchService = {
     while (retries <= MAX_RETRIES) {
       try {
         const isClient = typeof window !== "undefined"
-        const API_BASE_URL = isClient ? "" : process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+        const API_BASE_URL = isClient
+          ? ""
+          : process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
 
         // Try different possible endpoints - prefer local proxy route first for client-side
         const endpoints = isClient

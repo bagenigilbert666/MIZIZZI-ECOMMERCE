@@ -1,88 +1,8 @@
-import axios, { AxiosResponse, AxiosRequestConfig, InternalAxiosRequestConfig } from "axios"
+import axios, { type InternalAxiosRequestConfig, type AxiosResponse } from "axios"
 
-// Use Render deployment by default to avoid localhost in production
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
-const DEFAULT_TIMEOUT_MS = Number(process.env.NEXT_PUBLIC_API_TIMEOUT_MS) || 30000 // default 30s
-
-// Axios instance with shared baseURL
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: DEFAULT_TIMEOUT_MS,
-  headers: {
-    Accept: "application/json, text/plain, */*",
-    "Content-Type": "application/json",
-  },
-  withCredentials: false, // Set to false by default for public endpoints
-})
-
-export { API_BASE_URL }
-
-// Helper for other modules that previously used process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"
-export function getBackendUrl() {
-  return API_BASE_URL
-}
-
-// Simple prefetch helper used in product service (keeps previous behavior but uses the shared base)
-async function prefetchDataHelper(path: string, params: Record<string, any> = {}) {
-  try {
-    const url = path.startsWith("http") ? path : `${API_BASE_URL}${path.startsWith("/") ? "" : "/"}${path}`
-    await api.get(url, { params })
-    return true
-  } catch (e) {
-    console.warn("prefetchData failed:", e)
-    return false
-  }
-}
-
-export default api
-
-// Runtime patch: rewrite any runtime calls from localhost to the Render host.
-// This helps when some modules still use hard-coded "http://localhost:5000" or "ws://localhost:5000".
-if (typeof window !== "undefined") {
-  try {
-    const RENDER_HOST = (process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com").replace(/\/+$/, "")
-    const RENDER_WS = (process.env.NEXT_PUBLIC_WEBSOCKET_URL || RENDER_HOST.replace(/^https?/, "wss")).replace(/\/+$/, "")
-
-    // Patch fetch to rewrite URLs
-    const originalFetch = (window as any).fetch?.bind(window)
-    if (originalFetch) {
-      (window as any).fetch = (input: RequestInfo, init?: RequestInit) => {
-        try {
-          if (typeof input === "string") {
-            input = input.replace("http://localhost:5000", RENDER_HOST).replace("ws://localhost:5000", RENDER_WS)
-          } else if (input instanceof Request) {
-            const newUrl = input.url.replace("http://localhost:5000", RENDER_HOST).replace("ws://localhost:5000", RENDER_WS)
-            input = new Request(newUrl, input)
-          }
-        } catch (e) {
-          // ignore rewrite errors
-        }
-        return originalFetch(input, init)
-      }
-    }
-
-    // Patch WebSocket constructor to rewrite localhost WS urls
-    const OriginalWebSocket = (window as any).WebSocket
-    if (OriginalWebSocket) {
-      (window as any).WebSocket = function (url: string | URL, protocols?: string | string[]) {
-        try {
-          let u = typeof url === "string" ? url : String(url)
-          u = u.replace("ws://localhost:5000", RENDER_WS).replace("http://localhost:5000", RENDER_WS)
-          // @ts-ignore
-          return new OriginalWebSocket(u, protocols)
-        } catch (e) {
-          // Fallback to original if something goes wrong
-          // @ts-ignore
-          return new OriginalWebSocket(url as any, protocols)
-        }
-      }
-      ;(window as any).WebSocket.prototype = OriginalWebSocket.prototype
-    }
-  } catch (e) {
-    // safe-fail
-    console.warn("[v0] runtime localhost -> Render patch failed:", e)
-  }
-}
+// Add this at the top of the file if it doesn't exist
+const API_BASE_URL =
+  process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "https://mizizzi-ecommerce-1.onrender.com"
 
 // Add request deduplication for product requests to prevent excessive API calls
 // Add this near the top of the file with other helper functions
@@ -361,7 +281,7 @@ const refreshAuthToken = async () => {
   try {
     console.log(`🔄 Attempting to refresh authentication token... (attempt ${refreshAttempts}/${MAX_REFRESH_ATTEMPTS})`)
 
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 15000) // 15 second timeout
@@ -496,21 +416,28 @@ interface CustomAxiosRequestConfig extends InternalAxiosRequestConfig {
   skipDeduplication?: boolean // Add the missing property
   _retry?: boolean // Add property to track retry attempts
   _retryCount?: number // Track number of retries
-  url?: string // Add url property
-  headers: any // Add headers property (required)
 }
 
-// Ensure axios instance default timeout is used consistently
-api.defaults.timeout = DEFAULT_TIMEOUT_MS
+// Create the axios instance
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 15000, // 15 second timeout
+  headers: {
+    "Content-Type": "application/json",
+  },
+  withCredentials: false, // Set to false by default for public endpoints
+})
 
-// Add interceptor for request
-// Store original axios methods before overriding
-const originalGet = api.get.bind(api)
-const originalDelete = api.delete.bind(api)
+// Add request timeout
+api.defaults.timeout = 30000 // 30 seconds timeout
+
+// Store original methods to be able to call them later
+const originalGet = api.get
+const originalDelete = api.delete
 
 // Add interceptor for request
 api.interceptors.request.use(
-  (config: CustomAxiosRequestConfig) => {
+  (config: InternalAxiosRequestConfig) => {
     if (config.url?.includes("/api/refresh")) {
       console.log("[v0] Skipping token validation for refresh request")
       return config
@@ -587,7 +514,7 @@ api.interceptors.request.use(
     console.log(logMessage)
     return config
   },
-  (error: any) => {
+  (error) => {
     console.error("API request error:", error)
     return Promise.reject(error)
   },
@@ -630,7 +557,6 @@ api.interceptors.response.use(
 
       let errorMessage = "Backend server is not available. Please ensure the backend server is running."
 
-      // Check if this is a localhost connection issue
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
       if (apiUrl.includes("localhost")) {
         errorMessage = `Backend server at ${apiUrl} is not responding. Please start the backend server.`
@@ -968,12 +894,12 @@ api.interceptors.response.use(
 
 // Add a function to help with API URL construction
 export const getApiUrl = (path: string): string => {
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
+  const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
   // Validate base URL
   if (!baseUrl.startsWith("http")) {
     console.warn(`[v0] Invalid API base URL: ${baseUrl}. Using default.`)
-    return `https://mizizzi-ecommerce-1.onrender.com${path.startsWith("/") ? path : `/${path}`}`
+    return `http://localhost:5000${path.startsWith("/") ? path : `/${path}`}`
   }
 
   // Ensure we don't have double slashes in the URL
@@ -1004,7 +930,31 @@ export const apiWithCancel = (endpoint: string, config = {}) => {
 
 // Add a function to invalidate cache for specific endpoints
 export const prefetchData = async (url: string, params = {}): Promise<boolean> => {
-  return prefetchDataHelper(url, params)
+  try {
+    await api.get(url, {
+      params,
+      headers: {},
+    })
+    return true
+  } catch (error) {
+    console.error(`Failed to prefetch ${url}:`, error)
+    return false
+  }
+}
+
+// Add a function to help with CORS preflight requests
+export const handlePreflightRequest = async (url: string): Promise<boolean> => {
+  try {
+    // Use fetch with minimal headers for preflight
+    const response = await fetch(url, {
+      method: "OPTIONS",
+      credentials: "include",
+    })
+    return response.ok
+  } catch (error) {
+    console.error("Preflight request failed:", error)
+    return false
+  }
 }
 
 // Add this function to handle CORS preflight requests more effectively
@@ -1050,7 +1000,7 @@ export const checkApiAvailability = async (): Promise<boolean> => {
       }, 3000)
 
       // Use the API base URL domain with a non-existent image to trigger an error without CORS issues
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
       const domain = new URL(baseUrl).origin
       testImage.src = `${domain}/ping-test.gif?t=${timestamp}`
     })
@@ -1060,9 +1010,129 @@ export const checkApiAvailability = async (): Promise<boolean> => {
   }
 }
 
+// Cache management utilities
+export const clearApiCache = (): void => {
+  productRequestCache.clear()
+  pendingApiRequests.clear()
+  console.log("API cache cleared")
+}
+
+export const getCacheStats = (): { size: number; keys: string[] } => {
+  return {
+    size: productRequestCache.size,
+    keys: Array.from(productRequestCache.keys()),
+  }
+}
+
+// Security utilities
+export const clearAuthData = (): void => {
+  const keysToRemove = [
+    "mizizzi_token",
+    "mizizzi_refresh_token",
+    "mizizzi_csrf_token",
+    "admin_token",
+    "admin_refresh_token",
+    "admin_user",
+    "user",
+  ]
+  keysToRemove.forEach((key) => localStorage.removeItem(key))
+  clearApiCache()
+  console.log("Auth data cleared")
+}
+
+// Backend status utilities
+export const isBackendOnline = (): boolean => {
+  return true // Simplified for this version
+}
+
+export const getBackendStatus = (): { online: boolean; lastCheck: number } => {
+  return {
+    online: true,
+    lastCheck: Date.now(),
+  }
+}
+
+// API helper functions
+export const apiHelpers = {
+  // GET request
+  get: <T = any>(url: string, config?: any): Promise<AxiosResponse<T>> => {
+    return api.get<T>(url, config)
+  },
+
+  // POST request
+  post: <T = any>(url: string, data?: any, config?: any): Promise<AxiosResponse<T>> => {
+    return api.post<T>(url, data, config)
+  },
+
+  // PUT request
+  put: <T = any>(url: string, data?: any, config?: any): Promise<AxiosResponse<T>> => {
+    return api.put<T>(url, data, config)
+  },
+
+  // PATCH request
+  patch: <T = any>(url: string, data?: any, config?: any): Promise<AxiosResponse<T>> => {
+    return api.patch<T>(url, data, config)
+  },
+
+  // DELETE request
+  delete: <T = any>(url: string, config?: any): Promise<AxiosResponse<T>> => {
+    return api.delete<T>(url, config)
+  },
+
+  // Upload file
+  upload: <T = any>(url: string, formData: FormData, config?: any): Promise<AxiosResponse<T>> => {
+    return api.post<T>(url, formData, {
+      ...config,
+      headers: {
+        ...config?.headers,
+        "Content-Type": "multipart/form-data",
+      },
+    })
+  },
+
+  // Health check
+  healthCheck: async (): Promise<boolean> => {
+    try {
+      const response = await api.get("/health")
+      return response.status === 200
+    } catch (error) {
+      console.error("Health check failed:", error instanceof Error ? error.message : String(error))
+      return false
+    }
+  },
+}
+
+// Export the main API instance as default
+export default api
+
+// Export types for convenience
+export type { AxiosResponse }
+
+export { api }
+
+if (typeof window !== "undefined") {
+  // Listen for token update events from auth context
+  document.addEventListener("token-updated", (event: any) => {
+    const { token, csrfToken } = event.detail
+    console.log("[v0] Token updated event received, new token available")
+
+    // The token is already stored in localStorage by auth context
+    // This event just notifies us that fresh tokens are available
+  })
+
+  // Listen for token refresh events
+  document.addEventListener("token-refreshed", (event: any) => {
+    const { token } = event.detail
+    console.log("[v0] Token refreshed event received")
+
+    // Process any queued requests with the new token
+    processQueue(null, token)
+  })
+}
+
 export const testBackendConnection = async (): Promise<boolean> => {
   try {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
     // Use a simple fetch request to test connection
     const controller = new AbortController()
@@ -1608,7 +1678,7 @@ api.delete = async <T = any, R = AxiosResponse<T>>(url: string, config?: any): P
     // If the URL is a wishlist endpoint, handle it specially
     if (url.includes("/api/wishlist")) {
       // First, try to make a preflight request
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
       const fullUrl = `${baseUrl}${url.startsWith("/") ? url : `/${url}`}`
 
       try {

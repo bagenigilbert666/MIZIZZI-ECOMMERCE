@@ -1,6 +1,6 @@
 // Handles fetching carousel data from the backend API
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
 
 export interface CarouselBannerDTO {
   id: number

@@ -665,6 +665,12 @@ class AuthService {
 
       console.log("[v0] Calling google.accounts.id.initialize()...")
 
+      if (!window.google) {
+        console.error("[v0] ✗ Google object is not defined")
+        reject(new Error("Google Sign-In library is not available"))
+        return
+      }
+
       window.google.accounts.id.initialize({
         client_id: clientId,
         callback: (response: any) => {
@@ -694,6 +700,12 @@ class AuthService {
       console.log("[v0] ✓ Button container created and added to DOM")
 
       console.log("[v0] Rendering Google Sign-In button...")
+
+      if (!window.google) {
+        console.error("[v0] ✗ Google object is not defined")
+        reject(new Error("Google Sign-In library is not available"))
+        return
+      }
 
       window.google.accounts.id.renderButton(container, {
         theme: "outline",

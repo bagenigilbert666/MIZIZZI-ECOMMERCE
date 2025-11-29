@@ -6,7 +6,7 @@ import { imageCache } from "@/services/image-cache"
 // Only showing the changes needed to integrate with the new batch service
 import { imageBatchService } from "@/services/image-batch-service"
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
 // Safely extract a product list from diverse response shapes
 function extractProducts(payload: any): Product[] {
@@ -83,7 +83,7 @@ const brandsCache = new Map<string, { data: Brand[]; timestamp: number }>()
 const productReviewsCache = new Map<string, { data: any[]; timestamp: number }>() // Separate cache for reviews
 
 // Cache durations
-const CACHE_DURATION = 1000 // 1 second (was 5 minutes)
+const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes for products
 const CATEGORIES_CACHE_DURATION = 30 * 60 * 1000 // 30 minutes for categories
 const BRANDS_CACHE_DURATION = 30 * 60 * 1000 // 30 minutes for brands
 
@@ -328,12 +328,17 @@ export const productService = {
         return null
       }
 
+      const cacheBustTimestamp =
+        typeof window !== "undefined" ? sessionStorage.getItem(`product_${id}_cache_bust`) : null
+
       // Check cache first
       const cacheKey = `product-${id}`
       const now = Date.now()
       const cachedItem = productCache.get(cacheKey)
 
-      if (cachedItem && now - cachedItem.timestamp < CACHE_DURATION) {
+      const shouldSkipCache = cacheBustTimestamp && now - Number.parseInt(cacheBustTimestamp) < 10000 // 10 seconds
+
+      if (cachedItem && now - cachedItem.timestamp < CACHE_DURATION && !shouldSkipCache) {
         console.log(`Using cached product data for id ${id}`)
         return cachedItem.data[0] // Return the first product from the array
       }
@@ -552,7 +557,7 @@ export const productService = {
         return cachedItem.data[0] // Return the first product from the array
       }
 
-      const response = await api.get(`${API_BASE_URL}/api/products/${slug}`)
+      const response = await api.get(`/api/products/${slug}`)
       let product = response.data
 
       // Ensure the product has valid data
@@ -691,7 +696,6 @@ export const productService = {
 
   /**
    * Get top pick products
-   * @param limit Number of products to return
    * @returns Promise resolving to an array of products
    */
   async getTopPicks(limit = 12): Promise<Product[]> {
@@ -759,9 +763,9 @@ export const productService = {
 
       // Make the API request for missing products
       console.log(`Fetching ${missingIds.length} products from API: ${missingIds.join(", ")}`)
-      const response = await api.get(`${API_BASE_URL}/api/products`, {
-         params: { ids: missingIds.join(",") },
-       })
+      const response = await api.get("/api/products", {
+        params: { ids: missingIds.join(",") },
+      })
 
       console.log("API response for products by IDs:", response.data)
 
@@ -812,17 +816,17 @@ export const productService = {
       )
 
       // Add enhanced products to map and cache
-            enhancedApiProducts.forEach((product: Product) => {
-              const productId = product.id.toString()
-              productMap.set(productId, product)
-      
-              // Update cache
-              const cacheKey = `product-${productId}`
-              productCache.set(cacheKey, {
-                data: [product], // Cache as an array
-                timestamp: Date.now(),
-              })
-            })
+      enhancedApiProducts.forEach((product) => {
+        const productId = product.id.toString()
+        productMap.set(productId, product)
+
+        // Update cache
+        const cacheKey = `product-${productId}`
+        productCache.set(cacheKey, {
+          data: [product], // Cache as an array
+          timestamp: Date.now(),
+        })
+      })
 
       // Check which IDs are still missing
       const stillMissingIds = requestedIds.filter((id) => !productMap.has(id))
@@ -870,7 +874,7 @@ export const productService = {
         return cachedItem.data[0] // Return the first product from the array
       }
 
-      const response = await api.get(`${API_BASE_URL}/api/products/${productId}?include=details,variants,images,stock`)
+      const response = await api.get(`/api/products/${productId}?include=details,variants,images,stock`)
       return response.data
     } catch (error) {
       console.error(`Error fetching product ${productId} for cart:`, error)
@@ -995,7 +999,7 @@ export const productService = {
    * @returns Promise resolving to a boolean
    */
   async prefetchProductsByCategory(categoryId: string): Promise<boolean> {
-    return prefetchData(`${API_BASE_URL}/api/products`, { category_id: categoryId, limit: 12 })
+    return prefetchData("/api/products", { category_id: categoryId, limit: 12 })
   },
 
   /**
@@ -1005,9 +1009,9 @@ export const productService = {
     try {
       await Promise.allSettled([
         this.prefetchProductsByCategory("featured"),
-        prefetchData(`${API_BASE_URL}/api/products`, { flash_sale: true }),
-        prefetchData(`${API_BASE_URL}/api/products`, { luxury_deal: true }),
-        prefetchData(`${API_BASE_URL}/api/products`, { limit: 12 }),
+        prefetchData("/api/products", { flash_sale: true }),
+        prefetchData("/api/products", { luxury_deal: true }),
+        prefetchData("/api/products", { limit: 12 }),
       ])
     } catch (error) {
       console.error("Error prefetching homepage products:", error)
@@ -1030,7 +1034,7 @@ export const productService = {
         return Array.isArray(cachedItem.data) ? cachedItem.data : [cachedItem.data]
       }
 
-      const backendUrl = API_BASE_URL
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"
       const response = await fetch(`${backendUrl}/api/products/${productId}/reviews`, {
         method: "GET",
         headers: {
@@ -1066,7 +1070,7 @@ export const productService = {
    */
   async getProductReviewSummary(productId: number): Promise<any> {
     try {
-      const backendUrl = API_BASE_URL
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"
       const response = await fetch(`${backendUrl}/api/products/${productId}/reviews/summary`, {
         method: "GET",
         headers: {
@@ -1105,7 +1109,7 @@ export const productService = {
     },
   ): Promise<any> {
     try {
-      const backendUrl = API_BASE_URL
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"
       const token = localStorage.getItem("mizizzi_token")
 
       if (!token) {
@@ -1154,7 +1158,7 @@ export const productService = {
     },
   ): Promise<any> {
     try {
-      const backendUrl = API_BASE_URL
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"
       const token = localStorage.getItem("mizizzi_token")
 
       if (!token) {
@@ -1190,7 +1194,7 @@ export const productService = {
    */
   async deleteReview(reviewId: number): Promise<void> {
     try {
-      const backendUrl = API_BASE_URL
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"
       const token = localStorage.getItem("mizizzi_token")
 
       if (!token) {
@@ -1241,7 +1245,7 @@ export const productService = {
         return cachedItem.data
       }
 
-      const response = await api.get(`${API_BASE_URL}/api/categories`)
+      const response = await api.get("/api/categories")
       const categories = response.data.items || response.data || []
 
       // Cache the categories
@@ -1273,7 +1277,7 @@ export const productService = {
         return cachedItem.data
       }
 
-      const response = await api.get(`${API_BASE_URL}/api/brands`)
+      const response = await api.get("/api/brands")
       const brands = response.data.items || response.data || []
 
       // Cache the brands

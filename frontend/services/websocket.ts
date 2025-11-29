@@ -59,7 +59,7 @@ class WebSocketService {
         console.log("[v0] Environment variable:", process.env.NEXT_PUBLIC_ENABLE_WEBSOCKET)
 
         const socketUrl =
-          process.env.NEXT_PUBLIC_WEBSOCKET_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+          process.env.NEXT_PUBLIC_WEBSOCKET_URL || process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
 
         console.log("[v0] Connecting to WebSocket URL:", socketUrl)
 

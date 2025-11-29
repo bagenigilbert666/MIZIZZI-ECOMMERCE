@@ -2,7 +2,7 @@
 export const config = {
   // API Configuration
   api: {
-    baseUrl: process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000",
+    baseUrl: process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com",
     timeout: 30000, // 30 seconds
   },
 
@@ -15,7 +15,7 @@ export const config = {
 
   // WebSocket Configuration
   websocket: {
-    url: process.env.NEXT_PUBLIC_WEBSOCKET_URL || "ws://localhost:5000",
+    url: process.env.NEXT_PUBLIC_WEBSOCKET_URL || "wss://mizizzi-ecommerce-1.onrender.com",
     enabled: process.env.NEXT_PUBLIC_ENABLE_WEBSOCKET === "true",
   },
 

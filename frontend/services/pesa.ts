@@ -61,7 +61,7 @@ class PesaService {
   private token: string | null = null
 
   constructor() {
-    this.baseUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"
+    this.baseUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "https://mizizzi-ecommerce-1.onrender.com"
     console.log("[PesaService] Initialized with backend URL:", this.baseUrl)
     console.log("[PesaService] Environment variables:", {
       NEXT_PUBLIC_API_URL: process.env.NEXT_PUBLIC_API_URL,

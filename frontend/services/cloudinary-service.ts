@@ -45,7 +45,7 @@ class CloudinaryService {
   private apiKey: string
 
   constructor() {
-    this.baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+    this.baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
     this.cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || ""
     this.uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || ""
     this.apiKey = process.env.NEXT_PUBLIC_CLOUDINARY_API_KEY || ""

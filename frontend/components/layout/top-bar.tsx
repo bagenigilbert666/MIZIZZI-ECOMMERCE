@@ -5,6 +5,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { Star, ChevronRight } from 'lucide-react'
 import { cn } from "@/lib/utils"
+import { API_BASE_URL } from "@/lib/config" // added import
 
 interface TopBarSlide {
   id: number
@@ -29,7 +30,8 @@ export function TopBar() {
   useEffect(() => {
     const fetchSlides = async () => {
       try {
-        const response = await fetch('http://localhost:5000/api/topbar/slides')
+        const url = `${API_BASE_URL}/api/topbar/slides` // use configured base URL
+        const response = await fetch(url)
         const data = await response.json()
         
         if (data.success && data.slides.length > 0) {
@@ -38,6 +40,8 @@ export function TopBar() {
         setLoading(false)
       } catch (error) {
         console.error('[v0] Error fetching topbar slides:', error)
+        // log the attempted URL to help debugging connection issues
+        console.error('[v0] Request URL:', `${API_BASE_URL}/api/topbar/slides`)
         setLoading(false)
       }
     }

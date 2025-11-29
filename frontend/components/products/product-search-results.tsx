@@ -58,7 +58,7 @@ const ProductImageWithBatch = ({ product }: { product: Product }) => {
           const firstImage = cachedImages[0]
           const imageUrl = firstImage.image_url?.startsWith("http")
             ? firstImage.image_url
-            : `${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/api/uploads/product_images/${firstImage.image_url?.split("/").pop()}`
+            : `${process.env.NEXT_PUBLIC_BACKEND_URL || "https://mizizzi-ecommerce-1.onrender.com"}/api/uploads/product_images/${firstImage.image_url?.split("/").pop()}`
 
           setImageUrl(imageUrl)
           setIsLoadingImage(false)
@@ -72,7 +72,7 @@ const ProductImageWithBatch = ({ product }: { product: Product }) => {
           const firstImage = images[0]
           const imageUrl = firstImage.image_url?.startsWith("http")
             ? firstImage.image_url
-            : `${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/api/uploads/product_images/${firstImage.image_url?.split("/").pop()}`
+            : `${process.env.NEXT_PUBLIC_BACKEND_URL || "https://mizizzi-ecommerce-1.onrender.com"}/api/uploads/product_images/${firstImage.image_url?.split("/").pop()}`
 
           setImageUrl(imageUrl)
         } else {
@@ -82,7 +82,7 @@ const ProductImageWithBatch = ({ product }: { product: Product }) => {
             : product.image?.startsWith("http")
               ? product.image
               : product.thumbnail_url || product.image
-                ? `${process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"}/api/uploads/product_images/${(product.thumbnail_url || product.image)?.split("/").pop()}`
+                ? `${process.env.NEXT_PUBLIC_BACKEND_URL || "https://mizizzi-ecommerce-1.onrender.com"}/api/uploads/product_images/${(product.thumbnail_url || product.image)?.split("/").pop()}`
                 : "/diverse-products-still-life.png"
 
           setImageUrl(fallbackUrl)

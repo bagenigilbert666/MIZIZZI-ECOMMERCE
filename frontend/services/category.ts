@@ -33,7 +33,9 @@ function sanitizeParams<T extends Record<string, any>>(params: T): Partial<T> {
 }
 
 const getBaseUrl = () => {
-  return process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"
+  return (
+    process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "https://mizizzi-ecommerce-1.onrender.com"
+  )
 }
 
 const normalizeImageUrl = (url: string | undefined | null): string | undefined => {
@@ -78,7 +80,7 @@ export const categoryService = {
         delete cleanParams.parent_id
       }
 
-      delete cleanParams.signal
+      delete (cleanParams as Record<string, any>).signal
 
       const cacheKey = `categories-${JSON.stringify(cleanParams)}`
 

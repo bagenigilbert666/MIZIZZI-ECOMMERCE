@@ -146,7 +146,7 @@ export function NetworkStatus({ className }: NetworkStatusProps) {
     setRetryCount((prev) => prev + 1)
 
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
       const healthEndpoints = [
         `${baseUrl}/api/health`,
         `${baseUrl}/api/health-check`,
