@@ -1581,16 +1581,32 @@ api.get = async <T = any, R = AxiosResponse<T>>(url: string, config?: any): Prom
 
       while (attempt < MAX_ATTEMPTS) {
         attempt++
+        // Per-request timeout override to reduce false timeouts for product lists
+        const timeoutMs = safeConfig.timeout ?? 45000 // 45s default for product requests
+
+        // Create an AbortController for this attempt to ensure the signal is respected
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => {
+          try {
+            controller.abort()
+          } catch (e) {
+            // ignore
+          }
+        }, timeoutMs)
+
         try {
-          // Per-request timeout override to reduce false timeouts for product lists
-          const timeoutMs = safeConfig.timeout ?? 45000 // 45s default for product requests
-          const response = (await originalGet.call(api, url, {
-            ...safeConfig,
+          const response = (await api.request({
+            method: "get",
+            url,
+            signal: controller.signal,
             withCredentials: false,
             timeout: timeoutMs,
+            ...safeConfig,
           })) as R
 
-          // Cache the successful response
+          clearTimeout(timeoutId)
+
+          // Cache the successful response (store the raw data)
           const axiosResponse = response as unknown as AxiosResponse<any>
           productRequestCache.set(requestKey, {
             data: axiosResponse.data,
@@ -1599,9 +1615,17 @@ api.get = async <T = any, R = AxiosResponse<T>>(url: string, config?: any): Prom
 
           return response
         } catch (error: any) {
+          clearTimeout(timeoutId)
           lastError = error
 
-          const isTimeout = error?.code === "ECONNABORTED" || (error?.message || "").toLowerCase().includes("timeout")
+          const errMsg = (error && (error.message || "")).toString().toLowerCase()
+          const isTimeout =
+            error?.code === "ECONNABORTED" ||
+            error?.code === "ERR_ABORTED" ||
+            error?.code === "ERR_CANCELED" ||
+            errMsg.includes("timeout") ||
+            errMsg.includes("aborted") ||
+            errMsg.includes("canceled")
           const isNetwork =
             error?.message === "Network Error" || error?.code === "ERR_NETWORK" || error?.code === "ECONNREFUSED"
 
@@ -1614,11 +1638,16 @@ api.get = async <T = any, R = AxiosResponse<T>>(url: string, config?: any): Prom
           // If we've exhausted attempts, cleanup and throw
           if (attempt >= MAX_ATTEMPTS) {
             pendingApiRequests.delete(requestKey)
+            console.warn(`[v0] Product request failed after ${attempt} attempts:`, error?.message || error)
             throw lastError || error
           }
 
           // Exponential backoff before retrying
           const backoffMs = Math.min(500 * Math.pow(2, attempt - 1), 5000)
+          console.warn(
+            `[v0] Product request to ${url} failed (attempt ${attempt}/${MAX_ATTEMPTS}). Retrying in ${backoffMs}ms...`,
+            error?.message || error,
+          )
           await new Promise((res) => setTimeout(res, backoffMs))
           // continue retry loop
         }
@@ -1642,4 +1671,3 @@ api.get = async <T = any, R = AxiosResponse<T>>(url: string, config?: any): Prom
     throw error
   }
 }
-   
