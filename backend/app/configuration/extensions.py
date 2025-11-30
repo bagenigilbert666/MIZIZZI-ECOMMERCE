@@ -66,15 +66,46 @@ def init_extensions(app):
     }
     cache.init_app(app, config=cache_config)
     
-    cors.init_app(app, 
-        origins=app.config.get('CORS_ORIGINS', ['http://localhost:3000']),
-        supports_credentials=True,
-        allow_headers=[
-            'Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 
+    # Normalize CORS origins (accept list or comma-separated string), strip trailing slashes and dedupe
+    def _sanitize_origins(raw):
+        out = []
+        seen = set()
+        if not raw:
+            return out
+        if isinstance(raw, str):
+            items = [i.strip() for i in raw.split(',') if i.strip()]
+        elif isinstance(raw, (list, tuple, set)):
+            items = list(raw)
+        else:
+            items = [raw]
+        for u in items:
+            if not isinstance(u, str):
+                continue
+            norm = u.rstrip('/')
+            if norm and norm not in seen:
+                seen.add(norm)
+                out.append(norm)
+        return out
+    
+    raw_origins = app.config.get('CORS_ORIGINS', ['http://localhost:3000'])
+    origins = _sanitize_origins(raw_origins)
+    if not origins:
+        # fallback to localhost if nothing provided
+        origins = ['http://localhost:3000']
+
+    app.logger.info(f"Configured CORS origins: {origins}")
+
+    cors.init_app(
+        app,
+        resources={r"/*": {"origins": origins}},
+        supports_credentials=app.config.get('CORS_SUPPORTS_CREDENTIALS', True),
+        allow_headers=app.config.get('CORS_ALLOW_HEADERS', [
+            'Content-Type', 'Authorization', 'X-Requested-With', 'Accept',
             'Origin', 'X-CSRF-TOKEN', 'X-CSRF-Token', 'Cache-Control'
-        ],
-        methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD'],
-        max_age=86400
+        ]),
+        expose_headers=app.config.get('CORS_EXPOSE_HEADERS', ['Content-Range', 'X-Content-Range']),
+        methods=app.config.get('CORS_METHODS', ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH', 'HEAD']),
+        max_age=app.config.get('CORS_MAX_AGE', 86400)
     )
     
     # Migrations
@@ -82,13 +113,15 @@ def init_extensions(app):
     
     # Rate limiting
     try:
+        limiter_storage = app.config.get('RATELIMIT_STORAGE_URI', app.config.get('REDIS_URL', 'memory://'))
         limiter.init_app(
             app,
             key_func=get_remote_address,
             default_limits=[app.config.get('RATELIMIT_DEFAULT', '1000 per hour')],
-            in_memory_fallback_enabled=True
+            storage_uri=limiter_storage,
+            in_memory_fallback_enabled=app.config.get('RATELIMIT_IN_MEMORY_FALLBACK_ENABLED', True)
         )
-        logger.info(f"Rate limiter initialized with default: {app.config.get('RATELIMIT_DEFAULT', '1000 per hour')}")
+        logger.info(f"Rate limiter initialized with default: {app.config.get('RATELIMIT_DEFAULT', '1000 per hour')} using storage: {limiter_storage}")
     except Exception as e:
         logger.error(f"Error initializing rate limiter: {e}")
         # Continue anyway, limiter may already be initialized
