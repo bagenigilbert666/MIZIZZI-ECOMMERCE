@@ -243,15 +243,22 @@ def create_app(config_name=None, enable_socketio=True):
     app.config['CORS_ORIGINS'] = allowed_origins
     
     # Initialize Flask-CORS
-    CORS(
-        app,
-        resources={r"/*": {"origins": "*"}},
-        supports_credentials=True,
-        allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Cache-Control", "cache-control", "Pragma", "Expires", "X-MFA-Token", "Accept", "Origin"],
-        methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"],
-        expose_headers=["Content-Range", "X-Content-Range"],
-        max_age=86400
-    )
+    cors_origins = app.config.get('CORS_ORIGINS', None)
+    try:
+        CORS(
+            app,
+            resources={r"/*": {"origins": cors_origins}},
+            supports_credentials=app.config.get('CORS_SUPPORTS_CREDENTIALS', True),
+            allow_headers=app.config.get('CORS_ALLOW_HEADERS'),
+            methods=app.config.get('CORS_METHODS'),
+            expose_headers=app.config.get('CORS_EXPOSE_HEADERS'),
+            max_age=app.config.get('CORS_MAX_AGE', 86400)
+        )
+        app.logger.info("Flask-CORS initialized using app.config['CORS_ORIGINS']")
+    except Exception as e:
+        app.logger.warning(f"Flask-CORS initialization failed, falling back to permissive headers: {e}")
+        # Fallback: still allow preflight to succeed; after_request hook will enforce single origin header.
+        CORS(app, resources={r"/*": {"origins": "*"}}, supports_credentials=True)
 
     @app.after_request
     def add_cors_headers(response):
@@ -1350,98 +1357,81 @@ def create_app(config_name=None, enable_socketio=True):
     try:
         with app.app_context():
             if can_connect_to_db(app):
+                # Try a central create_all() but never let a RuntimeError related to an unregistered
+                # SQLAlchemy instance abort the whole startup. Many route modules create their own
+                # SQLAlchemy() instances — guard against that.
                 try:
                     db.create_all()
-
-                    try:
-                        from .routes.admin.admin_auth import init_admin_auth_tables
-                        init_admin_auth_tables()
-                        app.logger.info("Admin authentication tables initialized successfully")
-                    except ImportError:
-                        try:
-                            from routes.admin.admin_auth import init_admin_auth_tables
-                            init_admin_auth_tables()
-                            app.logger.info("Admin authentication tables initialized successfully")
-                        except ImportError:
-                            app.logger.warning("Admin authentication tables initialization skipped - module not found")
-
-                    try:
-                        from .routes.admin.admin_google_auth import init_admin_google_auth_tables
-                        init_admin_google_auth_tables()
-                        app.logger.info("Admin Google authentication tables initialized successfully")
-                    except ImportError:
-                        try:
-                            from routes.admin.admin_google_auth import init_admin_google_auth_tables
-                            init_admin_google_auth_tables()
-                            app.logger.info("Admin Google authentication tables initialized successfully")
-                        except ImportError:
-                            app.logger.warning("Admin Google authentication tables initialization skipped - module not found")
-
-                    try:
-                        from .routes.admin.admin_email_routes import init_admin_email_tables
-                        init_admin_email_tables()
-                        app.logger.info("Admin email tables initialized successfully")
-                    except ImportError:
-                        try:
-                            from routes.admin.admin_email_routes import init_admin_email_tables
-                            init_admin_email_tables()
-                            app.logger.info("Admin email tables initialized successfully")
-                        except ImportError:
-                            app.logger.warning("Admin email tables initialization skipped - module not found")
-
-                    try:
-                        from .routes.footer.footer_routes import init_footer_tables
-                        init_footer_tables(app)
-                        app.logger.info("Footer tables initialized successfully")
-                    except ImportError:
-                        try:
-                            from routes.footer.footer_routes import init_footer_tables
-                            init_footer_tables(app)
-                            app.logger.info("Footer tables initialized successfully")
-                        except ImportError:
-                            app.logger.warning("Footer tables initialization skipped - module not found")
-
-                    try:
-                        from .models.side_panel_model import SidePanel
-                        app.logger.info("Side panel model imported successfully")
-                    except ImportError:
-                        try:
-                            from models.side_panel_model import SidePanel
-                            app.logger.info("Side panel model imported successfully")
-                        except ImportError:
-                            app.logger.warning("Side panel model not found - side panel system will not be available")
-
-                    try:
-                        from .routes.contact_cta.contact_cta_routes import init_contact_cta_tables
-                        init_contact_cta_tables()
-                        app.logger.info("Contact CTA tables initialized successfully")
-                    except ImportError:
-                        try:
-                            from routes.contact_cta.contact_cta_routes import init_contact_cta_tables
-                            init_contact_cta_tables()
-                            app.logger.info("Contact CTA tables initialized successfully")
-                        except ImportError:
-                            app.logger.warning("Contact CTA tables initialization skipped - module not found")
-
-                    try:
-                        from .routes.products.featured_routes import init_featured_routes_tables
-                        init_featured_routes_tables()
-                        app.logger.info("Featured routes tables initialized successfully")
-                    except ImportError:
-                        app.logger.warning("Featured routes tables initialization skipped - module not found")
-                        
-                    try:
-                        from .routes.meilisearch.meilisearch_routes import init_meilisearch_tables
-                        init_meilisearch_tables()
-                        app.logger.info("Meilisearch tables initialized successfully")
-                    except ImportError:
-                        app.logger.warning("Meilisearch tables initialization skipped - module not found")
-
-                    app.logger.info("Database tables created successfully")
+                    app.logger.info("db.create_all() executed")
+                except RuntimeError as re:
+                    app.logger.warning(f"Skipping db.create_all() due to runtime error (likely different SQLAlchemy instance): {re}")
                 except Exception as e:
-                    app.logger.error(f"Error creating database tables or initializing admin tables: {str(e)}")
-                    import traceback
-                    app.logger.error(traceback.format_exc())
+                    app.logger.error(f"Unexpected error running db.create_all(): {e}")
+
+                # Helper to import and call init functions robustly.
+                import inspect
+                def _safe_init(import_paths, func_name, pass_app=False):
+                    """Try importing the init function from a list of modules and call it safely."""
+                    for module_path in import_paths:
+                        try:
+                            module = __import__(module_path, fromlist=[func_name])
+                            func = getattr(module, func_name, None)
+                            if not func:
+                                continue
+
+                            try:
+                                sig = inspect.signature(func)
+                                # If function accepts app, pass it; otherwise try without
+                                if pass_app or len(sig.parameters) == 1:
+                                    func(app)
+                                else:
+                                    func()
+                                app.logger.info(f"{func_name} initialized from {module_path}")
+                                return True
+                            except TypeError:
+                                # Fallback: call without args
+                                try:
+                                    func()
+                                    app.logger.info(f"{func_name} initialized from {module_path} (no-arg fallback)")
+                                    return True
+                                except RuntimeError as re:
+                                    app.logger.warning(f"{func_name} from {module_path} raised RuntimeError: {re}")
+                                    return False
+                                except Exception as e:
+                                    app.logger.warning(f"{func_name} from {module_path} failed: {e}")
+                                    continue
+                            except RuntimeError as re:
+                                app.logger.warning(f"{func_name} from {module_path} raised runtime error (likely DB/SQLA mismatch): {re}")
+                                return False
+                            except Exception as e:
+                                app.logger.warning(f"Error calling {func_name} from {module_path}: {e}")
+                                continue
+                        except ImportError:
+                            continue
+                    app.logger.debug(f"{func_name} not found in paths: {import_paths}")
+                    return False
+
+                # Call init functions with multiple fallback paths
+                _safe_init(['app.routes.admin.admin_auth', 'routes.admin.admin_auth'], 'init_admin_auth_tables', pass_app=False)
+                _safe_init(['app.routes.admin.admin_google_auth', 'routes.admin.admin_google_auth'], 'init_admin_google_auth_tables', pass_app=False)
+                _safe_init(['app.routes.admin.admin_email_routes', 'routes.admin.admin_email_routes'], 'init_admin_email_tables', pass_app=False)
+                _safe_init(['app.routes.footer.footer_routes', 'routes.footer.footer_routes'], 'init_footer_tables', pass_app=True)
+                # import-only checks (no init) - optional
+                try:
+                    # side panel model import attempt
+                    from .models.side_panel_model import SidePanel
+                    app.logger.info("Side panel model imported successfully")
+                except Exception:
+                    try:
+                        from models.side_panel_model import SidePanel
+                        app.logger.info("Side panel model imported successfully (alt path)")
+                    except Exception:
+                        app.logger.warning("Side panel model not found - side panel system will not be available")
+
+                _safe_init(['app.routes.contact_cta.contact_cta_routes', 'routes.contact_cta.contact_cta_routes'], 'init_contact_cta_tables', pass_app=False)
+                _safe_init(['app.routes.products.featured_routes', 'routes.products.featured_routes'], 'init_featured_routes_tables', pass_app=False)
+                _safe_init(['app.routes.meilisearch.meilisearch_routes', 'routes.meilisearch.meilisearch_routes', 'app.routes.meilisearch', 'routes.meilisearch'], 'init_meilisearch_tables', pass_app=False)
+                app.logger.info("Database initialization step completed (individual init calls are resilient)")
             else:
                 app.logger.warning(
                     "Database is not reachable - skipping db.create_all() and admin table initializations.\n"
