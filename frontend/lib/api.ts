@@ -1543,9 +1543,25 @@ api.get = async <T = any, R = AxiosResponse<T>>(url: string, config?: any): Prom
   if (url.includes("/api/products") && safeConfig.method !== "POST") {
     const requestKey = createRequestKey(url, safeConfig.params, "GET")
 
-    // Check if we're on the server side
+    // Check client-side cache first
+    if (typeof window !== "undefined") {
+      const cached = productRequestCache.get(requestKey)
+      if (cached && Date.now() - cached.timestamp < PRODUCT_CACHE_TTL) {
+        console.log(
+          `[v0] Returning cached products (${Math.round((Date.now() - cached.timestamp) / 1000)}s old) for ${url}`,
+        )
+        return {
+          data: cached.data,
+          status: 200,
+          statusText: "OK (Cache)",
+          headers: {},
+          config: safeConfig,
+        } as unknown as R
+      }
+    }
+
+    // Server-side request - don't use deduplication or caching
     if (typeof window === "undefined") {
-      // Server-side request - don't use deduplication or caching
       try {
         return (await originalGet.call(api, url, {
           ...safeConfig,
@@ -1557,144 +1573,73 @@ api.get = async <T = any, R = AxiosResponse<T>>(url: string, config?: any): Prom
       }
     }
 
-    // Client-side - use deduplicateRequest to handle caching and deduplication
+    // Client-side - use deduplicateRequest to handle caching, deduplication and retries
     return deduplicateRequest(requestKey, async () => {
-      try {
-        const response = (await originalGet.call(api, url, {
-          ...safeConfig,
-          withCredentials: false, // Public products endpoint doesn't need credentials
-        })) as R
+      const MAX_ATTEMPTS = 3
+      let attempt = 0
+      let lastError: any = null
 
-        // Cache the response - cast to AxiosResponse first
-        const axiosResponse = response as AxiosResponse<T>
-        productRequestCache.set(requestKey, {
-          data: axiosResponse.data,
-          timestamp: Date.now(),
-        })
+      while (attempt < MAX_ATTEMPTS) {
+        attempt++
+        try {
+          // Per-request timeout override to reduce false timeouts for product lists
+          const timeoutMs = safeConfig.timeout ?? 45000 // 45s default for product requests
+          const response = (await originalGet.call(api, url, {
+            ...safeConfig,
+            withCredentials: false,
+            timeout: timeoutMs,
+          })) as R
 
-        return response
-      } catch (error) {
-        // Remove from pending requests on error
+          // Cache the successful response
+          const axiosResponse = response as unknown as AxiosResponse<any>
+          productRequestCache.set(requestKey, {
+            data: axiosResponse.data,
+            timestamp: Date.now(),
+          })
+
+          return response
+        } catch (error: any) {
+          lastError = error
+
+          const isTimeout = error?.code === "ECONNABORTED" || (error?.message || "").toLowerCase().includes("timeout")
+          const isNetwork =
+            error?.message === "Network Error" || error?.code === "ERR_NETWORK" || error?.code === "ECONNREFUSED"
+
+          // If non-retriable error, cleanup and throw
+          if (!isTimeout && !isNetwork) {
+            pendingApiRequests.delete(requestKey)
+            throw error
+          }
+
+          // If we've exhausted attempts, cleanup and throw
+          if (attempt >= MAX_ATTEMPTS) {
+            pendingApiRequests.delete(requestKey)
+            throw lastError || error
+          }
+
+          // Exponential backoff before retrying
+          const backoffMs = Math.min(500 * Math.pow(2, attempt - 1), 5000)
+          await new Promise((res) => setTimeout(res, backoffMs))
+          // continue retry loop
+        }
+      }
+
+      // If we exit loop without a return, ensure we clean up and throw
+      if (lastError) {
         pendingApiRequests.delete(requestKey)
-        throw error
+        throw lastError
       }
+
+      pendingApiRequests.delete(requestKey)
+      throw new Error("Failed to fetch product data")
     })
   }
 
-  // Special handling for admin endpoints
-  if (url.includes("/api/admin/")) {
-    // Check if we're on the server side
-    if (typeof window === "undefined") {
-      // Server-side admin request - use simple axios call
-      try {
-        return (await originalGet.call(api, url, {
-          ...safeConfig,
-          withCredentials: true, // Admin endpoints need credentials
-        })) as R
-      } catch (error) {
-        console.error(`Server-side admin API request to ${url} failed:`, error)
-        throw error
-      }
-    }
-
-    try {
-      console.log(`Making request to admin endpoint: ${url}`)
-
-      // Get the admin token - prioritize admin_token, then fall back to mizizzi_token
-      let adminToken = localStorage.getItem("admin_token")
-      if (!adminToken || adminToken === "null" || adminToken !== "undefined") {
-        adminToken = localStorage.getItem("mizizzi_token")
-      }
-
-      if (!adminToken || adminToken === "null" || adminToken === "undefined") {
-        console.error("No admin token available for admin endpoint request")
-        throw new Error("No authentication token available")
-      }
-
-      // Validate the token before using it
-      if (!validateAdminToken(adminToken)) {
-        console.error("❌ Invalid admin token, clearing and throwing error")
-        const keysToRemove = ["admin_token", "admin_refresh_token", "mizizzi_token", "mizizzi_refresh_token"]
-        keysToRemove.forEach((key) => localStorage.removeItem(key))
-        throw new Error("Invalid authentication token")
-      }
-
-      console.log(`Using validated admin token: ${adminToken.substring(0, 10)}...`)
-
-      // Use the original get method with proper headers
-      const response = (await originalGet.call(api, url, {
-        ...safeConfig,
-        headers: {
-          ...safeConfig.headers,
-          Authorization: `Bearer ${adminToken}`,
-          "Content-Type": "application/json",
-          Accept: "application/json",
-        },
-        withCredentials: true, // Admin endpoints need credentials
-      })) as R
-
-      console.log(`Admin endpoint response status: ${(response as AxiosResponse).status}`)
-      return response
-    } catch (error: any) {
-      console.error(`Error fetching admin endpoint ${url}:`, error)
-
-      // If it's a 401 error, don't try to refresh here - let the response interceptor handle it
-      throw error
-    }
-  }
-
-  // Use the original get method with credentials only for authenticated endpoints
-  const response = (await originalGet.call(api, url, {
-    ...safeConfig,
-    withCredentials: isAuthenticatedEndpoint, // Only use credentials for authenticated endpoints
-  })) as R
-
-  // Cache product responses - cast to AxiosResponse first
-  const axiosResponse = response as AxiosResponse<T>
-  if (url.includes("/api/products") && axiosResponse.status === 200) {
-    const cacheKey = `${url}${safeConfig ? JSON.stringify(safeConfig) : ""}`
-    productRequestCache.set(cacheKey, {
-      data: axiosResponse.data,
-      timestamp: Date.now(),
-    })
-  }
-
-  return response
-}
-
-// Override the delete method to properly handle CORS
-api.delete = async <T = any, R = AxiosResponse<T>>(url: string, config?: any): Promise<R> => {
-  const isAuthenticatedEndpoint = url.includes("/api/admin/") || url.includes("/profile") || url.includes("/cart/")
-
-  // Ensure withCredentials is set appropriately
-  const updatedConfig = {
-    ...config,
-    withCredentials: isAuthenticatedEndpoint, // Only use credentials for authenticated endpoints
-  }
-
-  console.log(`Making DELETE request to ${url}`)
-
+  // For all other GET requests, just use the original implementation
   try {
-    // If the URL is a wishlist endpoint, handle it specially
-    if (url.includes("/api/wishlist")) {
-      // First, try to make a preflight request
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
-      const fullUrl = `${baseUrl}${url.startsWith("/") ? url : `/${url}`}`
-
-      try {
-        // Simple preflight
-        await fetch(fullUrl, {
-          method: "OPTIONS",
-          credentials: isAuthenticatedEndpoint ? "include" : "omit", // Only include credentials if needed
-        })
-      } catch (error) {
-        console.warn("Preflight request for wishlist failed, continuing anyway:", error)
-      }
-    }
-
-    return originalDelete.call(api, url, updatedConfig) as Promise<R>
+    return (await originalGet.call(api, url, safeConfig)) as R
   } catch (error) {
-    console.error(`DELETE request to ${url} failed:`, error)
     throw error
   }
 }
+   
