@@ -28,3 +28,7 @@ next-env.d.ts
 
 __pycache__/
 *.pyc
+
+# Local env (do not commit)
+/frontend/.env.local
+.env.local
