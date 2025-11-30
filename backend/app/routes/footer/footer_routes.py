@@ -3,7 +3,7 @@ Footer Management Routes
 Handles footer content, styling, and configuration
 """
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from ...models.footer_settings import FooterSettings
 from ...configuration.extensions import db
@@ -14,6 +14,23 @@ logger = logging.getLogger(__name__)
 
 footer_routes = Blueprint('footer_routes', __name__)
 
+# small helper to ensure db is initialized with the running Flask app
+def _ensure_db_registered():
+	"""
+	Attempt to register the SQLAlchemy 'db' with the current Flask app.
+	It's safe/idempotent to call init_app multiple times; catch and log warnings.
+	"""
+	try:
+		app_obj = current_app._get_current_object()
+		try:
+			db.init_app(app_obj)
+		except Exception as e:
+			# init_app may raise if already bound in some setups; warn and continue
+			logger.warning(f'[Footer] db.init_app warning: {e}')
+	except RuntimeError:
+		# current_app not available (e.g., called outside app/request context)
+		logger.debug('[Footer] _ensure_db_registered called with no current_app')
+
 # ============================================================================
 # PUBLIC ROUTES - Get footer settings
 # ============================================================================
@@ -22,6 +39,7 @@ footer_routes = Blueprint('footer_routes', __name__)
 def get_footer_settings_public():
     """Get current footer settings - Public endpoint"""
     try:
+        _ensure_db_registered()
         logger.info('[Footer] GET /api/footer/settings - Fetching settings')
         settings = FooterSettings.get_or_create_default()
         data = settings.to_dict()
@@ -46,6 +64,7 @@ def get_footer_settings_public():
 def get_footer_settings_admin():
     """Get current footer settings - Admin endpoint with auth"""
     try:
+        _ensure_db_registered()
         current_user_id = get_jwt_identity()
         logger.info(f'[Footer] Admin GET - User: {current_user_id}')
         
@@ -55,7 +74,7 @@ def get_footer_settings_admin():
         return jsonify({
             'success': True,
             'data': data
-        }, 200)
+        }), 200
     except Exception as e:
         logger.error(f'[Footer] Admin GET error: {str(e)}')
         return jsonify({
@@ -68,6 +87,7 @@ def get_footer_settings_admin():
 def update_footer_settings():
     """Update footer settings - Admin only"""
     try:
+        _ensure_db_registered()
         current_user_id = get_jwt_identity()
         logger.info(f'[Footer] Admin PUT - User: {current_user_id}')
         
@@ -161,6 +181,7 @@ def update_footer_settings():
 def reset_footer_settings():
     """Reset footer settings to defaults - Admin only"""
     try:
+        _ensure_db_registered()
         current_user_id = get_jwt_identity()
         logger.info(f'[Footer] Admin RESET - User: {current_user_id}')
         
