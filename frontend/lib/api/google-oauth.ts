@@ -56,7 +56,7 @@ class GoogleOAuthAPI {
         console.warn(`[v0] Request to ${endpoint} timed out after ${timeoutMs}ms`)
       }, timeoutMs)
 
-      console.log(`[v0] Making request to ${API_BASE_URL}${endpoint}`)
+      globalThis.console.log(`[v0] Making request to ${API_BASE_URL}${endpoint}`)
       const response = await fetch(`${API_BASE_URL}${endpoint}`, {
         headers: {
           "Content-Type": "application/json",
@@ -69,20 +69,43 @@ class GoogleOAuthAPI {
 
       clearTimeout(timeoutId)
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
+      // Helper to safely parse response body
+      const parseBody = async () => {
+        try {
+          const contentType = (response.headers.get("content-type") || "").toLowerCase()
+          if (contentType.includes("application/json")) {
+            // If it's JSON, parse it
+            return await response.json().catch(() => null)
+          }
+          // Fallback to text and try to JSON.parse it
+          const text = await response.text().catch(() => "")
+          try {
+            return text ? JSON.parse(text) : null
+          } catch {
+            return text ? { message: text } : null
+          }
+        } catch (err) {
+          return { message: `Failed to parse response body: ${String(err)}` }
+        }
+      }
 
-        const error = new Error(errorData.message || `HTTP error! status: ${response.status}`) as NetworkError
+      if (!response.ok) {
+        const errorData = (await parseBody()) || {}
+
+        // Build a helpful message
+        const baseMessage = errorData && typeof errorData.message === "string"
+          ? errorData.message
+          : `HTTP error! status: ${response.status}`
+
+        const error = new Error(baseMessage) as NetworkError
         error.statusCode = response.status
 
-        console.error(`[v0] HTTP ${response.status} error at ${endpoint}:`, {
-          statusCode: response.status,
-          errorData,
-          apiUrl: API_BASE_URL,
-        })
-
-        if (response.status >= 500) {
+        // Prefer a server-sent code if provided, else derive one from status
+        if (errorData && errorData.code && typeof errorData.code === "string") {
+          error.code = errorData.code as any
+        } else if (response.status >= 500) {
           error.code = "SERVER_UNAVAILABLE"
+          // provide more context for server errors
           error.message = `Backend server error (${response.status}). Please ensure the backend is running at ${API_BASE_URL}`
         } else if (response.status === 400) {
           error.code = "VALIDATION_ERROR"
@@ -91,42 +114,63 @@ class GoogleOAuthAPI {
         } else {
           error.code = "API_ERROR"
         }
+
+        globalThis.console.error(`[v0] HTTP ${response.status} error at ${endpoint}:`, {
+          statusCode: response.status,
+          parsedError: errorData,
+          apiUrl: API_BASE_URL,
+        })
+
         throw error
       }
 
-      const data = await response.json()
-      console.log(`[v0] Request successful to ${endpoint}`)
-      return data
-    } catch (error: any) {
-      if (error.name === "AbortError") {
-        const timeoutError = new Error("Request timed out. Please check your connection and try again.") as NetworkError
-        timeoutError.code = "TIMEOUT"
-        console.error(`[v0] Request timeout to ${endpoint}`)
-        throw timeoutError
-      }
-
-      if (error instanceof TypeError && error.message.includes("fetch")) {
-        const networkError = new Error(
-          `Backend server is not responding at ${API_BASE_URL}. Make sure your backend server is running.\n\nIf you haven't started the backend yet, please run: npm run dev:backend`,
-        ) as NetworkError
-        networkError.code = "NETWORK_ERROR"
-        networkError.originalError = error
-        console.error(`[v0] Network error connecting to ${API_BASE_URL}:`, error.message)
-        throw networkError
-      }
-
-      // Re-throw NetworkError instances
-      if ((error as NetworkError).code) {
-        throw error
-      }
-
-      const genericError = new Error(`Unexpected error: ${error.message}`) as NetworkError
-      genericError.code = "API_ERROR"
-      genericError.originalError = error
-      console.error(`[v0] Unexpected error in makeRequest:`, error)
-      throw genericError
-    }
-  }
+      // Parse successful response; handle empty bodies safely
+      const data = await (async () => {
+        const parsed = await (async () => {
+          try {
+            const ct = (response.headers.get("content-type") || "").toLowerCase()
+            if (!ct) return null
+            if (ct.includes("application/json")) {
+              return await response.json().catch(() => null)
+            }
+            const t = await response.text().catch(() => "")
+            try { return t ? JSON.parse(t) : null } catch { return t ? { message: t } : null }
+          } catch { return null }
+        })()
+        return parsed !== null ? parsed : ({} as any)
+      })()
+      globalThis.console.log(`[v0] Request successful to ${endpoint}`)
+       return data
+     } catch (error: any) {
+       if (error.name === "AbortError") {
+         const timeoutError = new Error("Request timed out. Please check your connection and try again.") as NetworkError
+         timeoutError.code = "TIMEOUT"
+         console.error(`[v0] Request timeout to ${endpoint}`)
+         throw timeoutError
+       }
+ 
+       if (error instanceof TypeError && error.message.includes("fetch")) {
+         const networkError = new Error(
+           `Backend server is not responding at ${API_BASE_URL}. Make sure your backend server is running.\n\nIf you haven't started the backend yet, please run: npm run dev:backend`,
+         ) as NetworkError
+         networkError.code = "NETWORK_ERROR"
+         networkError.originalError = error
+         console.error(`[v0] Network error connecting to ${API_BASE_URL}:`, error.message)
+         throw networkError
+       }
+ 
+       // Re-throw NetworkError instances
+       if ((error as NetworkError).code) {
+         throw error
+       }
+ 
+       const genericError = new Error(`Unexpected error: ${error.message}`) as NetworkError
+       genericError.code = "API_ERROR"
+       genericError.originalError = error
+       console.error(`[v0] Unexpected error in makeRequest:`, error)
+       throw genericError
+     }
+   }
 
   /**
    * Get Google OAuth configuration from backend
