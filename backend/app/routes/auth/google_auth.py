@@ -20,8 +20,8 @@ from google.auth.transport import requests as google_requests
 import random
 import string
 
-from ...configuration.extensions import db, limiter
-from ...models.models import User
+from ..configuration.extensions import db, limiter
+from ..models.models import User
 from .auth_email_templates import send_welcome_email  # Import send_welcome_email
 
 # Setup logging
@@ -547,7 +547,7 @@ def get_google_config():
             return jsonify({
                 'configured': False,
                 'message': 'Google OAuth is not configured on the server'
-            }), 500
+            }), 200  # Changed from 500 to 200
 
         return jsonify({
             'configured': True,
