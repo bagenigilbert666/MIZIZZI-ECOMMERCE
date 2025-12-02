@@ -156,7 +156,38 @@ class GoogleOAuthAPI {
         const data = await response.json().catch(() => ({}))
 
         if (!response.ok || data.configured === false) {
+          const envClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""
+          if (envClientId) {
+            console.warn(
+              "[v0] Google OAuth not configured on server, falling back to NEXT_PUBLIC_GOOGLE_CLIENT_ID from frontend env",
+            )
+            return {
+              status: "success",
+              client_id: envClientId,
+              configured: true,
+            }
+          }
+
           console.warn("[v0] Google OAuth not configured on server:", data.message)
+          return {
+            status: "error",
+            client_id: "",
+            configured: false,
+          }
+        }
+
+        if (!data.client_id) {
+          const envClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""
+          if (envClientId) {
+            console.warn("[v0] Server returned empty client_id, using NEXT_PUBLIC_GOOGLE_CLIENT_ID fallback")
+            return {
+              status: "success",
+              client_id: envClientId,
+              configured: true,
+            }
+          }
+
+          console.warn("[v0] Server returned no client_id for Google OAuth")
           return {
             status: "error",
             client_id: "",
@@ -175,6 +206,15 @@ class GoogleOAuthAPI {
 
         if (error.name === "AbortError") {
           if (attempt === maxRetries) {
+            const envClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""
+            if (envClientId) {
+              console.warn("[v0] Server timeout, falling back to NEXT_PUBLIC_GOOGLE_CLIENT_ID")
+              return {
+                status: "success",
+                client_id: envClientId,
+                configured: true,
+              }
+            }
             throw new Error(
               "Server is taking too long to respond. The server may be waking up - please try again in a moment.",
             )
@@ -193,6 +233,16 @@ class GoogleOAuthAPI {
     }
 
     if (lastError) {
+      const envClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ""
+      if (envClientId) {
+        console.warn("[v0] All retries failed, falling back to NEXT_PUBLIC_GOOGLE_CLIENT_ID")
+        return {
+          status: "success",
+          client_id: envClientId,
+          configured: true,
+        }
+      }
+
       if ((lastError as NetworkError).code === "TIMEOUT") {
         throw new Error(
           "Could not reach the authentication server after multiple attempts. The server may be waking up from sleep mode. Please wait a moment and try again.",
@@ -403,10 +453,10 @@ class GoogleOAuthAPI {
       const config = await this.getGoogleConfig()
 
       if (!config.configured || !config.client_id) {
-        console.error("[v0] Google OAuth not configured on server")
+        console.error("[v0] Google OAuth not configured on server and no frontend fallback available")
         reject(
           new Error(
-            "Google Sign-In is not available.\n\nTo fix this, add the GOOGLE_CLIENT_ID environment variable to your Render backend settings.",
+            "Google Sign-In is not available.\n\nTo fix this:\n1. Add GOOGLE_CLIENT_ID to your backend environment, OR\n2. Add NEXT_PUBLIC_GOOGLE_CLIENT_ID to your frontend environment.",
           ),
         )
         return
