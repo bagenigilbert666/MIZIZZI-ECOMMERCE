@@ -46,7 +46,7 @@ interface NetworkError extends Error {
 class GoogleOAuthAPI {
   private async makeRequest<T>(endpoint: string, options: RequestInit & { timeout?: number } = {}): Promise<T> {
     const token = getAuthToken()
-    const timeoutMs = options.timeout || 30000 // Default 30 second timeout
+    const timeoutMs = options.timeout || 60000 // Increased default timeout from 30s to 60s for cold start handling
     delete options.timeout // Remove timeout from options to avoid fetch error
 
     try {
@@ -131,20 +131,77 @@ class GoogleOAuthAPI {
   /**
    * Get Google OAuth configuration from backend
    */
-  async getGoogleConfig(options: { timeout?: number } = {}): Promise<GoogleConfigResponse> {
-    try {
-      const timeout = options.timeout || 10000 // 10 seconds default for config
-      return await this.makeRequest<GoogleConfigResponse>("/api/auth/google-config", { timeout })
-    } catch (error) {
-      console.error("[v0] Error getting Google config:", error)
-      // Add more context to timeout errors
-      if ((error as NetworkError).code === "TIMEOUT") {
+  async getGoogleConfig(options: { timeout?: number; retries?: number } = {}): Promise<GoogleConfigResponse> {
+    const timeout = options.timeout || 45000 // Increased from 10s to 45s for cold starts
+    const maxRetries = options.retries ?? 2
+    let lastError: Error | null = null
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          console.log(`[v0] Retrying getGoogleConfig (attempt ${attempt + 1}/${maxRetries + 1})...`)
+          await new Promise((resolve) => setTimeout(resolve, 1000 * attempt))
+        }
+
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), timeout)
+
+        const response = await fetch(`${API_BASE_URL}/api/auth/google-config`, {
+          headers: { "Content-Type": "application/json" },
+          signal: controller.signal,
+        })
+
+        clearTimeout(timeoutId)
+
+        const data = await response.json().catch(() => ({}))
+
+        if (!response.ok || data.configured === false) {
+          console.warn("[v0] Google OAuth not configured on server:", data.message)
+          return {
+            status: "error",
+            client_id: "",
+            configured: false,
+          }
+        }
+
+        return {
+          status: "success",
+          client_id: data.client_id,
+          configured: true,
+        }
+      } catch (error: any) {
+        lastError = error
+        console.warn(`[v0] getGoogleConfig attempt ${attempt + 1} failed:`, error.message)
+
+        if (error.name === "AbortError") {
+          if (attempt === maxRetries) {
+            throw new Error(
+              "Server is taking too long to respond. The server may be waking up - please try again in a moment.",
+            )
+          }
+          continue
+        }
+
+        if (
+          (error as NetworkError).code &&
+          (error as NetworkError).code !== "TIMEOUT" &&
+          (error as NetworkError).code !== "NETWORK_ERROR"
+        ) {
+          throw error
+        }
+      }
+    }
+
+    if (lastError) {
+      if ((lastError as NetworkError).code === "TIMEOUT") {
         throw new Error(
-          "Could not reach the authentication server. Please ensure the backend server is running and try again.",
+          "Could not reach the authentication server after multiple attempts. The server may be waking up from sleep mode. Please wait a moment and try again.",
         )
       }
-      throw error
+      throw lastError
     }
+
+    throw new Error("Failed to get Google config after retries")
   }
 
   /**
@@ -166,7 +223,6 @@ class GoogleOAuthAPI {
         body: JSON.stringify({ token: googleToken }),
       })
 
-      // Store tokens in localStorage if provided
       if (response.access_token) {
         localStorage.setItem("mizizzi_token", response.access_token)
         console.log("[v0] Access token stored")
@@ -182,7 +238,6 @@ class GoogleOAuthAPI {
         console.log("[v0] CSRF token stored")
       }
 
-      // Store user data
       if (response.user) {
         localStorage.setItem("user", JSON.stringify(response.user))
         console.log("[v0] User data stored")
@@ -299,7 +354,6 @@ class GoogleOAuthAPI {
         method: "POST",
       })
 
-      // Clear tokens from localStorage
       localStorage.removeItem("mizizzi_token")
       localStorage.removeItem("mizizzi_refresh_token")
       localStorage.removeItem("mizizzi_csrf_token")
@@ -319,7 +373,6 @@ class GoogleOAuthAPI {
     return new Promise((resolve, reject) => {
       console.log("[v0] Getting Google token")
 
-      // Load Google Sign-In script if not already loaded
       if (!window.google) {
         console.log("[v0] Loading Google Sign-In script")
         const script = document.createElement("script")
@@ -347,12 +400,15 @@ class GoogleOAuthAPI {
     reject: (error: Error) => void,
   ): Promise<void> {
     try {
-      // Get client ID from backend config with shorter timeout
       const config = await this.getGoogleConfig()
 
       if (!config.configured || !config.client_id) {
         console.error("[v0] Google OAuth not configured on server")
-        reject(new Error("Google OAuth is not configured. Please contact support."))
+        reject(
+          new Error(
+            "Google Sign-In is not available.\n\nTo fix this, add the GOOGLE_CLIENT_ID environment variable to your Render backend settings.",
+          ),
+        )
         return
       }
 
@@ -360,13 +416,11 @@ class GoogleOAuthAPI {
 
       console.log("[v0] Initializing Google Sign-In with clientId:", clientId.substring(0, 20) + "...")
 
-      // Ensure google object exists
       if (!window.google?.accounts?.id) {
         reject(new Error("Google Sign-In library not loaded correctly"))
         return
       }
 
-      // Initialize Google Sign-In
       window.google.accounts.id.initialize({
         client_id: clientId,
         callback: (response: any) => {
@@ -383,7 +437,6 @@ class GoogleOAuthAPI {
 
       console.log("[v0] Creating button container")
 
-      // Create a container for the button
       const container = document.createElement("div")
       container.id = "google-signin-button-container"
       container.style.display = "none"
@@ -391,13 +444,11 @@ class GoogleOAuthAPI {
 
       console.log("[v0] Rendering Google Sign-In button")
 
-      // Double-check google object still exists
       if (!window.google?.accounts?.id) {
         reject(new Error("Lost connection to Google Sign-In library"))
         return
       }
 
-      // Render the Google Sign-In button
       window.google.accounts.id.renderButton(container, {
         theme: "outline",
         size: "large",
@@ -406,14 +457,12 @@ class GoogleOAuthAPI {
 
       console.log("[v0] Looking for button to click")
 
-      // Wait a short moment for the button to be rendered
       setTimeout(() => {
         const button = container.querySelector("div[role='button']") as HTMLElement | null
         if (button) {
           console.log("[v0] Triggering Google Sign-In button click")
           button.click()
         } else {
-          // Try one more time with a different selector
           const fallbackButton = container.querySelector("button") as HTMLButtonElement | null
           if (fallbackButton) {
             console.log("[v0] Triggering Google Sign-In button click (fallback)")
@@ -424,7 +473,7 @@ class GoogleOAuthAPI {
             reject(new Error("Failed to render Google Sign-In button"))
           }
         }
-      }, 500) // Wait 500ms for the button to be rendered
+      }, 500)
     } catch (error) {
       console.error("[v0] Error in initializeGoogleSignIn:", error)
       reject(error instanceof Error ? error : new Error("Failed to initialize Google Sign-In"))
@@ -438,12 +487,10 @@ class GoogleOAuthAPI {
     try {
       console.log("[v0] Starting Google OAuth flow")
 
-      // Get Google token
       const googleToken = await this.getGoogleToken()
 
       console.log("[v0] Got Google token, authenticating with backend")
 
-      // Login with the token
       const response = await this.loginWithGoogle(googleToken)
 
       console.log("[v0] Google authentication successful")
@@ -462,9 +509,8 @@ class GoogleOAuthAPI {
   async checkServerHealth(): Promise<{ available: boolean; message: string }> {
     try {
       console.log(`[v0] Checking server health at ${API_BASE_URL}`)
-      // Use the Google OAuth config endpoint since it's public
       const config = await this.makeRequest<GoogleConfigResponse>("/api/auth/google-config", {
-        timeout: 5000, // Use a short timeout for health check
+        timeout: 5000,
       })
 
       return {

@@ -1,8 +1,49 @@
+/**
+ * Authentication utility functions
+ */
+
+/**
+ * Get the current authentication token from localStorage
+ * @returns The auth token or null if not found
+ */
 export function getAuthToken(): string | null {
-  if (typeof window === 'undefined') return null
-  return localStorage.getItem('mizizzi_token')
+  if (typeof window === "undefined") {
+    return null
+  }
+
+  // Try admin token first, then regular user token
+  return localStorage.getItem("admin_token") || localStorage.getItem("mizizzi_token") || null
 }
 
-export function isLoggedIn(): boolean {
-  return !!getAuthToken()
+/**
+ * Set the authentication token in localStorage
+ * @param token - The token to store
+ */
+export function setAuthToken(token: string): void {
+  if (typeof window === "undefined") {
+    return
+  }
+  localStorage.setItem("mizizzi_token", token)
+}
+
+/**
+ * Remove the authentication token from localStorage
+ */
+export function removeAuthToken(): void {
+  if (typeof window === "undefined") {
+    return
+  }
+  localStorage.removeItem("mizizzi_token")
+  localStorage.removeItem("admin_token")
+  localStorage.removeItem("mizizzi_refresh_token")
+  localStorage.removeItem("admin_refresh_token")
+  localStorage.removeItem("mizizzi_csrf_token")
+}
+
+/**
+ * Check if user is authenticated
+ * @returns true if an auth token exists
+ */
+export function isAuthenticated(): boolean {
+  return getAuthToken() !== null
 }
