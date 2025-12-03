@@ -1,40 +1,60 @@
-# ----------------------------------------------------
-# Core Libraries & Utilities
-# ----------------------------------------------------
+africastalking
+aiohappyeyeballs
+aiohttp
+aiohttp-retry
+aiosignal
+alabaster
+alembic
+amqp
+aniso8601
+annotated-types
+anyio
 attrs
-decorator
-Deprecated
-importlib_resources
-iniconfig
-json-logging
-packaging
-pathspec
-platformdirs
-pluggy
-pytz
-PyYAML
-python-dateutil
-requests
-urllib3
-idna
-charset-normalizer
-six
-typing_extensions
-typing-inspection
-ordered-set
+Authlib
+awscli
+babel
+bandit
+bcrypt
+bidict
+billiard
+black
+bleach
+blinker
+botocore
+brevo-python
+cachelib
 cachetools
+camel-converter
+celery
+Cerberus
+certifi
+cffi
+charset-normalizer
+click
+click-didyoumean
+click-plugins
+click-repl
+cloudinary
+colorama
+coverage
+cryptography
+decorator
+defusedxml
+Deprecated
+dnspython
+docutils
+dparse
+email-validator
+et_xmlfile
+eventlet
+exceptiongroup
+execnet
+fabric
+factory_boy
+Faker
 filelock
-humanize
-wcwidth
-tomlkit
-jsonschema
-jsonschema-specifications
-referencing
-rpds-py
-
-# ----------------------------------------------------
-# Flask & Extensions
-# ----------------------------------------------------
+flake8
+flasgger
 Flask
 Flask-Bcrypt
 Flask-Caching
@@ -51,142 +71,107 @@ Flask-SocketIO
 Flask-SQLAlchemy
 Flask-Testing
 Flask-WTF
-Werkzeug
-itsdangerous
-Jinja2
-MarkupSafe
-WTForms
-
-# ----------------------------------------------------
-# Database & SQL
-# ----------------------------------------------------
-SQLAlchemy
-psycopg
-psycopg2
-psycopg2-binary
-PyMySQL
-alembic
-greenlet
-
-# ----------------------------------------------------
-# Async, HTTP, Networking
-# ----------------------------------------------------
-aiohappyeyeballs
-aiohttp
-aiohttp-retry
-aiosignal
-httpcore
-httpx
-httplib2
-h11
-websockets
-simple-websocket
-python-socketio
-python-engineio
-yarl
-PySocks
-
-# ----------------------------------------------------
-# Authentication / Security / Crypto
-# ----------------------------------------------------
-bcrypt
-cryptography
-PyJWT
-passlib
-pyotp
-pyasn1
-pyasn1_modules
-starkbank-ecdsa
-bcrypt
-rsa
-cffi
-pycparser
-
-# ----------------------------------------------------
-# Email / SMS Providers
-# ----------------------------------------------------
-sendgrid
-sib-api-v3-sdk
-brevo-python
-twilio
-cloudinary
-africastalking
-
-# ----------------------------------------------------
-# Google Auth & OAuth
-# ----------------------------------------------------
-oauthlib
-requests-oauthlib
+flower
+freezegun
+frozenlist
+fsspec
+fuzzywuzzy
+gitdb
+GitPython
+google-api-core
+google-api-python-client
 google-auth
 google-auth-httplib2
 google-auth-oauthlib
-google-api-core
-google-api-python-client
+# --------------------------------------
+# Google Auth & OAuth
+# --------------------------------------
+oauthlib
+requests-oauthlib
+
 googleapis-common-protos
-
-# ----------------------------------------------------
-# AWS & Cloud
-# ----------------------------------------------------
-awscli
-boto3
-botocore
-s3transfer
-
-# ----------------------------------------------------
-# Celery & Task Queue
-# ----------------------------------------------------
-celery
-kombu
-billiard
-amqp
-vine
-flower
-eventlet
-
-# ----------------------------------------------------
-# PDF, Docs, Images
-# ----------------------------------------------------
-pillow
-reportlab
-qrcode
+greenlet
+gunicorn
+h11
+httpcore
+httpie
+httplib2
+httpx
+humanize
+idna
 imagesize
-python-magic
-
-# ----------------------------------------------------
-# Data Science & Math
-# ----------------------------------------------------
-numpy
-pandas
-scikit-learn
-scipy
-sympy
+importlib_resources
+iniconfig
+invoke
+isort
+itsdangerous
+Jinja2
+jmespath
 joblib
-mpmath
-
-# ----------------------------------------------------
-# Search / Indexing
-# ----------------------------------------------------
-meilisearch
-
-# ----------------------------------------------------
-# Logging / Struct / Formatting
-# ----------------------------------------------------
-structlog
-rich
-
-# ----------------------------------------------------
-# Slug, String, Levenshtein Similarity
-# ----------------------------------------------------
-python-slugify
-python-Levenshtein
+json-logging
+jsonschema
+jsonschema-specifications
+kombu
 Levenshtein
-fuzzywuzzy
-RapidFuzz
-regex
-
-# ----------------------------------------------------
-# Testing Tools
-# ----------------------------------------------------
+librt
+limits
+Mako
+markdown-it-py
+MarkupSafe
+marshmallow
+marshmallow-sqlalchemy
+mccabe
+mdurl
+meilisearch
+mirakuru
+mistune
+mpmath
+msgspec
+multidict
+mypy
+mypy_extensions
+networkx
+newrelic
+nltk
+numpy
+openpyxl
+ordered-set
+packaging
+pandas
+paramiko
+passlib
+pathspec
+pbr
+phonenumbers
+pillow
+platformdirs
+pluggy
+port-for
+prometheus_client
+prompt_toolkit
+propcache
+proto-plus
+protobuf
+psutil
+psycopg
+psycopg2
+psycopg2-binary
+py
+py-cpuinfo
+pyasn1
+pyasn1_modules
+pycodestyle
+pycparser
+pydantic
+pydantic_core
+pyflakes
+Pygments
+PyJWT
+PyMySQL
+PyNaCl
+pyotp
+pyparsing
+PySocks
 pytest
 pytest-benchmark
 pytest-cov
@@ -196,58 +181,47 @@ pytest-metadata
 pytest-mock
 pytest-postgresql
 pytest-xdist
-freezegun
-coverage
-
-# ----------------------------------------------------
-# Linting, Formatting, Security Analysis
-# ----------------------------------------------------
-black
-flake8
-pyflakes
-pycodestyle
-mccabe
-isort
-bandit
+python-dateutil
+python-dotenv
+python-engineio
+python-http-client
+python-Levenshtein
+python-magic
+python-slugify
+python-socketio
+pytokens
+pytz
+PyYAML
+qrcode
+RapidFuzz
+redis
+referencing
+regex
+reportlab
+requests
+requests-toolbelt
+responses
+retry
+rich
+rpds-py
+rsa
+ruamel.yaml
+ruamel.yaml.clib
+s3transfer
 safety
 safety-schemas
-dparse
-
-# ----------------------------------------------------
-# Utilities & Misc
-# ----------------------------------------------------
-anyio
-sniffio
-prometheus_client
-redis
-tornado
-tqdm
-invoke
-fabric
-paramiko
-shellingham
-propcache
-defusedxml
-email-validator
-et_xmlfile
-openpyxl
-phonenumbers
-pytokens
 schema
-mirakuru
-port-for
-fsspec
-msal
-newrelic
-networkx
-factory_boy
-Faker
-camel-converter
-markdown-it-py
-mdurl
-mistune
-bleach
-docutils
+scikit-learn
+scipy
+sendgrid
+setuptools
+shellingham
+sib-api-v3-sdk
+simple-websocket
+six
+smmap
+sniffio
+snowballstemmer
 Sphinx
 sphinx-rtd-theme
 sphinxcontrib-applehelp
@@ -257,11 +231,34 @@ sphinxcontrib-jquery
 sphinxcontrib-jsmath
 sphinxcontrib-qthelp
 sphinxcontrib-serializinghtml
-protobuf
-proto-plus
-pyparsing
+SQLAlchemy
+starkbank-ecdsa
+stevedore
+stripe
+structlog
+sympy
+tenacity
+text-unidecode
+threadpoolctl
+tomlkit
+tornado
+tqdm
+twilio
+typer
+typing-inspection
+typing_extensions
+tzdata
+tzlocal
 uritemplate
-httpie
-qrcode
+urllib3
+vine
+wcwidth
+webargs
+webencodings
+websockets
+Werkzeug
 wheel
-setuptools
+wrapt
+wsproto
+WTForms
+yarl
