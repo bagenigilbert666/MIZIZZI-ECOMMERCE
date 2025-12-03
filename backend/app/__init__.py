@@ -118,7 +118,7 @@ except ImportError:
             }
             JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'jwt-secret-key')
             JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=1)
-            CORS_ORIGINS = ['http://localhost:3000', 'http://127.0.0.1:3000', 'https://mizizzi-ecommerce-87pr-jfgwto387-jons-projects-a41f528c.vercel.app', 'https://mizizzi-ecommerce-87pr.vercel.app/']
+            CORS_ORIGINS = ['http://localhost:3000', 'http://127.0.0.1:3000', 'https://mizizzi-ecommerce-87pr-jfgwto387-jons-projects-a41f528c.vercel.app', 'https://mizizzi-ecommerce-87pr.vercel.app']
             CACHE_TYPE = 'SimpleCache'
             RATELIMIT_STORAGE_URI = 'memory://'
         
@@ -249,7 +249,7 @@ def create_app(config_name=None, enable_socketio=True):
         origin = request.headers.get('Origin')
         allowed_origins = app.config.get('CORS_ORIGINS', ['http://localhost:3000', 'http://127.0.0.1:3000', 'https://mizizzi-ecommerce-87pr-jfgwto387-jons-projects-a41f528c.vercel.app', 'https://mizizzi-ecommerce-87pr.vercel.app'])
         if origin and ("*" in allowed_origins or origin in allowed_origins):
-            response.headers['Access-Control-Allow-Origin'] = origin
+            response.headers['Access-Control-Allow-Origin'] = origin     
         else:
             response.headers['Access-Control-Allow-Origin'] = ','.join(allowed_origins)
 
