@@ -1,224 +1,253 @@
-# --------------------------------------
-# Core Web Framework & Extensions
-# --------------------------------------
+# ----------------------------------------------------
+# Core Libraries & Utilities
+# ----------------------------------------------------
+attrs
+decorator
+Deprecated
+importlib_resources
+iniconfig
+json-logging
+packaging
+pathspec
+platformdirs
+pluggy
+pytz
+PyYAML
+python-dateutil
+requests
+urllib3
+idna
+charset-normalizer
+six
+typing_extensions
+typing-inspection
+ordered-set
+cachetools
+filelock
+humanize
+wcwidth
+tomlkit
+jsonschema
+jsonschema-specifications
+referencing
+rpds-py
+
+# ----------------------------------------------------
+# Flask & Extensions
+# ----------------------------------------------------
 Flask
-Flask-SQLAlchemy
-Flask-Migrate
-Flask-WTF
 Flask-Bcrypt
 Flask-Caching
-Flask-Login
+flask-cors
+Flask-JWT-Extended
+Flask-Limiter
 Flask-Mail
+flask-marshmallow
+Flask-Migrate
 Flask-RESTful
 flask-restx
 Flask-Session
-flask-marshmallow
-Flask-JWT-Extended
-Flask-Limiter
-flask-cors
 Flask-SocketIO
+Flask-SQLAlchemy
 Flask-Testing
-
-# --------------------------------------
-# Authentication, Security & Tokens
-# --------------------------------------
-PyJWT
-Authlib
-passlib
-bcrypt
+Flask-WTF
+Werkzeug
 itsdangerous
-python-socketio
-python-engineio
-pyotp
+Jinja2
+MarkupSafe
+WTForms
 
-# --------------------------------------
-# Google Auth & OAuth
-# --------------------------------------
-google-auth
-google-auth-httplib2
-google-auth-oauthlib
-google-api-core
-google-api-python-client
-googleapis-common-protos
-oauthlib
-requests-oauthlib
-
-# --------------------------------------
-# Cloud Messaging, Email & SMS
-# --------------------------------------
-sendgrid
-sib-api-v3-sdk
-brevo-python
-twilio
-africastalking
-
-# --------------------------------------
-# Database & ORM
-# --------------------------------------
+# ----------------------------------------------------
+# Database & SQL
+# ----------------------------------------------------
 SQLAlchemy
 psycopg
 psycopg2
 psycopg2-binary
 PyMySQL
 alembic
-redis
+greenlet
 
-# --------------------------------------
-# File Processing, Images & Media
-# --------------------------------------
-pillow
-python-magic
-qrcode
-
-# --------------------------------------
-# Data Handling, Formats & Serialization
-# --------------------------------------
-marshmallow
-marshmallow-sqlalchemy
-jsonschema
-jsonschema-specifications
-schema
-pydantic
-pydantic_core
-msgspec
-PyYAML
-
-# --------------------------------------
-# Networking, HTTP Clients & APIs
-# --------------------------------------
-requests
-httpx
-httpcore
-httplib2
-requests-toolbelt
-simple-websocket
-websockets
-
-# --------------------------------------
-# CLI, Terminal & Productivity Tools
-# --------------------------------------
-click
-click-repl
-click-plugins
-click-didyoumean
-typer
-prompt_toolkit
-colorama
-humanize
-rich
-
-# --------------------------------------
-# Asynchronous Tools
-# --------------------------------------
+# ----------------------------------------------------
+# Async, HTTP, Networking
+# ----------------------------------------------------
+aiohappyeyeballs
 aiohttp
 aiohttp-retry
 aiosignal
-aiohappyeyeballs
-multidict
-frozenlist
+httpcore
+httpx
+httplib2
+h11
+websockets
+simple-websocket
+python-socketio
+python-engineio
+yarl
+PySocks
 
-# --------------------------------------
-# Celery & Task Queues
-# --------------------------------------
+# ----------------------------------------------------
+# Authentication / Security / Crypto
+# ----------------------------------------------------
+bcrypt
+cryptography
+PyJWT
+passlib
+pyotp
+pyasn1
+pyasn1_modules
+starkbank-ecdsa
+bcrypt
+rsa
+cffi
+pycparser
+
+# ----------------------------------------------------
+# Email / SMS Providers
+# ----------------------------------------------------
+sendgrid
+sib-api-v3-sdk
+brevo-python
+twilio
+cloudinary
+africastalking
+
+# ----------------------------------------------------
+# Google Auth & OAuth
+# ----------------------------------------------------
+oauthlib
+requests-oauthlib
+google-auth
+google-auth-httplib2
+google-auth-oauthlib
+google-api-core
+google-api-python-client
+googleapis-common-protos
+
+# ----------------------------------------------------
+# AWS & Cloud
+# ----------------------------------------------------
+awscli
+boto3
+botocore
+s3transfer
+
+# ----------------------------------------------------
+# Celery & Task Queue
+# ----------------------------------------------------
 celery
-billiard
 kombu
-vine
+billiard
 amqp
-eventlet
+vine
 flower
+eventlet
 
-# --------------------------------------
-# Search & Indexing
-# --------------------------------------
-meilisearch
+# ----------------------------------------------------
+# PDF, Docs, Images
+# ----------------------------------------------------
+pillow
+reportlab
+qrcode
+imagesize
+python-magic
 
-# --------------------------------------
-# NLP, ML & Data Science
-# --------------------------------------
+# ----------------------------------------------------
+# Data Science & Math
+# ----------------------------------------------------
 numpy
 pandas
 scikit-learn
 scipy
-nltk
-joblib
-networkx
 sympy
+joblib
+mpmath
 
-# --------------------------------------
-# Validation, Parsing & Formatting
-# --------------------------------------
-email-validator
-phonenumbers
-python-slugify
-text-unidecode
-regex
-markdown-it-py
-mistune
-mdurl
+# ----------------------------------------------------
+# Search / Indexing
+# ----------------------------------------------------
+meilisearch
 
-# --------------------------------------
-# Utilities & Helpers
-# --------------------------------------
-protobuf
-proto-plus
-python-dateutil
-pytz
-tzlocal
-tzdata
-uritemplate
-camel-converter
-cachetools
-cachelib
-decorator
-Deprecated
-wrapt
-exceptiongroup
-attrs
-platformdirs
-
-# --------------------------------------
-# Logging & Monitoring
-# --------------------------------------
+# ----------------------------------------------------
+# Logging / Struct / Formatting
+# ----------------------------------------------------
 structlog
-json-logging
-prometheus_client
-newrelic
+rich
 
-# --------------------------------------
-# Testing & QA
-# --------------------------------------
+# ----------------------------------------------------
+# Slug, String, Levenshtein Similarity
+# ----------------------------------------------------
+python-slugify
+python-Levenshtein
+Levenshtein
+fuzzywuzzy
+RapidFuzz
+regex
+
+# ----------------------------------------------------
+# Testing Tools
+# ----------------------------------------------------
 pytest
-pytest-flask
+pytest-benchmark
 pytest-cov
-pytest-xdist
-pytest-mock
+pytest-flask
 pytest-html
 pytest-metadata
+pytest-mock
 pytest-postgresql
-pytest-benchmark
+pytest-xdist
 freezegun
-Faker
-factory_boy
 coverage
 
-# --------------------------------------
-# Code Quality & Linting
-# --------------------------------------
+# ----------------------------------------------------
+# Linting, Formatting, Security Analysis
+# ----------------------------------------------------
 black
 flake8
-pycodestyle
 pyflakes
+pycodestyle
+mccabe
 isort
-mypy
-mypy_extensions
 bandit
 safety
+safety-schemas
 dparse
 
-# --------------------------------------
-# Documentation
-# --------------------------------------
+# ----------------------------------------------------
+# Utilities & Misc
+# ----------------------------------------------------
+anyio
+sniffio
+prometheus_client
+redis
+tornado
+tqdm
+invoke
+fabric
+paramiko
+shellingham
+propcache
+defusedxml
+email-validator
+et_xmlfile
+openpyxl
+phonenumbers
+pytokens
+schema
+mirakuru
+port-for
+fsspec
+msal
+newrelic
+networkx
+factory_boy
+Faker
+camel-converter
+markdown-it-py
+mdurl
+mistune
+bleach
+docutils
 Sphinx
 sphinx-rtd-theme
 sphinxcontrib-applehelp
@@ -228,91 +257,11 @@ sphinxcontrib-jquery
 sphinxcontrib-jsmath
 sphinxcontrib-qthelp
 sphinxcontrib-serializinghtml
-docutils
-alabaster
-imagesize
-mistune
-
-# --------------------------------------
-# Async, Websockets & Realtime
-# --------------------------------------
-websockets
-wsproto
-simple-websocket
-
-# --------------------------------------
-# File Formats & Excel
-# --------------------------------------
-openpyxl
-et_xmlfile
-
-# --------------------------------------
-# Cloud, Storage & AWS
-# --------------------------------------
-boto3
-botocore
-awscli
-s3transfer
-
-# --------------------------------------
-# Cryptography
-# --------------------------------------
-cryptography
-cffi
-pyasn1
-pyasn1_modules
-starkbank-ecdsa
-rsa
-PyNaCl
-
-# --------------------------------------
-# DevOps, SSH, Networking
-# --------------------------------------
-paramiko
-fabric
-invoke
-port-for
-
-# --------------------------------------
-# Search & String Matching
-# --------------------------------------
-fuzzywuzzy
-RapidFuzz
-python-Levenshtein
-Levenshtein
-
-# --------------------------------------
-# URL, Encoding & Normalizing
-# --------------------------------------
-charset-normalizer
-idna
-urllib3
-yarl
+protobuf
+proto-plus
+pyparsing
 uritemplate
-
-# --------------------------------------
-# Web Servers
-# --------------------------------------
-gunicorn
-tornado
-simple-websocket
-
-# --------------------------------------
-# Misc & Dependency Utilities
-# --------------------------------------
-setuptools
+httpie
+qrcode
 wheel
-filelock
-pluggy
-stevedore
-sniffio
-wrapt
-rpds-py
-importlib_resources
-ordered-set
-mirakuru
-fsspec
-propcache
-retry
-pytokens
-imagesize
+setuptools
