@@ -6,7 +6,7 @@ import os
 import sys
 import logging
 from datetime import datetime, timezone, timedelta
-from flask import Flask, jsonify, request, send_from_directory, g
+from flask import Flask, jsonify, request, send_from_directory, g, abort
 from flask_migrate import Migrate
 from flask_cors import CORS
 from flask_jwt_extended import JWTManager, get_jwt_identity, create_access_token, jwt_required, verify_jwt_in_request
@@ -14,6 +14,14 @@ import uuid
 import werkzeug.utils
 from pathlib import Path
 from functools import wraps
+from time import time
+from sqlalchemy.exc import OperationalError as SAOperationalError
+
+# Try to import psycopg2 error for database handling
+try:
+    from psycopg2 import OperationalError as PsycopgOperationalError
+except (ImportError, ModuleNotFoundError):
+    PsycopgOperationalError = None
 
 # Setup logging
 logging.basicConfig(
@@ -45,7 +53,7 @@ setup_app_environment()
 # Add minimal Meilisearch import stubs to avoid repeated import errors during startup
 try:
     # Try normal import first
-    from backend.app.models.meilisearch_models import MeilisearchModel  # type: ignore
+    from app.models.meilisearch_models import MeilisearchModel  # type: ignore
 except Exception:
     import types
     mod_name = 'app.models.meilisearch_model'
@@ -1559,6 +1567,7 @@ def create_app(config_name=None, enable_socketio=True):
     
     # Error handlers
     @app.errorhandler(404)
+
     def not_found_error(error):
         return jsonify({"error": "Not Found"}), 404
     
@@ -1575,6 +1584,23 @@ def create_app(config_name=None, enable_socketio=True):
     def ratelimit_handler(e):
         return jsonify({"error": "Rate limit exceeded", "message": str(e.description)}), 429
     
+    @app.errorhandler(SAOperationalError)
+    def handle_sqlalchemy_operational_error(err):
+        app.logger.warning(f"Database operational error caught: {str(err)}")
+        return jsonify({
+            "error": "database_operational_error",
+            "message": "A database connectivity error occurred. Please try again later."
+        }), 503
+
+    if PsycopgOperationalError is not None:
+        @app.errorhandler(PsycopgOperationalError)
+        def handle_psycopg_operational_error(err):
+            app.logger.warning(f"psycopg2 OperationalError caught: {str(err)}")
+            return jsonify({
+                "error": "database_operational_error",
+                "message": "A database connectivity error occurred. Please try again later."
+            }), 503
+
     @app.before_request
     def before_request():
         if request.path == '/' and request.method == 'GET':
@@ -1616,6 +1642,53 @@ def create_app(config_name=None, enable_socketio=True):
         except Exception:
             pass
         return response
+
+    # --- DB availability cache/helper (to avoid repeated heavy checks) ---
+    _db_check_cache = {"ts": 0.0, "available": False}
+    DB_CHECK_TTL = float(os.environ.get("DB_CHECK_TTL_SEC", "5"))
+
+    def is_db_available(force=False):
+        """Return True if DB reachable. Cache result for DB_CHECK_TTL seconds."""
+        try:
+            now = time()
+            if not force and (now - _db_check_cache["ts"] < DB_CHECK_TTL):
+                return _db_check_cache["available"]
+
+            with app.app_context():
+                try:
+                    conn = db.engine.connect()
+                    conn.close()
+                    _db_check_cache.update({"ts": now, "available": True})
+                    return True
+                except Exception:
+                    _db_check_cache.update({"ts": now, "available": False})
+                    return False
+        except Exception:
+            # If anything unexpected happens, assume DB unavailable to be safe
+            _db_check_cache.update({"ts": time(), "available": False})
+            return False
+
+    # Expose helper on app for debugging/testing
+    app.is_db_available = is_db_available
+
+    # Short-circuit APIs when DB is unavailable to avoid repeated 500 logs.
+    @app.before_request
+    def short_circuit_when_db_unavailable():
+        # Allow non-API requests, health checks and static files to proceed
+        path = (request.path or "").lower()
+        if path in ("/", "/api/health-check", "/api/health", "/api/admin/dashboard/health"):
+            return None
+
+        # Only short-circuit API routes; leave non-API endpoints alone
+        if path.startswith("/api"):
+            if not is_db_available():
+                # Return a clear 503 JSON indicating DB problem — clients can handle retry.
+                return jsonify({
+                    "error": "database_unavailable",
+                    "message": "Database is currently unavailable. Please try again later.",
+                    "retry_after_seconds": DB_CHECK_TTL
+                }), 503
+        return None
 
     app.logger.info(f"Application created successfully with config: {config_name}")
     return app
