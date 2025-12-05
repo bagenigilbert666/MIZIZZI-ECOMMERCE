@@ -78,7 +78,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
         return false
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
 
       console.log("[v0] Attempting to refresh admin token with endpoint:", `${apiUrl}/api/admin/refresh`)
 
@@ -188,7 +188,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
 
       try {
         const response = await fetch(`${apiUrl}/api/admin/profile`, {
@@ -336,10 +336,11 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
   }> => {
     setIsLoading(true)
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
 
       const requestBody: any = {
-        identifier: credentials.email, // Backend expects 'identifier' not 'email'
+        email: credentials.email, // For backends expecting 'email'
+        identifier: credentials.email, // For backends expecting 'identifier'
         password: credentials.password,
       }
 
@@ -348,6 +349,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
       }
 
       console.log("[v0] Attempting admin login to:", `${apiUrl}/api/admin/login`)
+      console.log("[v0] Request body keys:", Object.keys(requestBody))
 
       const response = await fetch(`${apiUrl}/api/admin/login`, {
         method: "POST",
@@ -438,7 +440,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
   const logout = async () => {
     setIsLoading(true)
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
 
       const token = getToken()
       if (token && token.trim()) {
@@ -489,7 +491,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const updateProfile = async (data: any): Promise<void> => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
     const token = getToken()
 
     const response = await fetch(`${apiUrl}/api/admin/profile`, {
@@ -518,7 +520,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
     newPassword: string,
     confirmPassword: string,
   ): Promise<void> => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
     const token = getToken()
 
     const response = await fetch(`${apiUrl}/api/admin/change-password`, {
@@ -542,7 +544,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const forgotPassword = async (email: string): Promise<void> => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
 
     const response = await fetch(`${apiUrl}/api/admin/forgot-password`, {
       method: "POST",
@@ -559,7 +561,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const resetPassword = async (token: string, password: string, confirmPassword: string): Promise<void> => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
 
     const response = await fetch(`${apiUrl}/api/admin/reset-password`, {
       method: "POST",
@@ -579,6 +581,10 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
+  const isAdminFlag =
+    !!user &&
+    (typeof user.role === "string" ? user.role === "admin" : user.role?.value === "admin")
+
   return (
     <AdminAuthContext.Provider
       value={{
@@ -586,7 +592,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
         isLoading,
         isAuthenticated,
         mfaRequired,
-        isAdmin: user?.role === "admin" || (typeof user?.role === "object" && user?.role?.value === "admin"),
+        isAdmin: isAdminFlag,
         login,
         logout,
         checkAuth,

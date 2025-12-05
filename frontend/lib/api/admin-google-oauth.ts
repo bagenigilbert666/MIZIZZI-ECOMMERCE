@@ -8,8 +8,8 @@ const ALLOWED_ADMIN_EMAILS = [
 ]
 
 export interface AdminGoogleAuthResponse {
-  status: "success" | "error"
-  message: string
+  message?: string
+  error?: string
   user?: {
     id: string
     email: string
@@ -17,6 +17,8 @@ export interface AdminGoogleAuthResponse {
     google_id?: string
     profile_picture?: string
     role: string
+    is_google_user?: boolean
+    email_verified?: boolean
   }
   access_token?: string
   refresh_token?: string
@@ -25,10 +27,15 @@ export interface AdminGoogleAuthResponse {
 }
 
 export interface GoogleConfigResponse {
-  status: "success" | "error"
+  status?: "success" | "error"
   client_id: string
   configured: boolean
 }
+
+let googleAuthResolve: ((token: string) => void) | null = null
+let googleAuthReject: ((error: Error) => void) | null = null
+let isGoogleInitialized = false
+let cachedClientId: string | null = null
 
 class AdminGoogleOAuthAPI {
   private isAllowedAdminEmail(email: string): boolean {
@@ -51,17 +58,26 @@ class AdminGoogleOAuthAPI {
           ...options.headers,
         },
         signal: controller.signal,
+        credentials: "include",
         ...options,
       })
 
       clearTimeout(timeoutId)
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.message || `HTTP error! status: ${response.status}`)
+      const responseText = await response.text()
+
+      let data: any
+      try {
+        data = responseText ? JSON.parse(responseText) : {}
+      } catch (e) {
+        throw new Error(`Server returned invalid JSON: ${response.status}`)
       }
 
-      return await response.json()
+      if (!response.ok) {
+        throw new Error(data.error || data.message || data.msg || `HTTP error! status: ${response.status}`)
+      }
+
+      return data as T
     } catch (error: any) {
       if (error.name === "AbortError") {
         throw new Error("Request timed out. Please check your connection and try again.")
@@ -81,17 +97,22 @@ class AdminGoogleOAuthAPI {
         throw new Error("Google token is required")
       }
 
-      console.log("[v0] Admin: Sending Google token to backend for authentication")
-
       const response = await this.makeRequest<AdminGoogleAuthResponse>("/api/admin/auth/google-login", {
         method: "POST",
         body: JSON.stringify({ token: googleToken }),
       })
 
+      // Backend returns user directly, check if it exists
+      if (!response.user && !response.access_token) {
+        throw new Error(response.error || "Authentication failed - no user data received")
+      }
+
+      // Validate admin role
       if (response.user && response.user.role !== "admin") {
         throw new Error("You don't have admin privileges to access this area")
       }
 
+      // Validate allowed email
       if (response.user && !this.isAllowedAdminEmail(response.user.email)) {
         throw new Error("This email is not authorized for admin access")
       }
@@ -100,155 +121,226 @@ class AdminGoogleOAuthAPI {
       if (response.access_token) {
         localStorage.setItem("admin_token", response.access_token)
         localStorage.setItem("mizizzi_token", response.access_token)
-        console.log("[v0] Admin access token stored")
       }
 
       if (response.refresh_token) {
         localStorage.setItem("admin_refresh_token", response.refresh_token)
         localStorage.setItem("mizizzi_refresh_token", response.refresh_token)
-        console.log("[v0] Admin refresh token stored")
       }
 
       if (response.csrf_token) {
         localStorage.setItem("mizizzi_csrf_token", response.csrf_token)
-        console.log("[v0] CSRF token stored")
       }
 
       // Store admin user data
       if (response.user) {
         localStorage.setItem("admin_user", JSON.stringify(response.user))
-        console.log("[v0] Admin user data stored")
       }
 
       return response
     } catch (error: any) {
-      console.error("[v0] Admin Google login error:", error)
       throw error
     }
   }
 
-  async getGoogleToken(): Promise<string> {
-    return new Promise((resolve, reject) => {
-      console.log("[v0] Getting Google token for admin login")
+  async preloadGoogleSignIn(): Promise<void> {
+    if (isGoogleInitialized) return
 
+    try {
+      // Load script if not present
       if (!window.google) {
-        console.log("[v0] Loading Google Sign-In script")
-        const script = document.createElement("script")
-        script.src = "https://accounts.google.com/gsi/client"
-        script.async = true
-        script.defer = true
-        script.onload = () => {
-          console.log("[v0] Google Sign-In script loaded")
-          this.initializeGoogleSignIn(resolve, reject)
-        }
-        script.onerror = () => {
-          console.error("[v0] Failed to load Google Sign-In library")
-          reject(new Error("Failed to load Google Sign-In library"))
-        }
-        document.head.appendChild(script)
-      } else {
-        console.log("[v0] Google Sign-In script already loaded")
-        this.initializeGoogleSignIn(resolve, reject)
+        await this.loadGoogleScript()
       }
+
+      // Get client ID
+      const config = await this.getGoogleConfig()
+      if (!config.configured || !config.client_id) {
+        throw new Error("Google OAuth is not configured")
+      }
+
+      cachedClientId = config.client_id
+
+      // Initialize Google Sign-In
+      window.google!.accounts.id.initialize({
+        client_id: cachedClientId,
+        callback: this.handleGoogleCallback,
+        auto_select: false,
+        cancel_on_tap_outside: true,
+      })
+
+      isGoogleInitialized = true
+    } catch (error) {
+      console.error("Failed to preload Google Sign-In:", error)
+    }
+  }
+
+  private loadGoogleScript(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      if (window.google) {
+        resolve()
+        return
+      }
+
+      const script = document.createElement("script")
+      script.src = "https://accounts.google.com/gsi/client"
+      script.async = true
+      script.defer = true
+      script.onload = () => resolve()
+      script.onerror = () => reject(new Error("Failed to load Google Sign-In library"))
+      document.head.appendChild(script)
     })
   }
 
-  private async initializeGoogleSignIn(
-    resolve: (token: string) => void,
-    reject: (error: Error) => void,
-  ): Promise<void> {
-    try {
-      const config = await this.getGoogleConfig()
-
-      if (!config.configured || !config.client_id) {
-        console.error("[v0] Google OAuth not configured on server")
-        reject(new Error("Google OAuth is not configured. Please contact support."))
-        return
+  private handleGoogleCallback = (response: any) => {
+    if (response.credential) {
+      if (googleAuthResolve) {
+        googleAuthResolve(response.credential)
+        googleAuthResolve = null
+        googleAuthReject = null
       }
-
-      const clientId = config.client_id
-
-      console.log("[v0] Initializing Google Sign-In for admin with clientId:", clientId.substring(0, 20) + "...")
-
-      if (!window.google?.accounts?.id) {
-        reject(new Error("Google Sign-In library not loaded correctly"))
-        return
+    } else {
+      if (googleAuthReject) {
+        googleAuthReject(new Error("No credential received from Google"))
+        googleAuthResolve = null
+        googleAuthReject = null
       }
-
-      window.google.accounts.id.initialize({
-        client_id: clientId,
-        callback: (response: any) => {
-          console.log("[v0] Google callback received for admin")
-          if (response.credential) {
-            console.log("[v0] Credential received, resolving with token")
-            resolve(response.credential)
-          } else {
-            console.log("[v0] No credential in response")
-            reject(new Error("No credential received from Google"))
-          }
-        },
-      })
-
-      console.log("[v0] Creating button container for admin")
-
-      const container = document.createElement("div")
-      container.id = "google-signin-button-container-admin"
-      container.style.display = "none"
-      document.body.appendChild(container)
-
-      console.log("[v0] Rendering Google Sign-In button for admin")
-
-      if (!window.google?.accounts?.id) {
-        reject(new Error("Lost connection to Google Sign-In library"))
-        return
-      }
-
-      window.google.accounts.id.renderButton(container, {
-        theme: "outline",
-        size: "large",
-        type: "standard",
-      })
-
-      console.log("[v0] Looking for button to click")
-
-      setTimeout(() => {
-        const button = container.querySelector("div[role='button']") as HTMLElement | null
-        if (button) {
-          console.log("[v0] Triggering Google Sign-In button click for admin")
-          button.click()
-        } else {
-          const fallbackButton = container.querySelector("button") as HTMLButtonElement | null
-          if (fallbackButton) {
-            console.log("[v0] Triggering Google Sign-In button click (fallback) for admin")
-            fallbackButton.click()
-          } else {
-            console.error("[v0] Failed to find Google Sign-In button")
-            console.log("[v0] Container contents:", container.innerHTML)
-            reject(new Error("Failed to render Google Sign-In button"))
-          }
-        }
-      }, 500)
-    } catch (error) {
-      console.error("[v0] Error in initializeGoogleSignIn:", error)
-      reject(error instanceof Error ? error : new Error("Failed to initialize Google Sign-In"))
     }
+  }
+
+  triggerGooglePrompt(): Promise<string> {
+    return new Promise((resolve, reject) => {
+      googleAuthResolve = resolve
+      googleAuthReject = reject
+
+      if (!window.google?.accounts?.id) {
+        reject(new Error("Google Sign-In not initialized. Please refresh the page."))
+        return
+      }
+
+      // Use prompt() for One Tap - this works better with popup blockers
+      window.google.accounts.id.prompt((notification: any) => {
+        if (notification.isNotDisplayed()) {
+          const reason = notification.getNotDisplayedReason()
+          console.log("Prompt not displayed:", reason)
+
+          // If prompt fails, fall back to rendering a button
+          if (reason === "opt_out_or_no_session" || reason === "suppressed_by_user") {
+            this.showGoogleButtonFallback(resolve, reject)
+          } else {
+            reject(new Error(`Google Sign-In unavailable: ${reason}`))
+          }
+        } else if (notification.isSkippedMoment()) {
+          const reason = notification.getSkippedReason()
+          console.log("Prompt skipped:", reason)
+          // User closed the prompt
+          reject(new Error("Sign-in was cancelled"))
+        } else if (notification.isDismissedMoment()) {
+          const reason = notification.getDismissedReason()
+          console.log("Prompt dismissed:", reason)
+          if (reason !== "credential_returned") {
+            reject(new Error("Sign-in was dismissed"))
+          }
+          // If credential_returned, the callback will handle it
+        }
+      })
+    })
+  }
+
+  private showGoogleButtonFallback(resolve: (token: string) => void, reject: (error: Error) => void): void {
+    // Create a visible modal with Google button
+    const overlay = document.createElement("div")
+    overlay.id = "google-signin-overlay"
+    overlay.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 10000;
+    `
+
+    const modal = document.createElement("div")
+    modal.style.cssText = `
+      background: white;
+      padding: 32px;
+      border-radius: 12px;
+      text-align: center;
+      max-width: 400px;
+    `
+
+    const title = document.createElement("h3")
+    title.textContent = "Sign in with Google"
+    title.style.cssText = "margin: 0 0 8px 0; font-size: 18px; font-weight: 600;"
+
+    const subtitle = document.createElement("p")
+    subtitle.textContent = "Click the button below to continue"
+    subtitle.style.cssText = "margin: 0 0 20px 0; color: #666; font-size: 14px;"
+
+    const buttonContainer = document.createElement("div")
+    buttonContainer.id = "google-signin-button-fallback"
+    buttonContainer.style.cssText = "display: flex; justify-content: center;"
+
+    const cancelBtn = document.createElement("button")
+    cancelBtn.textContent = "Cancel"
+    cancelBtn.style.cssText = `
+      margin-top: 16px;
+      padding: 8px 24px;
+      border: 1px solid #ddd;
+      background: white;
+      border-radius: 6px;
+      cursor: pointer;
+    `
+    cancelBtn.onclick = () => {
+      overlay.remove()
+      reject(new Error("Sign-in was cancelled"))
+    }
+
+    modal.appendChild(title)
+    modal.appendChild(subtitle)
+    modal.appendChild(buttonContainer)
+    modal.appendChild(cancelBtn)
+    overlay.appendChild(modal)
+    document.body.appendChild(overlay)
+
+    // Update callbacks to also close overlay
+    googleAuthResolve = (token: string) => {
+      overlay.remove()
+      resolve(token)
+    }
+    googleAuthReject = (error: Error) => {
+      overlay.remove()
+      reject(error)
+    }
+
+    // Render Google button in the modal
+    window.google!.accounts.id.renderButton(buttonContainer, {
+      theme: "outline",
+      size: "large",
+      type: "standard",
+      text: "signin_with",
+      width: 280,
+    })
   }
 
   async authenticateWithGoogle(): Promise<AdminGoogleAuthResponse> {
     try {
-      console.log("[v0] Starting Admin Google OAuth flow")
+      // Ensure initialized
+      if (!isGoogleInitialized) {
+        await this.preloadGoogleSignIn()
+      }
 
-      const googleToken = await this.getGoogleToken()
+      // Trigger prompt - this happens synchronously on user click
+      const googleToken = await this.triggerGooglePrompt()
 
-      console.log("[v0] Got Google token, authenticating admin with backend")
-
+      // Authenticate with backend
       const response = await this.loginWithGoogle(googleToken)
-
-      console.log("[v0] Admin Google authentication successful")
 
       return response
     } catch (error) {
-      console.error("[v0] Admin Google authentication flow error:", error)
       throw error
     }
   }
@@ -262,6 +354,7 @@ declare global {
           initialize: (config: any) => void
           prompt: (callback?: (notification: any) => void) => void
           renderButton: (element: HTMLElement, config: any) => void
+          cancel: () => void
         }
         oauth2: {
           initTokenClient: (config: any) => {
