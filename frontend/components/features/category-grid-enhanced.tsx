@@ -1,39 +1,112 @@
 "use client"
 
-import { useEffect, useState, useRef, useCallback, useMemo } from "react"
+import { useEffect, useRef, useCallback, useMemo } from "react"
 import Link from "next/link"
 import { motion } from "framer-motion"
 import { ChevronLeft, ChevronRight, ArrowRight } from "lucide-react"
-import { categoryService, type Category } from "@/services/category"
-import { Loader } from "@/components/ui/loader"
+import type { Category } from "@/services/category"
 import { useInView } from "react-intersection-observer"
 import { websocketService } from "@/services/websocket"
+import useSWR from "swr"
 
-const getImageUrlWithCacheBust = (url: string | undefined): string => {
-  if (!url) return "/abstract-categories.png"
-  // Add cache-busting timestamp if it's from our backend
-  if (url.includes("localhost") || url.includes("/api/")) {
-    const separator = url.includes("?") ? "&" : "?"
-    return `${url}${separator}_t=${Date.now()}`
+const CATEGORIES_STORAGE_KEY = "mizizzi_categories_cache"
+const CATEGORIES_TIMESTAMP_KEY = "mizizzi_categories_timestamp"
+
+const getCachedCategories = (): Category[] => {
+  if (typeof window === "undefined") return []
+  try {
+    const cached = localStorage.getItem(CATEGORIES_STORAGE_KEY)
+    if (cached) {
+      return JSON.parse(cached)
+    }
+  } catch (e) {
+    console.warn("[v0] Failed to parse cached categories")
+  }
+  return []
+}
+
+const setCachedCategories = (categories: Category[]) => {
+  if (typeof window === "undefined") return
+  try {
+    localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(categories))
+    localStorage.setItem(CATEGORIES_TIMESTAMP_KEY, Date.now().toString())
+  } catch (e) {
+    console.warn("[v0] Failed to cache categories")
+  }
+}
+
+const categoriesFetcher = async (): Promise<Category[]> => {
+  const baseUrl =
+    process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "https://mizizzi-ecommerce-1.onrender.com"
+
+  const response = await fetch(`${baseUrl}/api/categories?parent_id=null&per_page=100`, {
+    headers: {
+      "Cache-Control": "no-cache",
+    },
+  })
+
+  if (!response.ok) throw new Error("Failed to fetch categories")
+
+  const data = await response.json()
+  let categories = data?.items ?? data ?? []
+
+  if (!Array.isArray(categories)) {
+    categories = []
+  }
+
+  // Normalize image URLs
+  categories = categories.map((cat: any) => ({
+    ...cat,
+    image_url: normalizeImageUrl(cat.image_url),
+    banner_url: normalizeImageUrl(cat.banner_url),
+  }))
+
+  // Cache to localStorage for instant loading next time
+  setCachedCategories(categories)
+
+  return categories
+}
+
+const normalizeImageUrl = (url: string | undefined | null): string | undefined => {
+  if (!url) return undefined
+  if (url.startsWith("http") || url.startsWith("data:")) return url
+  if (url.startsWith("/")) {
+    const baseUrl =
+      process.env.NEXT_PUBLIC_API_URL ||
+      process.env.NEXT_PUBLIC_BACKEND_URL ||
+      "https://mizizzi-ecommerce-1.onrender.com"
+    return `${baseUrl}${url}`
   }
   return url
 }
 
-// Optimized CategoryCard component to reduce re-renders
-const CategoryCard = ({ category, index, refreshKey }: { category: Category; index: number; refreshKey: number }) => {
+const CategoryCardSkeleton = ({ index }: { index: number }) => (
+  <div className="flex-shrink-0 min-w-[150px] sm:min-w-[170px] md:min-w-[190px] flex-1">
+    <div className="relative overflow-hidden rounded-lg w-full h-full bg-white shadow-md">
+      <div className="aspect-square w-full overflow-hidden bg-gray-200 animate-pulse" />
+      <div className="absolute bottom-0 left-0 w-full p-3 space-y-2">
+        <div className="h-4 w-3/4 bg-gray-300 rounded animate-pulse" />
+        <div className="h-3 w-1/2 bg-gray-300 rounded animate-pulse" />
+      </div>
+    </div>
+  </div>
+)
+
+const CategoryCard = ({
+  category,
+  index,
+  isPriority,
+}: {
+  category: Category
+  index: number
+  isPriority: boolean
+}) => {
   const { ref, inView } = useInView({
     triggerOnce: true,
-    rootMargin: "200px 0px",
+    rootMargin: "300px 0px", // Increased margin for earlier preloading
   })
 
-  const imageUrl = useMemo(() => {
-    const baseUrl = category.image_url || "/abstract-categories.png"
-    if (baseUrl.includes("localhost") || baseUrl.includes("/api/")) {
-      const separator = baseUrl.includes("?") ? "&" : "?"
-      return `${baseUrl}${separator}_r=${refreshKey}`
-    }
-    return baseUrl
-  }, [category.image_url, refreshKey])
+  const imageUrl = category.image_url || "/abstract-categories.png"
 
   return (
     <Link
@@ -41,6 +114,7 @@ const CategoryCard = ({ category, index, refreshKey }: { category: Category; ind
       key={`carousel-${category.id || index}`}
       className="flex-shrink-0 min-w-[150px] sm:min-w-[170px] md:min-w-[190px] flex-1"
       ref={ref}
+      prefetch={true}
     >
       <motion.div
         className="group relative overflow-hidden rounded-lg w-full h-full bg-white shadow-md transition-all duration-300"
@@ -48,47 +122,32 @@ const CategoryCard = ({ category, index, refreshKey }: { category: Category; ind
         transition={{ duration: 0.2, ease: "easeOut" }}
         layout
       >
-        {inView && (
+        {(inView || isPriority) && (
           <>
             <div className="aspect-square w-full overflow-hidden bg-gray-100">
-              <motion.img
-                src={imageUrl}
+              <img
+                src={imageUrl || "/placeholder.svg"}
                 alt={category.name}
                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
-                loading="lazy"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.4 }}
+                loading={isPriority ? "eager" : "lazy"}
+                decoding={isPriority ? "sync" : "async"}
+                // @ts-ignore - fetchpriority is valid but not in types
+                fetchpriority={isPriority ? "high" : "auto"}
                 onError={(e) => {
-                  console.log(`[v0] Image load error for ${category.name}:`, category.image_url)
                   ;(e.target as HTMLImageElement).src = "/abstract-categories.png"
                 }}
               />
             </div>
-            <motion.div
-              className="absolute inset-0 bg-gradient-to-t from-black/70 to-black/20"
-              initial={{ opacity: 0.6 }}
-              whileHover={{ opacity: 0.75 }}
-              transition={{ duration: 0.3 }}
-            />
-            <motion.div
-              className="absolute bottom-0 left-0 w-full p-3"
-              initial={{ y: 8, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.1 }}
-            >
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-black/20" />
+            <div className="absolute bottom-0 left-0 w-full p-3">
               <h3 className="text-sm font-semibold text-white sm:text-base group-hover:text-cherry-200 transition-colors">
                 {category.name}
               </h3>
-              <motion.div
-                className="flex items-center text-xs text-white/90 mt-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                initial={{ x: -4 }}
-                whileHover={{ x: 2 }}
-              >
+              <div className="flex items-center text-xs text-white/90 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
                 <span>Shop Now</span>
                 <ArrowRight className="ml-1 h-3 w-3" />
-              </motion.div>
-            </motion.div>
+              </div>
+            </div>
           </>
         )}
       </motion.div>
@@ -97,170 +156,72 @@ const CategoryCard = ({ category, index, refreshKey }: { category: Category; ind
 }
 
 export function CategoryGrid() {
-  const [categories, setCategories] = useState<Category[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const carouselRef = useRef<HTMLDivElement>(null)
-  const [isScrolling, setIsScrolling] = useState(false)
-  const [refreshKey, setRefreshKey] = useState(Date.now())
 
-  const handleScroll = useCallback(() => {
-    if (!isScrolling) {
-      setIsScrolling(true)
-      requestAnimationFrame(() => {
-        setIsScrolling(false)
+  const {
+    data: categories = [],
+    isLoading,
+    mutate: refreshCategories,
+  } = useSWR<Category[]>("categories-grid", categoriesFetcher, {
+    fallbackData: getCachedCategories(), // Show cached data instantly
+    revalidateOnFocus: false, // Don't refetch on window focus
+    revalidateOnReconnect: true,
+    dedupingInterval: 60000, // Dedupe requests for 1 minute
+    refreshInterval: 0, // No auto-refresh, only manual
+    keepPreviousData: true, // Keep showing old data while fetching new
+    revalidateIfStale: true,
+    revalidateOnMount: true,
+  })
+
+  useEffect(() => {
+    if (categories.length > 0) {
+      const imagesToPreload = categories.slice(0, 4)
+      imagesToPreload.forEach((cat) => {
+        if (cat.image_url) {
+          const link = document.createElement("link")
+          link.rel = "preload"
+          link.as = "image"
+          link.href = cat.image_url
+          document.head.appendChild(link)
+        }
       })
     }
-  }, [isScrolling])
+  }, [categories])
 
   const scrollCarousel = useCallback((direction: "left" | "right") => {
     if (!carouselRef.current) return
-
     const scrollAmount = carouselRef.current.clientWidth * 0.75
     const currentScroll = carouselRef.current.scrollLeft
-
     carouselRef.current.scrollTo({
       left: direction === "left" ? currentScroll - scrollAmount : currentScroll + scrollAmount,
       behavior: "smooth",
     })
   }, [])
 
-  const fetchCategoriesFromAPI = useCallback(async (forceRefresh = false) => {
-    try {
-      console.log("[v0] Fetching categories, forceRefresh:", forceRefresh)
-
-      if (forceRefresh) {
-        categoryService.clearCache()
-        if (typeof sessionStorage !== "undefined") {
-          sessionStorage.removeItem("categories")
-        }
-      }
-
-      const data = await categoryService.getCategories({ parent_id: null }, forceRefresh)
-      if (Array.isArray(data)) {
-        console.log(
-          `[v0] Loaded ${data.length} categories:`,
-          data.map((c) => ({ name: c.name, image: c.image_url })),
-        )
-        setCategories(data)
-        setRefreshKey(Date.now())
-        if (typeof sessionStorage !== "undefined") {
-          sessionStorage.setItem("categories", JSON.stringify(data))
-        }
-        return data
-      }
-      return []
-    } catch (err) {
-      console.error("[v0] Error fetching categories:", err)
-      throw err
-    }
-  }, [])
-
   useEffect(() => {
-    let isMounted = true
-
-    async function initCategories() {
-      try {
-        setLoading(true)
-
-        if (isMounted) {
-          await fetchCategoriesFromAPI(true)
-          setLoading(false)
-        }
-      } catch (err) {
-        if (isMounted) {
-          console.error("Error fetching categories:", err)
-          setError("Failed to load categories")
-          setLoading(false)
-        }
-      }
+    const handleCategoryUpdate = async () => {
+      // Clear localStorage cache
+      localStorage.removeItem(CATEGORIES_STORAGE_KEY)
+      // Revalidate SWR cache
+      refreshCategories()
     }
 
-    initCategories()
+    const unsub1 = websocketService.on("category_updated", handleCategoryUpdate)
+    const unsub2 = websocketService.on("category_created", handleCategoryUpdate)
+    const unsub3 = websocketService.on("category_deleted", handleCategoryUpdate)
 
     return () => {
-      isMounted = false
+      unsub1()
+      unsub2()
+      unsub3()
     }
-  }, [fetchCategoriesFromAPI])
-
-  useEffect(() => {
-    let pollInterval: NodeJS.Timeout | null = null
-
-    const handleCategoryUpdate = async (data: any) => {
-      console.log("[v0] Received category update event in grid:", data)
-
-      // Clear all caches
-      categoryService.clearCache()
-      if (typeof sessionStorage !== "undefined") {
-        sessionStorage.removeItem("categories")
-      }
-
-      try {
-        await fetchCategoriesFromAPI(true)
-        console.log("[v0] Grid categories refreshed after admin update")
-      } catch (error) {
-        console.error("[v0] Failed to refresh grid categories:", error)
-      }
-    }
-
-    // Subscribe to websocket events
-    const unsubscribe = websocketService.on("category_updated", handleCategoryUpdate)
-
-    const unsubscribeCreated = websocketService.on("category_created", handleCategoryUpdate)
-    const unsubscribeDeleted = websocketService.on("category_deleted", handleCategoryUpdate)
-
-    const startPolling = () => {
-      if (!websocketService.getConnectionStatus()) {
-        console.log("[v0] WebSocket not connected, starting polling for category updates")
-        pollInterval = setInterval(async () => {
-          await fetchCategoriesFromAPI(true)
-        }, 30000) // Poll every 30 seconds
-      }
-    }
-
-    // Start polling after a short delay to give websocket time to connect
-    const pollingTimeout = setTimeout(startPolling, 5000)
-
-    return () => {
-      unsubscribe()
-      unsubscribeCreated()
-      unsubscribeDeleted()
-      clearTimeout(pollingTimeout)
-      if (pollInterval) {
-        clearInterval(pollInterval)
-      }
-    }
-  }, [fetchCategoriesFromAPI])
-
-  useEffect(() => {
-    const carousel = carouselRef.current
-    if (carousel) {
-      carousel.addEventListener("scroll", handleScroll, { passive: true })
-      return () => {
-        carousel.removeEventListener("scroll", handleScroll)
-      }
-    }
-  }, [handleScroll])
+  }, [refreshCategories])
 
   const memoizedCategories = useMemo(() => {
     return Array.isArray(categories) ? categories : []
   }, [categories])
 
-  if (loading && memoizedCategories.length === 0) {
-    return (
-      <div className="flex justify-center py-6">
-        <Loader />
-      </div>
-    )
-  }
-
-  if (error && memoizedCategories.length === 0) {
-    return (
-      <div className="py-6 text-center">
-        <p className="text-red-500">{error}</p>
-      </div>
-    )
-  }
+  const showSkeleton = isLoading && memoizedCategories.length === 0
 
   return (
     <div className="w-full overflow-hidden max-w-full">
@@ -270,6 +231,7 @@ export function CategoryGrid() {
           <Link
             href="/categories"
             className="flex items-center gap-2 px-3 py-1.5 bg-white/10 hover:bg-white/20 text-white rounded-full text-sm font-medium transition-colors duration-200"
+            prefetch={true}
           >
             <span>View All</span>
             <ArrowRight className="h-4 w-4" />
@@ -288,14 +250,16 @@ export function CategoryGrid() {
             scrollBehavior: "smooth",
           }}
         >
-          {memoizedCategories.map((category, index) => (
-            <CategoryCard
-              key={category.id || `category-${index}`}
-              category={category}
-              index={index}
-              refreshKey={refreshKey}
-            />
-          ))}
+          {showSkeleton
+            ? [...Array(6)].map((_, index) => <CategoryCardSkeleton key={`skeleton-${index}`} index={index} />)
+            : memoizedCategories.map((category, index) => (
+                <CategoryCard
+                  key={category.id || `category-${index}`}
+                  category={category}
+                  index={index}
+                  isPriority={index < 4} // First 4 items load with high priority
+                />
+              ))}
         </div>
 
         <motion.button

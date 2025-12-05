@@ -1,8 +1,7 @@
 "use client"
 
 import type React from "react"
-
-import { useState } from "react"
+import { useState, memo } from "react"
 import { cn } from "@/lib/utils"
 
 interface OptimizedImageProps {
@@ -15,7 +14,7 @@ interface OptimizedImageProps {
   priority?: boolean
 }
 
-export function OptimizedImage({
+export const OptimizedImage = memo(function OptimizedImage({
   src,
   alt,
   className,
@@ -27,10 +26,7 @@ export function OptimizedImage({
   const [isLoading, setIsLoading] = useState(true)
   const [hasError, setHasError] = useState(false)
 
-  console.log("[v0] OptimizedImage received src:", src, "alt:", alt)
-
   if (!src || hasError) {
-    console.log("[v0] OptimizedImage showing fallback - no src:", !src, "hasError:", hasError)
     return <div className={cn("flex items-center justify-center bg-gray-100", className)}>{fallback}</div>
   }
 
@@ -47,20 +43,19 @@ export function OptimizedImage({
         width={width}
         height={height}
         className={cn(
-          "w-full h-full object-cover transition-opacity duration-300",
+          "w-full h-full object-cover transition-opacity duration-200", // Faster transition
           isLoading ? "opacity-0" : "opacity-100",
         )}
-        onLoad={() => {
-          console.log("[v0] Image loaded successfully:", src)
-          setIsLoading(false)
-        }}
+        onLoad={() => setIsLoading(false)}
         onError={() => {
-          console.log("[v0] Image failed to load:", src)
           setHasError(true)
           setIsLoading(false)
         }}
         loading={priority ? "eager" : "lazy"}
+        decoding={priority ? "sync" : "async"}
+        // @ts-ignore - fetchpriority is valid HTML attribute
+        fetchpriority={priority ? "high" : "auto"}
       />
     </div>
   )
-}
+})

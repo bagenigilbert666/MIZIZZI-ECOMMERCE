@@ -18,7 +18,7 @@ export interface Category {
 
 // Create a cache for API responses with expiry
 const cache = new Map<string, { data: any; timestamp: number }>()
-const CACHE_TTL = 30 * 1000 // 30 seconds
+const CACHE_TTL = 5 * 60 * 1000 // Increased to 5 minutes
 
 // Helper to strip nullish values from params
 function sanitizeParams<T extends Record<string, any>>(params: T): Partial<T> {
@@ -30,6 +30,44 @@ function sanitizeParams<T extends Record<string, any>>(params: T): Partial<T> {
     }
   })
   return out as Partial<T>
+}
+
+const STORAGE_KEY = "mizizzi_category_service_cache"
+
+const loadCacheFromStorage = () => {
+  if (typeof window === "undefined") return
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY)
+    if (stored) {
+      const parsed = JSON.parse(stored)
+      Object.entries(parsed).forEach(([key, value]: [string, any]) => {
+        // Only restore if not too old (30 min max)
+        if (Date.now() - value.timestamp < 30 * 60 * 1000) {
+          cache.set(key, value)
+        }
+      })
+    }
+  } catch (e) {
+    // Ignore errors
+  }
+}
+
+const saveCacheToStorage = () => {
+  if (typeof window === "undefined") return
+  try {
+    const cacheObj: Record<string, any> = {}
+    cache.forEach((value, key) => {
+      cacheObj[key] = value
+    })
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(cacheObj))
+  } catch (e) {
+    // Ignore errors
+  }
+}
+
+// Initialize cache from storage
+if (typeof window !== "undefined") {
+  loadCacheFromStorage()
 }
 
 const getBaseUrl = () => {
@@ -73,35 +111,25 @@ export const categoryService = {
         page: params.page || 1,
         per_page: params.per_page || 100,
         parent_id: params.parent_id !== undefined ? params.parent_id : undefined,
+        featured: params.featured !== undefined ? params.featured : undefined,
         ...params,
       })
-
-      if (!("parent_id" in params)) {
-        delete cleanParams.parent_id
-      }
-
-      delete (cleanParams as Record<string, any>).signal
 
       const cacheKey = `categories-${JSON.stringify(cleanParams)}`
 
       if (!forceRefresh && isCacheValid(cacheKey)) {
-        console.log("[v0] Returning cached categories (still valid)")
         return cache.get(cacheKey)!.data
       }
 
-      console.log("[v0] Fetching all categories from API with params:", cleanParams)
+      const staleData = cache.get(cacheKey)?.data
 
       const baseUrl = getBaseUrl()
-      const timestamp = Date.now()
       const response = await api.get(`${baseUrl}${CATEGORIES_BASE}`, {
-        params: { ...cleanParams, _t: timestamp },
+        params: cleanParams,
         headers: {
           "Cache-Control": "no-cache",
-          Pragma: "no-cache",
         },
       })
-
-      console.log("[v0] Categories API response received:", response.data)
 
       let data = response.data?.items ?? response.data ?? []
 
@@ -110,17 +138,21 @@ export const categoryService = {
       }
 
       if (!Array.isArray(data)) {
-        console.warn("[v0] Categories API returned non-array data:", data)
+        if (staleData) return staleData
         data = []
       }
 
       data = data.map(normalizeCategoryImages)
 
-      console.log(`[v0] Successfully fetched ${data.length} categories from database`)
       cache.set(cacheKey, { data, timestamp: Date.now() })
+      saveCacheToStorage()
+
       return data
     } catch (error) {
       console.error("[v0] Error fetching categories:", error)
+      const cacheKey = `categories-${JSON.stringify(params)}`
+      const cachedData = cache.get(cacheKey)?.data
+      if (cachedData) return cachedData
       return []
     }
   },
@@ -133,7 +165,7 @@ export const categoryService = {
     if (!slug) return null
     try {
       const cacheKey = `category-${slug}`
-      if (cache.has(cacheKey)) return cache.get(cacheKey)!.data
+      if (isCacheValid(cacheKey)) return cache.get(cacheKey)!.data
 
       const response = await api.get(`${getBaseUrl()}${CATEGORIES_BASE}/slug/${encodeURIComponent(slug)}`)
       const data = response.data ?? null
@@ -141,6 +173,7 @@ export const categoryService = {
       const normalizedData = data ? normalizeCategoryImages(data) : null
 
       cache.set(cacheKey, { data: normalizedData, timestamp: Date.now() })
+      saveCacheToStorage()
       return normalizedData
     } catch (error) {
       console.error(`[v0] Error fetching category with slug ${slug}:`, error)
@@ -151,7 +184,7 @@ export const categoryService = {
   async getSubcategories(parentId: number): Promise<Category[]> {
     try {
       const cacheKey = `subcategories-${parentId}`
-      if (cache.has(cacheKey)) return cache.get(cacheKey)!.data
+      if (isCacheValid(cacheKey)) return cache.get(cacheKey)!.data
 
       const response = await api.get(`${getBaseUrl()}${CATEGORIES_BASE}`, {
         params: { parent_id: parentId },
@@ -163,13 +196,13 @@ export const categoryService = {
       }
 
       if (!Array.isArray(data)) {
-        console.warn("[v0] Subcategories API returned non-array data:", data)
         data = []
       }
 
       data = data.map(normalizeCategoryImages)
 
       cache.set(cacheKey, { data, timestamp: Date.now() })
+      saveCacheToStorage()
       return data
     } catch (error) {
       console.error(`[v0] Error fetching subcategories for parent ${parentId}:`, error)
@@ -200,14 +233,16 @@ export const categoryService = {
       const items = res.data?.items ?? res.data ?? []
       return Array.isArray(items) ? items.map(normalizeCategoryImages) : []
     } catch (error) {
-      console.warn("[v0] getRelatedCategories fallback failed:", error)
       return []
     }
   },
 
   clearCache() {
-    console.log("[v0] Clearing category service cache")
     cache.clear()
+    if (typeof localStorage !== "undefined") {
+      localStorage.removeItem(STORAGE_KEY)
+      localStorage.removeItem("mizizzi_categories_cache")
+    }
     if (typeof sessionStorage !== "undefined") {
       sessionStorage.removeItem("categories")
     }
