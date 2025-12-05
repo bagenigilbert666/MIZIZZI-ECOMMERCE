@@ -5,16 +5,27 @@ import os
 from datetime import timedelta
 
 
+# Helper to defensively coerce environment values to strings and tolerate accidental tuples/lists
+def _get_env_as_str(key, default=None):
+    """Return an environment value as a string; if the env value is a tuple return the last item."""
+    val = os.environ.get(key, default)
+    if isinstance(val, (list, tuple)):
+        # Some misuses can end up storing (key, value) or similar tuples; prefer the last element
+        val = val[-1] if val else default
+    if val is None:
+        return default
+    return str(val)
+
+
 class Config:
     """Base configuration class."""
 
     # Basic Flask configuration
-    SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
+    SECRET_KEY = _get_env_as_str('SECRET_KEY') or 'dev-secret-key-change-in-production'
 
-    # Database configuration
-    SQLALCHEMY_DATABASE_URI = os.environ.get(
-        'DATABASE_URL', 'postgresql://neondb_owner:npg_0gMwASZYo9pJ@ep-shiny-term-adlossxs-pooler.c-2.us-east-1.aws.neon.tech/mizizzi_project?sslmode=require&channel_binding=require'
-    )
+    # Database configuration - use helper to ensure a string is provided to SQLAlchemy
+    _db_default = 'postgresql://neondb_owner:npg_0gMwASZYo9pJ@ep-shiny-term-adlossxs-pooler.c-2.us-east-1.aws.neon.tech/mizizzi_project?sslmode=require&channel_binding=require'
+    SQLALCHEMY_DATABASE_URI = _get_env_as_str('DATABASE_URL', _db_default)
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     # JWT configuration
@@ -34,10 +45,10 @@ class Config:
     BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
     # Upload folder configuration (single canonical absolute path)
-    UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER') or os.path.join(BASE_DIR, 'uploads')
+    UPLOAD_FOLDER = _get_env_as_str('UPLOAD_FOLDER') or os.path.join(BASE_DIR, 'uploads')
     CATEGORIES_UPLOAD_FOLDER = os.path.join(UPLOAD_FOLDER, 'categories')
     # URL prefix used by the API to serve uploaded files (route should use this)
-    UPLOAD_URL_PREFIX = os.environ.get('UPLOAD_URL_PREFIX', '/api/uploads')
+    UPLOAD_URL_PREFIX = _get_env_as_str('UPLOAD_URL_PREFIX', '/api/uploads')
 
     # File upload configuration
     MAX_CONTENT_LENGTH = int(os.environ.get('MAX_CONTENT_LENGTH', 16 * 1024 * 1024))  # 16MB default
@@ -80,7 +91,7 @@ class Config:
     CACHE_DEFAULT_TIMEOUT = 300
 
     # Rate limiting configuration - normalized env names and sane defaults
-    RATELIMIT_STORAGE_URI = os.environ.get('RATELIMIT_STORAGE_URI') or os.environ.get('REDIS_URL') or 'memory://'
+    RATELIMIT_STORAGE_URI = _get_env_as_str('RATELIMIT_STORAGE_URI') or _get_env_as_str('REDIS_URL') or 'memory://'
     RATELIMIT_DEFAULT = os.environ.get('RATELIMIT_DEFAULT', '1000 per hour')
     RATELIMIT_HEADERS_ENABLED = True
     RATELIMIT_IN_MEMORY_FALLBACK_ENABLED = True
@@ -133,8 +144,8 @@ class ProductionConfig(Config):
     """Production configuration."""
     DEBUG = False
     CACHE_TYPE = 'RedisCache'
-    CACHE_REDIS_URL = os.environ.get('REDIS_URL') or 'redis://localhost:6379/0'
-    RATELIMIT_STORAGE_URI = os.environ.get('REDIS_URL') or 'redis://localhost:6379/1'
+    CACHE_REDIS_URL = _get_env_as_str('REDIS_URL') or 'redis://localhost:6379/0'
+    RATELIMIT_STORAGE_URI = _get_env_as_str('REDIS_URL') or 'redis://localhost:6379/1'
     SESSION_COOKIE_SECURE = True
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'
