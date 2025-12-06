@@ -16,34 +16,27 @@ import { cloudinaryService } from "@/services/cloudinary-service"
 type Product = BaseProduct & { color_options?: string[]; stock?: number; rating?: number; reviews_count?: number }
 
 function getProductImageUrl(product: Product): string {
-  // Check for image_urls array first
   if (product.image_urls && product.image_urls.length > 0) {
-    // If it's a Cloudinary public ID, generate URL:
     if (typeof product.image_urls[0] === "string" && !product.image_urls[0].startsWith("http")) {
       return cloudinaryService.generateOptimizedUrl(product.image_urls[0])
     }
     return product.image_urls[0]
   }
 
-  // Then check for thumbnail_url
   if (product.thumbnail_url) {
-    // If it's a Cloudinary public ID, generate URL:
     if (typeof product.thumbnail_url === "string" && !product.thumbnail_url.startsWith("http")) {
       return cloudinaryService.generateOptimizedUrl(product.thumbnail_url)
     }
     return product.thumbnail_url
   }
 
-  // Check for images array with url property
   if (product.images && product.images.length > 0 && product.images[0].url) {
-    // If it's a Cloudinary public ID, generate URL:
     if (typeof product.images[0].url === "string" && !product.images[0].url.startsWith("http")) {
       return cloudinaryService.generateOptimizedUrl(product.images[0].url)
     }
     return product.images[0].url
   }
 
-  // Fallback to placeholder
   return "/placeholder.svg?height=300&width=300"
 }
 
@@ -114,7 +107,6 @@ const ProductCard = memo(({ product, isMobile }: { product: Product; isMobile: b
 
   const imageUrl = getProductImageUrl(product)
 
-  // Generate random rating and reviews for demo
   const rating = product.rating || 3 + Math.random() * 2
   const reviewCount = product.reviews_count || Math.floor(Math.random() * 5000) + 100
 
@@ -128,7 +120,6 @@ const ProductCard = memo(({ product, isMobile }: { product: Product; isMobile: b
         className="h-full"
       >
         <div className="group h-full overflow-hidden bg-white border-r border-gray-100 transition-all duration-200 hover:shadow-sm">
-          {/* Image Container - Square aspect ratio */}
           <div className="relative aspect-square overflow-hidden bg-[#f8f8f8]">
             <AnimatePresence>
               {(showPlaceholder || imageError) && (
@@ -160,7 +151,6 @@ const ProductCard = memo(({ product, isMobile }: { product: Product; isMobile: b
               />
             </motion.div>
 
-            {/* Discount Badge - Orange like Kilimall */}
             {product.sale_price && discountPercentage > 0 && (
               <div className="absolute top-1 left-1 bg-[#f85606] text-white text-[9px] font-medium px-1 py-0.5 rounded-sm z-20">
                 -{discountPercentage}%
@@ -168,16 +158,13 @@ const ProductCard = memo(({ product, isMobile }: { product: Product; isMobile: b
             )}
           </div>
 
-          {/* Product Info - Compact like product-grid */}
           <div className={isMobile ? "p-1.5" : "p-2"}>
-            {/* Product Name - 2 lines max */}
             <h3
               className={`text-gray-800 line-clamp-2 leading-tight mb-1 ${isMobile ? "text-[10px] min-h-[24px]" : "text-xs min-h-[32px]"}`}
             >
               {product.name}
             </h3>
 
-            {/* Price - Orange/Red like Kilimall */}
             <div className="mb-1">
               <span className={`font-semibold text-[#f85606] ${isMobile ? "text-xs" : "text-sm"}`}>
                 KSh {(product.sale_price || product.price).toLocaleString()}
@@ -189,7 +176,6 @@ const ProductCard = memo(({ product, isMobile }: { product: Product; isMobile: b
               )}
             </div>
 
-            {/* Star Rating */}
             <StarRating rating={rating} reviewCount={reviewCount} />
           </div>
         </div>
@@ -212,16 +198,16 @@ const DailyFindsSkeleton = ({ isMobile }: { isMobile: boolean }) => (
 
       <div className={isMobile ? "p-1" : "p-2"}>
         <div className="flex gap-[1px] bg-gray-100">
-          {[...Array(isMobile ? 3 : 6)].map((_, index) => (
+          {[...Array(isMobile ? 4 : 6)].map((_, index) => (
             <motion.div
               key={index}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-              className={`bg-white flex-shrink-0 ${isMobile ? "p-2 w-[calc(33.333%-1px)]" : "p-4 w-[180px]"}`}
+              className={`bg-white flex-shrink-0 ${isMobile ? "p-2 w-[calc(25%-1px)]" : "p-4 w-[200px]"}`}
             >
               <div
-                className={`w-full mb-2 bg-[#f5f5f7] flex items-center justify-center relative overflow-hidden ${isMobile ? "aspect-square" : "aspect-square"}`}
+                className={`w-full mb-2 bg-[#f5f5f7] flex items-center justify-center relative overflow-hidden ${isMobile ? "aspect-square" : "aspect-[4/3]"}`}
               >
                 <motion.div
                   animate={{
@@ -283,6 +269,106 @@ export function DailyFinds() {
   const itemsPerView = isSmallMobile ? 3 : isMobile ? 3 : isTablet ? 5 : 6
   const mobileItemWidth = "calc((100vw - 32px) / 3)"
   const itemWidthPx = isSmallMobile ? 110 : isMobile ? 120 : 180
+
+  const [mobileScrollIndex, setMobileScrollIndex] = useState(0)
+  useEffect(() => {
+    if (!isMobile || !carouselRef.current) return
+    const handleScroll = () => {
+      const scrollLeft = carouselRef.current!.scrollLeft
+      setMobileScrollIndex(Math.round(scrollLeft / itemWidthPx))
+    }
+    const el = carouselRef.current
+    el.addEventListener("scroll", handleScroll)
+    return () => el.removeEventListener("scroll", handleScroll)
+  }, [isMobile, itemWidthPx])
+
+  const fetchDailyFinds = useCallback(async () => {
+    try {
+      setLoading(true)
+      setError(null)
+
+      const products = await productService.getDailyFindProducts(12)
+
+      if (products && products.length > 0) {
+        const processedProducts = products.map((product: any) => ({
+          ...product,
+          image_urls: (product.image_urls || []).map((url: any) => {
+            if (typeof url === "string" && !url.startsWith("http")) {
+              return cloudinaryService.generateOptimizedUrl(url)
+            }
+            return url
+          }),
+        }))
+        setDailyFinds(processedProducts.slice(0, 12))
+      } else {
+        const regularProducts = await productService.getProducts({
+          limit: 12,
+          sort_by: "created_at",
+          sort_order: "desc",
+        })
+        const processedProducts = regularProducts.map((product) => ({
+          ...product,
+          image_urls: (product.image_urls || []).map((url) => {
+            if (typeof url === "string" && !url.startsWith("http")) {
+              return cloudinaryService.generateOptimizedUrl(url)
+            }
+            return url
+          }),
+        }))
+        setDailyFinds(processedProducts || [])
+      }
+    } catch (error) {
+      console.error("Error fetching daily finds:", error)
+      setError("Failed to load daily finds")
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    const fetchData = async () => {
+      try {
+        await fetchDailyFinds()
+      } catch (error) {
+        if (error instanceof Error && error.name !== "AbortError") {
+          console.error("Error in daily finds fetch:", error)
+        }
+      }
+    }
+
+    fetchData()
+
+    return () => {
+      controller.abort()
+    }
+  }, [fetchDailyFinds])
+
+  useEffect(() => {
+    const handleProductImagesUpdated = (event: CustomEvent) => {
+      const { productId } = event.detail
+      console.log("[v0] Daily Finds: Product images updated event received for product:", productId)
+
+      setDailyFinds([])
+      setLoading(true)
+
+      setTimeout(() => {
+        fetchDailyFinds()
+      }, 500)
+    }
+
+    window.addEventListener("productImagesUpdated", handleProductImagesUpdated as EventListener)
+
+    return () => {
+      window.removeEventListener("productImagesUpdated", handleProductImagesUpdated as EventListener)
+    }
+  }, [fetchDailyFinds])
+
+  const handleViewAll = (e: React.MouseEvent) => {
+    e.preventDefault()
+    router.push("/daily-finds")
+  }
 
   const maxIndex = Math.max(0, dailyFinds.length - itemsPerView)
 
@@ -440,51 +526,6 @@ export function DailyFinds() {
     return () => currentCarousel.removeEventListener("wheel", handleWheelEvent)
   }, [currentIndex, maxIndex, goToPrevious, goToNext, isMobile])
 
-  useEffect(() => {
-    const controller = new AbortController()
-
-    const fetchData = async () => {
-      try {
-        await fetchDailyFinds(setLoading, setError, setDailyFinds)
-      } catch (error) {
-        if (error instanceof Error && error.name !== "AbortError") {
-          console.error("Error in daily finds fetch:", error)
-        }
-      }
-    }
-
-    fetchData()
-
-    return () => {
-      controller.abort()
-    }
-  }, [fetchDailyFinds])
-
-  useEffect(() => {
-    const handleProductImagesUpdated = (event: CustomEvent) => {
-      const { productId } = event.detail
-      console.log("[v0] Daily Finds: Product images updated event received for product:", productId)
-
-      setDailyFinds([])
-      setLoading(true)
-
-      setTimeout(() => {
-        fetchDailyFinds(setLoading, setError, setDailyFinds)
-      }, 500)
-    }
-
-    window.addEventListener("productImagesUpdated", handleProductImagesUpdated as EventListener)
-
-    return () => {
-      window.removeEventListener("productImagesUpdated", handleProductImagesUpdated as EventListener)
-    }
-  }, [fetchDailyFinds])
-
-  const handleViewAll = (e: React.MouseEvent) => {
-    e.preventDefault()
-    router.push("/daily-finds")
-  }
-
   if (loading) {
     return <DailyFindsSkeleton isMobile={isMobile} />
   }
@@ -492,20 +533,20 @@ export function DailyFinds() {
   if (error) {
     return (
       <section className="w-full mb-4 sm:mb-8">
-        <div className="w-full">
-          <div className="bg-cherry-900 text-white flex items-center justify-between px-2 sm:px-4 py-1.5 sm:py-2">
-            <div className="flex items-center gap-1 sm:gap-2">
-              <Sparkles className={isMobile ? "h-3.5 w-3.5" : "h-4 w-4"} />
-              <span className={`font-semibold ${isMobile ? "text-xs" : "text-sm"}`}>Daily Finds</span>
-            </div>
+        <div className="w-full p-1 sm:p-2">
+          <div className="mb-2 sm:mb-4">
+            <h2 className="text-base sm:text-lg lg:text-xl font-bold">Daily Finds</h2>
           </div>
-          <div className="p-6 bg-white border border-t-0 border-gray-100 text-center">
-            <p className="text-sm text-gray-600 mb-3">{error}</p>
+          <div className="bg-red-50 p-3 sm:p-4 rounded-md text-red-700 text-center text-sm">
+            <div className="mx-auto w-12 h-12 mb-2 text-red-500">
+              <Sparkles className="w-full h-full" />
+            </div>
+            <p className="mb-2">{error}</p>
             <button
-              onClick={() => fetchDailyFinds(setLoading, setError, setDailyFinds)}
-              className="text-sm text-[#f85606] hover:underline font-medium"
+              onClick={fetchDailyFinds}
+              className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm"
             >
-              Try again
+              Try Again
             </button>
           </div>
         </div>
@@ -513,144 +554,143 @@ export function DailyFinds() {
     )
   }
 
-  if (dailyFinds.length === 0) {
+  if (!dailyFinds || dailyFinds.length === 0) {
     return null
   }
 
   return (
     <section className="w-full mb-4 sm:mb-8">
       <div className="w-full">
-        {/* Header */}
         <div className="bg-cherry-900 text-white flex items-center justify-between px-2 sm:px-4 py-1.5 sm:py-2">
           <div className="flex items-center gap-1 sm:gap-2">
-            <Sparkles className={isMobile ? "h-3.5 w-3.5" : "h-4 w-4"} />
-            <span className={`font-semibold ${isMobile ? "text-xs" : "text-sm"}`}>Daily Finds</span>
+            <Sparkles className={`text-yellow-300 ${isMobile ? "h-4 w-4" : "h-5 w-5"}`} />
+            <h2 className={`font-bold whitespace-nowrap ${isMobile ? "text-xs" : "text-sm sm:text-base"}`}>
+              {isMobile ? "Daily Finds" : "Daily Finds | Great Deals Every Day!"}
+            </h2>
           </div>
+
           <button
             onClick={handleViewAll}
-            className={`flex items-center gap-0.5 font-medium hover:underline ${isMobile ? "text-[10px]" : "text-xs"}`}
+            className={`flex items-center gap-0.5 sm:gap-1 font-medium hover:underline whitespace-nowrap ${
+              isMobile ? "text-[10px]" : "text-xs sm:text-sm"
+            }`}
           >
             See All
-            <ChevronRight className={isMobile ? "h-3 w-3" : "h-3.5 w-3.5"} />
+            <ChevronRight className={isMobile ? "h-3 w-3" : "h-4 w-4"} />
           </button>
         </div>
 
-        {/* Carousel Container */}
-        <div
-          ref={carouselRef}
-          className="relative bg-white border border-t-0 border-gray-100 overflow-hidden"
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
-          onMouseMove={handleMouseMove}
-          onTouchStart={handleTouchStart}
-          onTouchMove={handleTouchMove}
-          onTouchEnd={handleTouchEnd}
-        >
-          {/* Desktop Navigation Arrows */}
-          {!isMobile && (
-            <>
-              <AnimatePresence>
-                {isHovering && hoverSide === "left" && currentIndex > 0 && (
-                  <motion.button
-                    initial={{ opacity: 0, x: -10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -10 }}
-                    transition={{ duration: 0.2 }}
-                    onClick={goToPrevious}
-                    className="absolute left-2 top-1/2 -translate-y-1/2 z-30 bg-white/95 rounded-full p-1.5 shadow-lg hover:bg-white transition-colors"
-                    aria-label="Previous"
+        <div className={isMobile ? "p-1" : "p-2"}>
+          <div
+            ref={carouselRef}
+            className={`relative bg-gray-100 ${isMobile ? "overflow-hidden" : "overflow-hidden"}`}
+            style={{
+              maxWidth: isMobile ? "100%" : undefined,
+              width: isMobile ? "100%" : undefined,
+            }}
+            onMouseMove={handleMouseMove}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
+          >
+            {isMobile ? (
+              <div
+                className="flex gap-1 w-full overflow-x-auto scrollbar-hide px-2"
+                style={{
+                  scrollSnapType: "x mandatory",
+                  WebkitOverflowScrolling: "touch",
+                  paddingBottom: "8px",
+                }}
+              >
+                {dailyFinds.map((product, index) => (
+                  <div
+                    key={product.id}
+                    className="flex-shrink-0 pointer-events-auto"
+                    style={{
+                      width: mobileItemWidth,
+                      minWidth: isSmallMobile ? "100px" : "110px",
+                      maxWidth: "130px",
+                      scrollSnapAlign: "start",
+                    }}
                   >
-                    <ChevronLeft className="h-4 w-4 text-gray-700" />
-                  </motion.button>
-                )}
-              </AnimatePresence>
-              <AnimatePresence>
-                {isHovering && hoverSide === "right" && currentIndex < maxIndex && (
-                  <motion.button
-                    initial={{ opacity: 0, x: 10 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 10 }}
-                    transition={{ duration: 0.2 }}
-                    onClick={goToNext}
-                    className="absolute right-2 top-1/2 -translate-y-1/2 z-30 bg-white/95 rounded-full p-1.5 shadow-lg hover:bg-white transition-colors"
-                    aria-label="Next"
+                    <ProductCard product={product} isMobile={true} />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <motion.div
+                className="flex gap-[1px]"
+                drag="x"
+                dragConstraints={{ left: 0, right: 0 }}
+                dragElastic={0.1}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                animate={{
+                  x: `-${currentIndex * (isTablet ? 20 : 16.666)}%`,
+                }}
+                transition={{
+                  type: "spring",
+                  stiffness: 300,
+                  damping: 30,
+                  mass: 0.8,
+                }}
+                style={{
+                  cursor: isDragging ? "grabbing" : "grab",
+                }}
+              >
+                {dailyFinds.map((product, index) => (
+                  <motion.div
+                    key={product.id}
+                    className="flex-shrink-0 pointer-events-auto"
+                    style={{ width: `${isTablet ? 20 : 16.666}%` }}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: index * 0.05 }}
                   >
-                    <ChevronRight className="h-4 w-4 text-gray-700" />
-                  </motion.button>
-                )}
-              </AnimatePresence>
-            </>
-          )}
+                    <ProductCard product={product} isMobile={false} />
+                  </motion.div>
+                ))}
+              </motion.div>
+            )}
 
-          {/* Products */}
-          {isMobile ? (
-            // Mobile: Native scroll
-            <div
-              className="flex overflow-x-auto scrollbar-hide scroll-smooth"
-              style={{ scrollSnapType: "x mandatory" }}
-            >
-              {dailyFinds.map((product) => (
-                <div
-                  key={product.id}
-                  className="flex-shrink-0"
-                  style={{ width: mobileItemWidth, scrollSnapAlign: "start" }}
+            <AnimatePresence>
+              {!isMobile && isHovering && !isDragging && hoverSide === "left" && currentIndex > 0 && (
+                <motion.button
+                  initial={{ opacity: 0, x: -20, scale: 0.8 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={{ opacity: 0, x: -20, scale: 0.8 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  onClick={goToPrevious}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white border border-gray-200 text-gray-700 hover:text-gray-900 p-2 rounded-full shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:shadow-xl"
+                  aria-label="Previous products"
                 >
-                  <ProductCard product={product} isMobile={isMobile} />
-                </div>
-              ))}
-            </div>
-          ) : (
-            // Desktop: Animated carousel
-            <motion.div
-              drag="x"
-              dragConstraints={{ left: 0, right: 0 }}
-              dragElastic={0.1}
-              onDragStart={handleDragStart}
-              onDragEnd={handleDragEnd}
-              className="flex cursor-grab active:cursor-grabbing"
-              animate={{ x: -currentIndex * itemWidthPx }}
-              transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            >
-              {dailyFinds.map((product) => (
-                <div key={product.id} className="flex-shrink-0" style={{ width: `${itemWidthPx}px` }}>
-                  <ProductCard product={product} isMobile={isMobile} />
-                </div>
-              ))}
-            </motion.div>
-          )}
+                  <ChevronLeft className="h-4 w-4" />
+                </motion.button>
+              )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {!isMobile && isHovering && !isDragging && hoverSide === "right" && currentIndex < maxIndex && (
+                <motion.button
+                  initial={{ opacity: 0, x: 20, scale: 0.8 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={{ opacity: 0, x: 20, scale: 0.8 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  onClick={goToNext}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white border border-gray-200 text-gray-700 hover:text-gray-900 p-2 rounded-full shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:shadow-xl"
+                  aria-label="Next products"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </motion.button>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
     </section>
   )
-}
-
-const fetchDailyFinds = async (setLoading: any, setError: any, setDailyFinds: any) => {
-  try {
-    setLoading(true)
-    setError(null)
-
-    const products = await productService.getDailyFindProducts(12)
-
-    if (products && products.length > 0) {
-      const processedProducts = products.map((product: any) => ({
-        ...product,
-        image_urls: (product.image_urls || []).map((url: any) => {
-          if (typeof url === "string" && !url.startsWith("http")) {
-            return cloudinaryService.generateOptimizedUrl(url)
-          }
-          return url
-        }),
-      }))
-      setDailyFinds(processedProducts.slice(0, 12))
-    } else {
-      setDailyFinds([])
-    }
-  } catch (error) {
-    console.error("Error fetching daily finds:", error)
-    setError("Failed to load daily finds")
-  } finally {
-    setLoading(false)
-  }
 }
 
 export default DailyFinds
