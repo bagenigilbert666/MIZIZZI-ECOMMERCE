@@ -122,7 +122,7 @@ export default function NewProductPage() {
 
       console.log("[v0] Product created successfully, full response:", JSON.stringify(response, null, 2))
 
-      const productId = response?.id || response?.product?.id || response?.data?.id
+      const productId = response?.id
 
       console.log("[v0] Extracted product ID:", productId)
       console.log("[v0] Product ID type:", typeof productId)

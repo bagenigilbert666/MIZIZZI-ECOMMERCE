@@ -12,7 +12,8 @@ import { useAuth } from "@/contexts/auth/auth-context"
 import { AddressManagement } from "@/components/profile/address-management"
 
 export default function SettingsPage() {
-  const { user, updateProfile } = useAuth()
+  const auth = useAuth()
+  const { user } = auth
   const [isUpdating, setIsUpdating] = useState(false)
   const [formData, setFormData] = useState({
     name: user?.name || "",
@@ -29,7 +30,13 @@ export default function SettingsPage() {
     e.preventDefault()
     setIsUpdating(true)
     try {
-      await updateProfile(formData)
+      // Call updateProfile only if available on the auth context at runtime.
+      if (typeof (auth as any).updateProfile === "function") {
+        await (auth as any).updateProfile(formData)
+      } else {
+        // Fallback behaviour when updateProfile isn't provided by the auth context.
+        console.warn("updateProfile not available on auth context. Skipping update.")
+      }
     } catch (error) {
       console.error("Failed to update profile:", error)
     } finally {

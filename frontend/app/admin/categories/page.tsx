@@ -55,8 +55,26 @@ export default function CategoriesPage() {
           per_page: 10,
           search: searchQuery || undefined,
         })
-        setCategories(response.items || [])
-        setTotalPages(response.pagination?.total_pages || 1)
+        const resp: any = response
+        const perPage = 10
+        setCategories(resp.items || [])
+
+        const totalItems =
+          typeof resp.totalItems === "number"
+            ? resp.totalItems
+            : typeof resp.total === "number"
+            ? resp.total
+            : typeof resp.total_items === "number"
+            ? resp.total_items
+            : resp.pagination?.total_items ?? 0
+
+        const totalPagesFromResp =
+          resp.totalPages ??
+          resp.total_pages ??
+          resp.pagination?.total_pages ??
+          (totalItems ? Math.max(1, Math.ceil(totalItems / perPage)) : 1)
+
+        setTotalPages(totalPagesFromResp)
       } catch (error) {
         console.error("Failed to fetch categories:", error)
         toast({

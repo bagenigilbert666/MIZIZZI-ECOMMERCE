@@ -356,7 +356,7 @@ export default function PaymentsPageClient() {
           </TabsList>
 
           <TabsContent value="transactions" className="space-y-4">
-            <TransactionHistory showMpesaOnly={true} />
+            <TransactionHistory />
           </TabsContent>
 
           <TabsContent value="methods" className="space-y-4">

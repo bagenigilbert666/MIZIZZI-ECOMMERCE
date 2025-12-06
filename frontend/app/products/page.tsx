@@ -715,17 +715,17 @@ export default function ProductsPage() {
                                     </div>
 
                                     {/* Stock indicator */}
-                                    {product.stock > 0 && product.stock < 5 && (
+                                    {(product.stock ?? 0) > 0 && (product.stock ?? 0) < 5 && (
                                       <p className="text-xs text-orange-600 font-medium">
-                                        Only {product.stock} left
+                                        Only {product.stock ?? 0} left
                                       </p>
                                     )}
 
-                                    {product.stock === 0 && (
+                                    {(product.stock ?? 0) === 0 && (
                                       <p className="text-xs text-red-600 font-medium">Out of Stock</p>
                                     )}
 
-                                    {product.stock > 5 && (
+                                    {(product.stock ?? 0) > 5 && (
                                       <p className="text-xs text-green-600 font-medium flex items-center gap-1">
                                         <span className="inline-block w-1.5 h-1.5 rounded-full bg-green-600"></span>
                                         Available
@@ -823,8 +823,8 @@ export default function ProductsPage() {
                 {/* Stock */}
                 <div className="mb-6">
                   <p className="text-sm text-gray-600 mb-2">Availability</p>
-                  <p className={cn("font-medium", selectedProduct.stock > 0 ? "text-green-600" : "text-red-600")}>
-                    {selectedProduct.stock > 0 ? `${selectedProduct.stock} in stock` : "Out of Stock"}
+                  <p className={cn("font-medium", (selectedProduct.stock ?? 0) > 0 ? "text-green-600" : "text-red-600")}>
+                    {(selectedProduct.stock ?? 0) > 0 ? `${selectedProduct.stock ?? 0} in stock` : "Out of Stock"}
                   </p>
                 </div>
 

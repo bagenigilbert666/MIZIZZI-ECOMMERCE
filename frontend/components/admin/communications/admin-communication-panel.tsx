@@ -15,7 +15,7 @@ interface AdminCommunicationPanelProps {
 }
 
 export const AdminCommunicationPanel: React.FC<AdminCommunicationPanelProps> = ({ className }) => {
-  const { socket, isConnected, send } = useSocket() // Use send instead of sendMessage
+  const { isConnected, send } = useSocket() // Use send instead of sendMessage
   const [messageType, setMessageType] = useState("notification")
   const [userId, setUserId] = useState("")
   const [title, setTitle] = useState("")

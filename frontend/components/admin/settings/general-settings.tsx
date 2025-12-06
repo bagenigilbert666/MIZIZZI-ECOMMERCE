@@ -9,12 +9,13 @@ import { Settings, Shield, Globe, Mail } from "lucide-react"
 import type { SystemSettings } from "@/types/admin"
 
 interface GeneralSettingsProps {
-  settings: SystemSettings
+  settings: any
   updateSetting: (section: keyof SystemSettings, key: string, value: any) => void
   updateNestedSetting: (section: keyof SystemSettings, parentKey: string, key: string, value: any) => void
 }
 
 export function GeneralSettings({ settings, updateSetting, updateNestedSetting }: GeneralSettingsProps) {
+  const cfg = settings as any
   return (
     <div className="space-y-6">
       <Card>
@@ -31,16 +32,16 @@ export function GeneralSettings({ settings, updateSetting, updateNestedSetting }
               <Label htmlFor="site-name">Site Name</Label>
               <Input
                 id="site-name"
-                value={settings.site.name}
-                onChange={(e) => updateSetting("site", "name", e.target.value)}
+                value={cfg.site?.name}
+                onChange={(e) => updateSetting("site" as any, "name", e.target.value)}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="site-tagline">Tagline</Label>
               <Input
                 id="site-tagline"
-                value={settings.site.tagline || ""}
-                onChange={(e) => updateSetting("site", "tagline", e.target.value)}
+                value={cfg.site?.tagline || ""}
+                onChange={(e) => updateSetting("site" as any, "tagline", e.target.value)}
               />
             </div>
           </div>
@@ -49,8 +50,8 @@ export function GeneralSettings({ settings, updateSetting, updateNestedSetting }
             <Label htmlFor="site-description">Description</Label>
             <Textarea
               id="site-description"
-              value={settings.site.description || ""}
-              onChange={(e) => updateSetting("site", "description", e.target.value)}
+              value={cfg.site?.description || ""}
+              onChange={(e) => updateSetting("site" as any, "description", e.target.value)}
               rows={3}
             />
           </div>
@@ -60,16 +61,16 @@ export function GeneralSettings({ settings, updateSetting, updateNestedSetting }
               <Label htmlFor="logo-url">Logo URL</Label>
               <Input
                 id="logo-url"
-                value={settings.site.logo_url || ""}
-                onChange={(e) => updateSetting("site", "logo_url", e.target.value)}
+                value={cfg.site?.logo_url || ""}
+                onChange={(e) => updateSetting("site" as any, "logo_url", e.target.value)}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="favicon-url">Favicon URL</Label>
               <Input
                 id="favicon-url"
-                value={settings.site.favicon_url || ""}
-                onChange={(e) => updateSetting("site", "favicon_url", e.target.value)}
+                value={cfg.site?.favicon_url || ""}
+                onChange={(e) => updateSetting("site" as any, "favicon_url", e.target.value)}
               />
             </div>
           </div>
@@ -91,16 +92,16 @@ export function GeneralSettings({ settings, updateSetting, updateNestedSetting }
               <Input
                 id="site-email"
                 type="email"
-                value={settings.site.email}
-                onChange={(e) => updateSetting("site", "email", e.target.value)}
+                value={cfg.site?.email}
+                onChange={(e) => updateSetting("site" as any, "email", e.target.value)}
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="site-phone">Phone</Label>
               <Input
                 id="site-phone"
-                value={settings.site.phone || ""}
-                onChange={(e) => updateSetting("site", "phone", e.target.value)}
+                value={cfg.site?.phone || ""}
+                onChange={(e) => updateSetting("site" as any, "phone", e.target.value)}
               />
             </div>
           </div>
@@ -109,8 +110,8 @@ export function GeneralSettings({ settings, updateSetting, updateNestedSetting }
             <Label htmlFor="site-address">Address</Label>
             <Textarea
               id="site-address"
-              value={settings.site.address || ""}
-              onChange={(e) => updateSetting("site", "address", e.target.value)}
+              value={cfg.site?.address || ""}
+              onChange={(e) => updateSetting("site" as any, "address", e.target.value)}
               rows={2}
             />
           </div>
@@ -127,15 +128,15 @@ export function GeneralSettings({ settings, updateSetting, updateNestedSetting }
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {Object.entries(settings.site.social_links || {}).map(([platform, url]) => (
+            {Object.entries(cfg.site?.social_links || {}).map(([platform, url]) => (
               <div key={platform} className="space-y-2">
                 <Label htmlFor={`social-${platform}`} className="capitalize">
                   {platform}
                 </Label>
                 <Input
                   id={`social-${platform}`}
-                  value={url}
-                  onChange={(e) => updateNestedSetting("site", "social_links", platform, e.target.value)}
+                  value={url as string}
+                  onChange={(e) => updateNestedSetting("site" as any, "social_links", platform, e.target.value)}
                   placeholder={`https://${platform}.com/yourpage`}
                 />
               </div>
@@ -160,8 +161,8 @@ export function GeneralSettings({ settings, updateSetting, updateNestedSetting }
               type="number"
               min="6"
               max="50"
-              value={settings.security.password_min_length}
-              onChange={(e) => updateSetting("security", "password_min_length", Number.parseInt(e.target.value))}
+              value={cfg.security?.password_min_length}
+              onChange={(e) => updateSetting("security" as any, "password_min_length", Number.parseInt(e.target.value))}
             />
           </div>
 
@@ -169,8 +170,8 @@ export function GeneralSettings({ settings, updateSetting, updateNestedSetting }
             <div className="flex items-center space-x-2">
               <Switch
                 id="require-special-char"
-                checked={settings.security.password_requires_special_char}
-                onCheckedChange={(checked) => updateSetting("security", "password_requires_special_char", checked)}
+                checked={cfg.security?.password_requires_special_char}
+                onCheckedChange={(checked) => updateSetting("security" as any, "password_requires_special_char", checked)}
               />
               <Label htmlFor="require-special-char">Require special characters</Label>
             </div>
@@ -178,8 +179,8 @@ export function GeneralSettings({ settings, updateSetting, updateNestedSetting }
             <div className="flex items-center space-x-2">
               <Switch
                 id="require-number"
-                checked={settings.security.password_requires_number}
-                onCheckedChange={(checked) => updateSetting("security", "password_requires_number", checked)}
+                checked={cfg.security?.password_requires_number}
+                onCheckedChange={(checked) => updateSetting("security" as any, "password_requires_number", checked)}
               />
               <Label htmlFor="require-number">Require numbers</Label>
             </div>
@@ -187,8 +188,8 @@ export function GeneralSettings({ settings, updateSetting, updateNestedSetting }
             <div className="flex items-center space-x-2">
               <Switch
                 id="require-uppercase"
-                checked={settings.security.password_requires_uppercase}
-                onCheckedChange={(checked) => updateSetting("security", "password_requires_uppercase", checked)}
+                checked={cfg.security?.password_requires_uppercase}
+                onCheckedChange={(checked) => updateSetting("security" as any, "password_requires_uppercase", checked)}
               />
               <Label htmlFor="require-uppercase">Require uppercase letters</Label>
             </div>
@@ -196,8 +197,8 @@ export function GeneralSettings({ settings, updateSetting, updateNestedSetting }
             <div className="flex items-center space-x-2">
               <Switch
                 id="enable-two-factor"
-                checked={settings.security.enable_two_factor}
-                onCheckedChange={(checked) => updateSetting("security", "enable_two_factor", checked)}
+                checked={cfg.security?.enable_two_factor}
+                onCheckedChange={(checked) => updateSetting("security" as any, "enable_two_factor", checked)}
               />
               <Label htmlFor="enable-two-factor">Enable two-factor authentication</Label>
             </div>
@@ -211,8 +212,8 @@ export function GeneralSettings({ settings, updateSetting, updateNestedSetting }
                 type="number"
                 min="3"
                 max="10"
-                value={settings.security.max_login_attempts}
-                onChange={(e) => updateSetting("security", "max_login_attempts", Number.parseInt(e.target.value))}
+                value={cfg.security?.max_login_attempts}
+                onChange={(e) => updateSetting("security" as any, "max_login_attempts", Number.parseInt(e.target.value))}
               />
             </div>
             <div className="space-y-2">
@@ -222,8 +223,8 @@ export function GeneralSettings({ settings, updateSetting, updateNestedSetting }
                 type="number"
                 min="5"
                 max="60"
-                value={settings.security.lockout_time}
-                onChange={(e) => updateSetting("security", "lockout_time", Number.parseInt(e.target.value))}
+                value={cfg.security?.lockout_time}
+                onChange={(e) => updateSetting("security" as any, "lockout_time", Number.parseInt(e.target.value))}
               />
             </div>
             <div className="space-y-2">
@@ -233,8 +234,8 @@ export function GeneralSettings({ settings, updateSetting, updateNestedSetting }
                 type="number"
                 min="1"
                 max="168"
-                value={settings.security.session_lifetime}
-                onChange={(e) => updateSetting("security", "session_lifetime", Number.parseInt(e.target.value))}
+                value={cfg.security?.session_lifetime}
+                onChange={(e) => updateSetting("security" as any, "session_lifetime", Number.parseInt(e.target.value))}
               />
             </div>
           </div>

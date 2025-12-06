@@ -73,7 +73,6 @@ export function CategoryBanner() {
         <OptimizedImage
           src={banner.image}
           alt={banner.title}
-          fill
           className="object-cover"
           priority
         />

@@ -163,6 +163,13 @@ export default function AdminAuthTest() {
     return `${token.substring(0, 15)}...${token.substring(token.length - 10)}`
   }
 
+  const formatRole = (role: any) => {
+    if (!role) return "N/A"
+    if (typeof role === "string") return role
+    if (typeof role === "object") return role.label ?? role.value ?? JSON.stringify(role)
+    return String(role)
+  }
+
   return (
     <div className="container py-10">
       <h1 className="text-2xl font-bold mb-6">Admin Authentication Debug</h1>
@@ -181,7 +188,7 @@ export default function AdminAuthTest() {
               <span className="font-medium">Is Loading:</span> {isLoading ? "Yes" : "No"}
             </p>
             <p>
-              <span className="font-medium">User Role:</span> {user?.role || "N/A"}
+              <span className="font-medium">User Role:</span> {formatRole(user?.role)}
             </p>
             <p>
               <span className="font-medium">Token:</span> {formatToken(getToken())}

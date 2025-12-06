@@ -90,7 +90,8 @@ export default function CustomerProfilePage() {
   const { isAuthenticated, isLoading: authLoading } = useAdminAuth()
   const router = useRouter()
   const params = useParams()
-  const customerId = params.id as string
+  // useParams() can return null; treat customerId as possibly undefined and rely on downstream guards
+  const customerId = params?.id as string | undefined
 
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [orders, setOrders] = useState<Order[]>([])
@@ -332,7 +333,7 @@ export default function CustomerProfilePage() {
                   <Button size="sm" onClick={handleSave} disabled={isSaving} className="bg-blue-500 hover:bg-blue-600">
                     {isSaving ? (
                       <>
-                        <Loader className="h-4 w-4 mr-2" />
+                        <Loader  />
                         Saving...
                       </>
                     ) : (

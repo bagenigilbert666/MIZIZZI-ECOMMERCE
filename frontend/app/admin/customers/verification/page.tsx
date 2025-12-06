@@ -58,9 +58,23 @@ export default function CustomerVerificationPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
+  const [totalCustomers, setTotalCustomers] = useState(0)
   const [statusFilter, setStatusFilter] = useState("")
   const [verificationFilter, setVerificationFilter] = useState("")
   const [isUpdating, setIsUpdating] = useState<string | null>(null)
+
+  // Stats state used for aggregated counts (kept in sync when fetching customers)
+  const [stats, setStats] = useState<{
+    total: number
+    active: number
+    verified: number
+    complete: number
+  }>({
+    total: 0,
+    active: 0,
+    verified: 0,
+    complete: 0,
+  })
 
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
@@ -87,9 +101,11 @@ export default function CustomerVerificationPage() {
         }
 
         const response = await adminService.getUsers(params)
+        const resp: any = response
+        const items = resp.items || []
 
         // Transform the data to include verification status
-        const transformedCustomers = (response.items || []).map((customer: any) => ({
+        const transformedCustomers = items.map((customer: any) => ({
           ...customer,
           is_verified: customer.is_verified || false,
           verification_status: customer.verification_status || "pending",
@@ -99,7 +115,39 @@ export default function CustomerVerificationPage() {
         }))
 
         setCustomers(transformedCustomers)
-        setTotalPages(response.pagination?.total_pages || 1)
+
+        // derive total items from common response shapes
+        const totalItems =
+          typeof resp.totalItems === "number"
+            ? resp.totalItems
+            : typeof resp.total === "number"
+            ? resp.total
+            : typeof resp.total_items === "number"
+            ? resp.total_items
+            : typeof resp.meta?.total === "number"
+            ? resp.meta.total
+            : typeof resp.pagination?.total_items === "number"
+            ? resp.pagination.total_items
+            : 0
+
+        const totalPagesFromResp =
+          resp.totalPages ??
+          resp.total_pages ??
+          resp.pageCount ??
+          resp.pages ??
+          resp.pagination?.total_pages ??
+          (totalItems ? Math.max(1, Math.ceil(totalItems / 10)) : 1)
+
+        setTotalPages(totalPagesFromResp)
+        setTotalCustomers(totalItems)
+
+        // Calculate stats
+        setStats({
+          total: totalItems,
+          active: items.filter((c: any) => c.is_active).length,
+          verified: 0, // Would come from backend
+          complete: 0, // Would come from backend
+        })
       } catch (error) {
         console.error("Failed to fetch customers:", error)
         toast({

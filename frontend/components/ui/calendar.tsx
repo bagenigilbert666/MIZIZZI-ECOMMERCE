@@ -1,2 +1,2 @@
-
-// Calendar component disabled due to React 19 incompatibility with react-day-picker.
+import "react-day-picker/dist/style.css"
+export { DayPicker as Calendar } from "react-day-picker"

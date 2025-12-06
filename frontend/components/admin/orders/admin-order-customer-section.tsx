@@ -26,7 +26,7 @@ export function AdminOrderCustomerSection({ order }: AdminOrderCustomerSectionPr
   }
 
   const customerName =
-    order.customer_name ||
+    (order as any).customer_name ||
     `${order.shipping_address?.first_name || ""} ${order.shipping_address?.last_name || ""}`.trim()
 
   const shippingAddress = order.shipping_address
@@ -68,21 +68,21 @@ export function AdminOrderCustomerSection({ order }: AdminOrderCustomerSectionPr
         </div>
 
         {/* Email */}
-        {order.customer_email && (
+        {(order as any).customer_email && (
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between group pt-2 border-t border-gray-100">
             <div className="flex-1">
               <p className="text-xs text-gray-500 mb-1 font-medium flex items-center gap-1">
                 <Mail className="h-3 w-3" /> EMAIL
               </p>
               <a
-                href={`mailto:${order.customer_email}`}
+                href={`mailto:${(order as any).customer_email}`}
                 className="text-sm text-blue-600 hover:text-blue-700 font-medium break-words"
               >
-                {order.customer_email}
+                {(order as any).customer_email}
               </a>
             </div>
             <button
-              onClick={() => handleCopy(order.customer_email, "Email")}
+              onClick={() => handleCopy((order as any).customer_email, "Email")}
               className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity p-2 ml-0 sm:ml-2"
               aria-label="Copy email"
             >
@@ -96,18 +96,18 @@ export function AdminOrderCustomerSection({ order }: AdminOrderCustomerSectionPr
         )}
 
         {/* Phone */}
-        {order.customer_phone && (
+        {(order as any).customer_phone && (
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between group pt-2 border-t border-gray-100">
             <div className="flex-1">
               <p className="text-xs text-gray-500 mb-1 font-medium flex items-center gap-1">
                 <Phone className="h-3 w-3" /> PHONE NUMBER
               </p>
-              <a href={`tel:${order.customer_phone}`} className="text-sm text-blue-600 hover:text-blue-700 font-medium">
-                {order.customer_phone}
+              <a href={`tel:${(order as any).customer_phone}`} className="text-sm text-blue-600 hover:text-blue-700 font-medium">
+                {(order as any).customer_phone}
               </a>
             </div>
             <button
-              onClick={() => handleCopy(order.customer_phone, "Phone")}
+              onClick={() => handleCopy((order as any).customer_phone, "Phone")}
               className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity p-2 ml-0 sm:ml-2"
               aria-label="Copy phone"
             >
@@ -236,7 +236,7 @@ export function AdminOrderCustomerSection({ order }: AdminOrderCustomerSectionPr
             <div className="pt-2 border-t border-gray-100">
               <p className="text-xs text-gray-500 mb-1 font-medium">PLACE TO BE DELIVERED TO</p>
               <p className="text-sm text-gray-900 font-medium">
-                {order.billing_address?.address_line1 || order.billing_address?.city || order.customer_email || order.customer_phone || "No address provided"}
+                {order.billing_address?.address_line1 || order.billing_address?.city || (order as any).customer_email || (order as any).customer_phone || "No address provided"}
               </p>
             </div>
           </div>

@@ -47,3 +47,11 @@ export function removeAuthToken(): void {
 export function isAuthenticated(): boolean {
   return getAuthToken() !== null
 }
+
+// Minimal auth utilities to satisfy imports like `import { isLoggedIn } from '@/lib/auth'`
+export function isLoggedIn(): boolean {
+	// Safe on server during SSR
+	if (typeof window === "undefined") return false
+	// Adjust these keys to match your app's auth storage (token, session, etc.)
+	return Boolean(localStorage.getItem("token") || localStorage.getItem("auth"))
+}

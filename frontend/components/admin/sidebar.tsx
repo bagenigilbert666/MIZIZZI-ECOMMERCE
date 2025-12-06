@@ -14,6 +14,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from "@/components/ui/tooltip"
 
 // Icons
+import Image from "next/image"
 import {
   LayoutDashboard,
   ShoppingBag,
@@ -27,7 +28,6 @@ import {
   Search,
   Boxes,
   ShoppingCart,
-  ImageIcon,
   Sliders,
   Palette,
   Layout,
@@ -394,7 +394,7 @@ export function AdminSidebar({ isCollapsed, toggleSidebar }: AdminSidebarProps) 
                 <div className="flex h-16 items-center justify-between px-4 border-b border-gray-200 dark:border-gray-800">
                   <div className="flex items-center">
                     <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-md bg-white dark:bg-slate-800 p-1 shadow-sm border border-slate-200 dark:border-slate-700">
-                      <ImageIcon
+                      <Image
                         src="/images/screenshot-20from-202025-02-18-2013-30-22.png"
                         alt="Mizizzi Logo"
                         width={32}
@@ -466,7 +466,7 @@ export function AdminSidebar({ isCollapsed, toggleSidebar }: AdminSidebarProps) 
             onClick={toggleSidebar}
           >
             <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-md bg-white dark:bg-slate-800 p-1 shadow-sm border border-slate-200 dark:border-slate-700">
-              <ImageIcon
+              <Image
                 src="/images/screenshot-20from-202025-02-18-2013-30-22.png"
                 alt="Mizizzi Logo"
                 width={32}

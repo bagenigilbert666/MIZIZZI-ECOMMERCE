@@ -137,7 +137,7 @@ export const PremiumCustomerExperience = React.memo(() => {
   const experience = experiences[currentExperience]
   if (!experience) return null
 
-  const IconComponent = (iconMap[experience.icon_name as keyof typeof iconMap] || iconMap.Award).default
+  const IconComponent = iconMap[experience.icon_name as keyof typeof iconMap] || iconMap.Award
 
   return (
     <section

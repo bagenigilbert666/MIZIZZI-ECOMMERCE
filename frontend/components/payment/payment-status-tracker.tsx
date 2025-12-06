@@ -84,43 +84,64 @@ export function PaymentStatusTracker({
         })
       }
 
-      if (response?.success && response.response) {
-        const statusData: TransactionStatus = {
-          id: transactionId || checkoutRequestId || "",
-          status: getStatusFromResultCode(response.response.ResultCode),
-          amount: response.response.Amount || 0,
-          phone_number: response.response.PhoneNumber || "",
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          result_code: response.response.ResultCode,
-          result_desc: response.response.ResultDesc,
-          mpesa_receipt_number: response.response.MpesaReceiptNumber,
-          transaction_date: response.response.TransactionDate
-            ? new Date(response.response.TransactionDate * 1000).toISOString()
-            : undefined,
-          checkout_request_id: checkoutRequestId,
-        }
+      if (response?.success) {
+        // Normalize payload from different service responses (response.response or response.transaction)
+        const respBody: any =
+          typeof response === "object" && "response" in response && response.response
+            ? response.response
+            : typeof response === "object" && "transaction" in response && response.transaction
+            ? response.transaction
+            : null
 
-        setTransaction(statusData)
-        setLastChecked(new Date())
+        if (respBody) {
+          const resultCode = respBody.ResultCode ?? respBody.resultCode ?? 0
+          const resultDesc = respBody.ResultDesc ?? respBody.result_desc ?? ""
+          const amount = respBody.Amount ?? respBody.amount ?? 0
+          const phone_number = respBody.PhoneNumber ?? respBody.phone_number ?? ""
+          const mpesa_receipt_number = respBody.MpesaReceiptNumber ?? respBody.mpesa_receipt_number
+          const transaction_date = respBody.TransactionDate
+            ? new Date(respBody.TransactionDate * 1000).toISOString()
+            : respBody.transaction_date
+            ? new Date(respBody.transaction_date).toISOString()
+            : undefined
 
-        // Notify parent component of status change
-        if (onStatusChange) {
-          onStatusChange(statusData.status)
-        }
+          const statusData: TransactionStatus = {
+            id: transactionId || checkoutRequestId || "",
+            status: getStatusFromResultCode(resultCode),
+            amount,
+            phone_number,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            result_code: resultCode,
+            result_desc: resultDesc,
+            mpesa_receipt_number,
+            transaction_date,
+            checkout_request_id: checkoutRequestId,
+          }
 
-        // Show toast for status changes
-        if (statusData.status === "completed" && transaction?.status !== "completed") {
-          toast({
-            title: "Payment Confirmed",
-            description: "Your M-PESA payment has been successfully processed.",
-          })
-        } else if (statusData.status === "failed" && transaction?.status !== "failed") {
-          toast({
-            title: "Payment Failed",
-            description: statusData.result_desc || "Payment could not be processed.",
-            variant: "destructive",
-          })
+          setTransaction(statusData)
+          setLastChecked(new Date())
+
+          // Notify parent component of status change
+          if (onStatusChange) {
+            onStatusChange(statusData.status)
+          }
+
+          // Show toast for status changes
+          if (statusData.status === "completed" && transaction?.status !== "completed") {
+            toast({
+              title: "Payment Confirmed",
+              description: "Your M-PESA payment has been successfully processed.",
+            })
+          } else if (statusData.status === "failed" && transaction?.status !== "failed") {
+            toast({
+              title: "Payment Failed",
+              description: statusData.result_desc || "Payment could not be processed.",
+              variant: "destructive",
+            })
+          }
+        } else {
+          throw new Error(response?.error || "Failed to fetch transaction status")
         }
       } else {
         throw new Error(response?.error || "Failed to fetch transaction status")

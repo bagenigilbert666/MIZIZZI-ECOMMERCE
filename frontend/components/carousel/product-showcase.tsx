@@ -6,14 +6,14 @@ import dynamic from "next/dynamic"
 import { Loader2 } from 'lucide-react'
 
 const iconMap = {
-  Gem: dynamic(() => import("lucide-react").then(mod => ({ default: mod.Gem }))),
-  Shirt: dynamic(() => import("lucide-react").then(mod => ({ default: mod.Shirt }))),
-  Watch: dynamic(() => import("lucide-react").then(mod => ({ default: mod.Watch }))),
-  Crown: dynamic(() => import("lucide-react").then(mod => ({ default: mod.Crown }))),
-  Award: dynamic(() => import("lucide-react").then(mod => ({ default: mod.Award }))),
-  Timer: dynamic(() => import("lucide-react").then(mod => ({ default: mod.Timer }))),
-  TrendingUp: dynamic(() => import("lucide-react").then(mod => ({ default: mod.TrendingUp }))),
-  Users: dynamic(() => import("lucide-react").then(mod => ({ default: mod.Users }))),
+  Gem: dynamic(() => import("lucide-react").then(mod => ({ default: mod.Gem })), { ssr: false }),
+  Shirt: dynamic(() => import("lucide-react").then(mod => ({ default: mod.Shirt })), { ssr: false }),
+  Watch: dynamic(() => import("lucide-react").then(mod => ({ default: mod.Watch })), { ssr: false }),
+  Crown: dynamic(() => import("lucide-react").then(mod => ({ default: mod.Crown })), { ssr: false }),
+  Award: dynamic(() => import("lucide-react").then(mod => ({ default: mod.Award })), { ssr: false }),
+  Timer: dynamic(() => import("lucide-react").then(mod => ({ default: mod.Timer })), { ssr: false }),
+  TrendingUp: dynamic(() => import("lucide-react").then(mod => ({ default: mod.TrendingUp })), { ssr: false }),
+  Users: dynamic(() => import("lucide-react").then(mod => ({ default: mod.Users })), { ssr: false }),
 } as const
 
 interface ProductCategory {
@@ -143,7 +143,7 @@ export const ProductShowcase = React.memo(() => {
   const category = categories[currentCategory]
   if (!category) return null
 
-  const IconComponent = (iconMap[category.icon_name as keyof typeof iconMap] || iconMap.Gem).default
+  const IconComponent = iconMap[category.icon_name as keyof typeof iconMap] || iconMap.Gem
 
   return (
     <section

@@ -15,11 +15,12 @@ export function SocialAuthButtons({ mode }: SocialAuthButtonsProps) {
   const { socialLogin } = useAuth()
   const [isLoading, setIsLoading] = useState<string | null>(null)
 
-  const handleSocialAuth = async (provider: string) => {
+  const handleSocialAuth = async (provider: "google" | "facebook" | "apple") => {
     setIsLoading(provider)
     try {
       // Call the social login function from the auth context
-      await socialLogin(provider)
+      // provider is cast to any to match the existing auth context signature that accepts only "google"
+      await socialLogin(provider as any)
       // On success, show a toast notification
       toast({
         title: "Success!",

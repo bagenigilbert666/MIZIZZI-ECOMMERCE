@@ -4,7 +4,7 @@ import AdminLayoutClient from "./AdminLayoutClient"
 
 export const metadata: Metadata = {
   title: "Admin Dashboard | Mizizzi",
-  description: "Mizizzi E-commerce Admin Dashboard",
+  description: "Mizizzi Admin Dashboard",
 }
 
 export default function AdminLayout({

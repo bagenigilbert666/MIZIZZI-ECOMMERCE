@@ -26,7 +26,7 @@ export default function CategoryPageClient({
   subcategories,
   slug,
   relatedCategories = [],
-}: CategoryPageClientProps) {
+}: CategoryPageClientProps): JSX.Element {
   const router = useRouter()
   const [showBackToTop, setShowBackToTop] = useState(false)
   const [showAllCategories, setShowAllCategories] = useState(false)

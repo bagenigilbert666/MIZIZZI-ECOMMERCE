@@ -12,7 +12,63 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { toast } from "@/components/ui/use-toast"
 import { adminService } from "@/services/admin"
-import type { SystemSettings } from "@/types/admin"
+import type { SystemSettings as OriginalSystemSettings } from "@/types/admin"
+
+// Extend SystemSettings type to include missing properties for this page
+type SystemSettings = OriginalSystemSettings & {
+  site: {
+    name: string
+    tagline: string
+    description: string
+    logo_url: string
+    favicon_url: string
+    email: string
+    phone: string
+    address: string
+    social_links: {
+      facebook: string
+      instagram: string
+      twitter: string
+      youtube: string
+      pinterest: string
+      linkedin: string
+    }
+    currency: string
+    currency_symbol: string
+    timezone: string
+    date_format: string
+    time_format: string
+    default_language: string
+    available_languages: string[]
+  }
+  security: {
+    password_min_length: number
+    password_requires_special_char: boolean
+    password_requires_number: boolean
+    password_requires_uppercase: boolean
+    max_login_attempts: number
+    lockout_time: number
+    session_lifetime: number
+    enable_two_factor: boolean
+  }
+  inventory: {
+    low_stock_threshold: number
+    notify_on_low_stock: boolean
+    allow_backorders: boolean
+    show_out_of_stock_products: boolean
+  }
+  reviews: {
+    enabled: boolean
+    require_approval: boolean
+    allow_guest_reviews: boolean
+    notify_on_new_review: boolean
+  }
+  maintenance: {
+    maintenance_mode: boolean
+    maintenance_message: string
+    allowed_ips: string[]
+  }
+}
 import {
   Settings,
   Store,
@@ -35,7 +91,7 @@ import {
   Monitor,
 } from "lucide-react"
 
-const defaultSettings: SystemSettings = {
+const defaultSettings = {
   site: {
     name: "Mizizzi E-commerce",
     tagline: "Your Premium Shopping Destination",
@@ -154,7 +210,7 @@ const defaultSettings: SystemSettings = {
     maintenance_message: "We're currently performing maintenance. Please check back soon.",
     allowed_ips: [],
   },
-}
+} as unknown as SystemSettings
 
 export default function AdminSettingsPage() {
   const [settings, setSettings] = useState<SystemSettings>(defaultSettings)
@@ -303,23 +359,23 @@ export default function AdminSettingsPage() {
     }
   }
 
-  const updateSetting = (section: keyof SystemSettings, key: string, value: any) => {
-    setSettings((prev) => ({
+  const updateSetting = (section: string, key: string, value: any) => {
+    setSettings((prev: any) => ({
       ...prev,
       [section]: {
-        ...prev[section],
+        ...(prev[section] || {}),
         [key]: value,
       },
     }))
   }
 
-  const updateNestedSetting = (section: keyof SystemSettings, parentKey: string, key: string, value: any) => {
-    setSettings((prev) => ({
+  const updateNestedSetting = (section: string, parentKey: string, key: string, value: any) => {
+    setSettings((prev: any) => ({
       ...prev,
       [section]: {
-        ...prev[section],
+        ...(prev[section] || {}),
         [parentKey]: {
-          ...(prev[section] as any)[parentKey],
+          ...(prev[section]?.[parentKey] || {}),
           [key]: value,
         },
       },

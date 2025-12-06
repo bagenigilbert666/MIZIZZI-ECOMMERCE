@@ -1,7 +1,7 @@
 "use client"
 
 import { Header } from "@/components/layout/header"
-import { Footer } from "@/components/layout/footer-with-settings"
+import { FooterWithSettings as Footer } from "@/components/layout/footer-with-settings"
 import { Providers as AppProviders } from "./providers"
 import { Providers as StateProviders } from "@/components/providers"
 import { ThemeProvider } from "@/contexts/theme-context"

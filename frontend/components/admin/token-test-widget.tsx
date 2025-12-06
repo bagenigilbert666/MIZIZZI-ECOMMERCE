@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { CheckCircle, XCircle, AlertTriangle, RefreshCw, Shield } from "lucide-react"
 import { useAdminAuth } from "@/contexts/admin/auth-context"
-import adminService from "@/services/admin"
+import { adminService } from "@/services/admin"
 
 interface QuickTestResult {
   name: string

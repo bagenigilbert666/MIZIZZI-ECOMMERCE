@@ -81,7 +81,8 @@ export function MpesaTransactionHistory({
       if (response.success) {
         setTransactions(response.transactions)
         setPagination(response.pagination)
-        setTotalPages(response.pagination?.total_pages || 1)
+        setTotalPages(response.pagination?.pages || 1)
+        setCurrentPage(response.pagination?.page || page)
       } else {
         throw new Error(response.error || "Failed to fetch transactions")
       }
@@ -339,9 +340,9 @@ export function MpesaTransactionHistory({
             <div className="text-sm text-gray-500">
               {pagination && (
                 <>
-                  Showing {pagination.current_page * pagination.per_page - pagination.per_page + 1} to{" "}
-                  {Math.min(pagination.current_page * pagination.per_page, pagination.total_items)} of{" "}
-                  {pagination.total_items} transactions
+                  Showing {(pagination.page - 1) * pagination.limit + 1} to{" "}
+                  {Math.min(pagination.page * pagination.limit, pagination.total)} of{" "}
+                  {pagination.total} transactions
                 </>
               )}
             </div>

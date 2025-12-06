@@ -137,7 +137,8 @@ export function ProductSpecificationsHighlightsTab({
         })
       })
 
-      setValue("specifications", categorizedSpecs, { shouldDirty: true })
+      // cast to any to satisfy the form value type (specifications may be nested)
+      setValue("specifications" as any, categorizedSpecs as any, { shouldDirty: true })
     }, 100)
 
     return () => clearTimeout(timeoutId)

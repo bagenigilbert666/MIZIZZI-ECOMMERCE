@@ -9,9 +9,9 @@ import { defaultViewport } from "@/lib/metadata-utils"
 export const viewport = defaultViewport
 
 interface CategoryPageProps {
-  params: {
+  params: Promise<{
     slug: string
-  }
+  }>
 }
 
 export async function generateMetadata({ params }: CategoryPageProps): Promise<Metadata> {

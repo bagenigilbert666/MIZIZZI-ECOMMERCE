@@ -279,7 +279,7 @@ export function RealTimeDashboard() {
               {isConnecting ? (
                 <>
                   <div className="mr-2">
-                    <Loader size="sm" className="mr-2" />
+                    <Loader  />
                   </div>
                   Connecting...
                 </>

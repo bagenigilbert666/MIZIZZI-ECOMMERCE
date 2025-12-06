@@ -18,10 +18,9 @@ export function SocketNotificationHandler() {
     const handleProductUpdate = (data: any) => {
       addNotification({
         title: "Product Updated",
-        message: `Product #${data.product_id} has been updated.`,
+        description: `Product #${data.product_id} has been updated.`,
         type: "product_update",
-        priority: "normal",
-        timestamp: "now",
+        priority: "low",
       })
     }
 
@@ -29,11 +28,10 @@ export function SocketNotificationHandler() {
     const handleOrderUpdate = (data: any) => {
       addNotification({
         title: "Order Status Updated",
-        message: `Order #${data.order_id} status changed to ${data.status}.`,
+        description: `Order #${data.order_id} status changed to ${data.status}.`,
         type: "order",
-        priority: "normal",
-        timestamp: "now",
         link: `/orders/${data.order_id}`,
+        priority: "low",
       })
     }
 
@@ -43,10 +41,9 @@ export function SocketNotificationHandler() {
       if (data.stock_level <= 5) {
         addNotification({
           title: "Low Stock Alert",
-          message: `Product #${data.product_id} has only ${data.stock_level} items left.`,
+          description: `Product #${data.product_id} has only ${data.stock_level} items left.`,
           type: "stock_alert",
           priority: "high",
-          timestamp: "now",
           badge: "Urgent",
         })
       }
@@ -56,10 +53,9 @@ export function SocketNotificationHandler() {
     const handleFlashSale = (data: any) => {
       addNotification({
         title: "Flash Sale Started!",
-        message: data.sale_data?.description || "Check out our limited-time offers!",
+        description: data.sale_data?.description || "Check out our limited-time offers!",
         type: "promotion",
-        priority: "medium",
-        timestamp: "now",
+        priority: "low",
         badge: "Limited Time",
       })
     }
@@ -68,10 +64,9 @@ export function SocketNotificationHandler() {
     const handleNotification = (data: any) => {
       addNotification({
         title: data.type || "Notification",
-        message: data.message,
+        description: data.message,
         type: data.type === "error" ? "system" : "system",
-        priority: data.type === "error" ? "high" : "normal",
-        timestamp: "now",
+        priority: data.type === "error" ? "high" : "low",
       })
     }
 

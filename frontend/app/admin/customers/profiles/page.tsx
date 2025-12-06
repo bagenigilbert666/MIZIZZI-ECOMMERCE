@@ -148,14 +148,38 @@ export default function CustomerProfilesPage() {
         // }
 
         const response = await adminService.getUsers(params)
-        const items = response.items || []
+        const resp: any = response
+        const items = resp.items || []
         setCustomers(items)
-        setTotalPages(response.pagination?.total_pages || 1)
-        setTotalCustomers(response.pagination?.total_items || 0)
+
+        // derive total items from common response shapes
+        const totalItems =
+          typeof resp.totalItems === "number"
+            ? resp.totalItems
+            : typeof resp.total === "number"
+            ? resp.total
+            : typeof resp.total_items === "number"
+            ? resp.total_items
+            : typeof resp.meta?.total === "number"
+            ? resp.meta.total
+            : typeof resp.pagination?.total_items === "number"
+            ? resp.pagination.total_items
+            : 0
+
+        const totalPagesFromResp =
+          resp.totalPages ??
+          resp.total_pages ??
+          resp.pageCount ??
+          resp.pages ??
+          resp.pagination?.total_pages ??
+          (totalItems ? Math.max(1, Math.ceil(totalItems / perPage)) : 1)
+
+        setTotalPages(totalPagesFromResp)
+        setTotalCustomers(totalItems)
 
         // Calculate stats
         setStats({
-          total: response.pagination?.total_items || 0,
+          total: totalItems,
           active: items.filter((c: any) => c.is_active).length,
           verified: 0, // Would come from backend
           complete: 0, // Would come from backend

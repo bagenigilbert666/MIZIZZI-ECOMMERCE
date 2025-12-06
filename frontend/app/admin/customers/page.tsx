@@ -113,9 +113,34 @@ export default function CustomersPage() {
         }
 
         const response = await adminService.getUsers(params)
-        setCustomers(response.items || [])
-        setTotalPages(response.pagination?.total_pages || 1)
-        setTotalCustomers(response.pagination?.total_items || 0)
+        const resp: any = response
+        setCustomers(resp.items || [])
+
+        // derive total items from common response shapes
+        const totalItems =
+          typeof resp.totalItems === "number"
+            ? resp.totalItems
+            : typeof resp.total === "number"
+            ? resp.total
+            : typeof resp.total_items === "number"
+            ? resp.total_items
+            : typeof resp.meta?.total === "number"
+            ? resp.meta.total
+            : typeof resp.pagination?.total_items === "number"
+            ? resp.pagination.total_items
+            : 0
+
+        // derive total pages from common fields or compute from totalItems/perPage
+        const totalPagesFromResp =
+          resp.totalPages ??
+          resp.total_pages ??
+          resp.pageCount ??
+          resp.pages ??
+          resp.pagination?.total_pages ??
+          (totalItems ? Math.max(1, Math.ceil(totalItems / perPage)) : 1)
+
+        setTotalPages(totalPagesFromResp)
+        setTotalCustomers(totalItems)
       } catch (error) {
         console.error("Failed to fetch customers:", error)
         toast({
@@ -140,7 +165,7 @@ export default function CustomersPage() {
       setIsLoadingOrders(true)
       try {
         // Fetch customer orders
-        const ordersResponse = await adminService.getOrders({ user_id: selectedCustomer.id })
+        const ordersResponse = await adminService.getOrders({ user_id: selectedCustomer.id } as any)
         const orders = ordersResponse.items || ordersResponse.data || []
         setCustomerOrders(orders)
 

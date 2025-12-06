@@ -55,9 +55,12 @@ export default function LuxuryPage() {
           setLuxuryProducts(products || [])
           setHasMore((products || []).length >= 20)
         } else {
-          const products = await productService.getLuxuryDeals(24)
-          setLuxuryProducts(products.items || [])
-          setHasMore((products.items || []).length >= 20)
+          // Use an existing productService method that returns Product[]
+          const products = await productService.getProductsByCategory?.("luxury")
+          // If getProductsByCategory isn't available, fallback to getProducts()
+          const finalProducts = products ?? (await productService.getProducts?.() ?? [])
+          setLuxuryProducts(finalProducts || [])
+          setHasMore((finalProducts || []).length >= 20)
         }
       } catch (error) {
         console.error("Error fetching luxury products:", error)
@@ -106,8 +109,8 @@ export default function LuxuryPage() {
       if (typeof productService.getLuxuryDealProducts === "function") {
         moreProducts = await productService.getLuxuryDealProducts()
       } else {
-        const result = await productService.getLuxuryDeals(24)
-        moreProducts = result.items || []
+        // Use getProductsByCategory("luxury") as the fallback
+        moreProducts = (await productService.getProductsByCategory?.("luxury")) ?? (await productService.getProducts?.() ?? [])
       }
 
       if (moreProducts.length === 0) {

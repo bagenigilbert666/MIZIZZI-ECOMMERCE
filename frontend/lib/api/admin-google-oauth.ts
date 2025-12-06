@@ -354,7 +354,6 @@ declare global {
           initialize: (config: any) => void
           prompt: (callback?: (notification: any) => void) => void
           renderButton: (element: HTMLElement, config: any) => void
-          cancel: () => void
         }
         oauth2: {
           initTokenClient: (config: any) => {

@@ -28,7 +28,7 @@ export function AdminOrderItemsSection({ items = [], order, productImages = {} }
   }
 
   const customerName =
-    order.customer_name ||
+    (order as any).customer_name ||
     `${order.shipping_address?.first_name || ""} ${order.shipping_address?.last_name || ""}`.trim() ||
     "Customer"
 

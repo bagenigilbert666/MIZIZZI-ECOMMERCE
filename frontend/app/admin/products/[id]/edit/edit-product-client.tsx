@@ -617,13 +617,17 @@ export function EditProductClient({ productId }: { productId: string }) {
                 </TabsContent>
 
                 <TabsContent value="pricing" className="mt-0">
-                  <ProductPricingInventoryTab form={form} saveSectionChanges={saveSectionChanges} />
+                  <ProductPricingInventoryTab
+                    form={form}
+                    saveSectionChanges={saveSectionChanges}
+                    productId={Number(productId)}
+                  />
                 </TabsContent>
 
                 <TabsContent value="images" className="mt-0">
                   <ProductImagesTab
                     images={images}
-                    setImages={setImages}
+                    setImages={(imgs) => setImages(imgs as string[])}
                     setFormChanged={setFormChanged}
                     saveSectionChanges={saveSectionChanges}
                     productId={Number(productId)}

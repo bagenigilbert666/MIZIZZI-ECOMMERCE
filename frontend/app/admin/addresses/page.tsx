@@ -95,9 +95,23 @@ export default function AddressesPage() {
         }
 
         const response = await adminService.getAddresses(params)
-        setAddresses(response.items || [])
-        setTotalPages(response.totalPages || 1)
-        setTotalAddresses(response.totalItems || 0)
+        // response shape may vary; use guarded lookups and compute fallbacks
+        const resp: any = response
+        setAddresses(resp.items || [])
+
+        const computedTotalItems =
+          typeof resp.totalItems === "number" ? resp.totalItems : typeof resp.total === "number" ? resp.total : 0
+
+        const totalPagesFromResp =
+          resp.totalPages ??
+          resp.total_pages ??
+          resp.pageCount ??
+          resp.pages ??
+          (computedTotalItems ? Math.max(1, Math.ceil(computedTotalItems / perPage)) : undefined) ??
+          1
+
+        setTotalPages(totalPagesFromResp)
+        setTotalAddresses(computedTotalItems)
       } catch (error) {
         console.error("Failed to fetch addresses:", error)
         toast({

@@ -1,5 +1,6 @@
 "use client"
 import { DragDropContext, Droppable, Draggable, type DropResult } from "@hello-pangea/dnd"
+import type { DroppableProvided, DroppableStateSnapshot, DraggableProvided, DraggableStateSnapshot } from "@hello-pangea/dnd"
 import { GripVertical, Trash2, Eye, EyeOff } from "lucide-react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
@@ -52,7 +53,7 @@ export function CategoryBannersGallery({ banners, onBannersChange, onRemove }: C
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
       <Droppable droppableId="banners">
-        {(provided, snapshot) => (
+        {(provided: DroppableProvided, snapshot: DroppableStateSnapshot) => (
           <div
             {...provided.droppableProps}
             ref={provided.innerRef}
@@ -60,7 +61,7 @@ export function CategoryBannersGallery({ banners, onBannersChange, onRemove }: C
           >
             {banners.map((banner, index) => (
               <Draggable key={banner.id} draggableId={banner.id || `banner-${index}`} index={index}>
-                {(provided, snapshot) => (
+                {(provided: DraggableProvided, snapshot: DraggableStateSnapshot) => (
                   <div
                     ref={provided.innerRef}
                     {...provided.draggableProps}

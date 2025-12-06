@@ -41,8 +41,17 @@ export default function AddressDetailPage() {
     const fetchAddress = async () => {
       try {
         setIsLoading(true)
-        const response = await adminService.getAddress(addressId)
-        setAddress(response)
+        // adminService provides getAddresses(); find the specific address by id/_id
+        const response = await adminService.getAddresses()
+        const found = Array.isArray(response)
+          ? response.find((a: any) => String(a.id) === String(addressId) || String(a._id) === String(addressId))
+          : null
+
+        if (!found) {
+          throw new Error("Address not found")
+        }
+
+        setAddress(found)
       } catch (error) {
         console.error("Failed to fetch address:", error)
         toast({
@@ -68,7 +77,7 @@ export default function AddressDetailPage() {
   const handleDelete = async () => {
     try {
       setIsDeleting(true)
-      await adminService.deleteAddress(addressId)
+      await adminService.deleteAddress(Number(addressId))
 
       toast({
         title: "Success",

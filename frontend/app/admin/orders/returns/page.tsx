@@ -19,7 +19,26 @@ import {
 import { useToast } from "@/hooks/use-toast"
 import { adminService } from "@/services/admin"
 import { formatCurrency } from "@/lib/utils"
-import type { Order } from "@/types"
+import type { Order as BaseOrder } from "@/types"
+
+type UserInfo = {
+  name?: string
+  email?: string
+  phone?: string
+}
+
+type Order = BaseOrder & {
+  user?: UserInfo
+  return_reason?: string
+  items?: Array<any>
+  total_amount?: number
+  notes?: string
+  status?: string
+  order_number?: string
+  updated_at?: string
+  created_at?: string
+  id?: number | string
+}
 import {
   ArrowLeft,
   Search,
@@ -74,10 +93,10 @@ export default function ReturnsManagementPage() {
       const response = await adminService.getOrders({ status: "returned" })
       setReturns(response.items || [])
     } catch (error: any) {
-      console.error("Error fetching returns:", error)
+      console.error("Failed fetching returns:", error)
       toast({
-        title: "Error loading returns",
-        description: error.message || "Failed to load returns",
+        title: "Failed to load returns",
+        description: error?.message || "Unable to fetch returns",
         variant: "destructive",
       })
     } finally {
@@ -86,30 +105,40 @@ export default function ReturnsManagementPage() {
   }
 
   const handleAction = async () => {
-    if (!actionDialog.order || !actionDialog.action) return
+    const action = actionDialog.action
+    const order = actionDialog.order
+    if (!action || !order) return
+    setProcessing(true)
 
     try {
-      setProcessing(true)
-
-      const { order, action } = actionDialog
-
       if (action === "reject") {
         // Reject return - revert to delivered
         const notes = `[RETURN REJECTED] ${actionNotes || "Return request denied."}`
-        await adminService.updateOrderStatus(order.id, {
+        await adminService.updateOrderStatus(Number(order.id), {
           status: "delivered",
-          notes: notes,
+          notes,
         })
       } else if (action === "refund") {
         // Process refund - change to refunded status
         const notes = `[REFUND PROCESSED] Amount: ${refundAmount || order.total_amount}. ${actionNotes || "Refund completed successfully."}`
-        await adminService.updateOrderStatus(order.id, {
+        await adminService.updateOrderStatus(Number(order.id), {
           status: "refunded",
-          notes: notes,
+          notes,
         })
+      } else if (action === "approve") {
+        // Approve return - add a note
+        const notes = `[RETURN APPROVED] ${actionNotes || "Return approved."}`
+        await adminService.updateOrderStatus(Number(order.id), { status: order.status ?? "processing", notes })
+      } else if (action === "receive") {
+        // Mark returned items as received
+        const notes = `[RETURN RECEIVED] ${actionNotes || "Return marked as received."}`
+        await adminService.updateOrderStatus(Number(order.id), { status: order.status ?? "processing", notes })
+      } else if (action === "inspect") {
+        // Add inspection notes
+        const notes = `[INSPECTION ADDED] ${actionNotes || "Inspection notes added."}`
+        await adminService.updateOrderStatus(Number(order.id), { status: order.status ?? "processing", notes })
       } else {
-        // For approve, receive, and inspect - just show success without API call
-        // These actions don't change status, so we skip the API call to avoid backend validation errors
+        // For any other local-only action
         console.log(`[v0] ${action} action processed locally - no status change needed`)
       }
 

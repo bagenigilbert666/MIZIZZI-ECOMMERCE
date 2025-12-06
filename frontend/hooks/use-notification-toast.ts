@@ -45,10 +45,9 @@ export function useNotificationToast() {
       // Add notification to header instead of showing toast
       addNotification({
         title,
-        message: description || title,
+        description: description || title,
         type,
         priority,
-        timestamp: "now",
       })
     },
     [addNotification],

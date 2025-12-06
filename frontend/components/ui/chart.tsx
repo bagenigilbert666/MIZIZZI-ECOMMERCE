@@ -286,7 +286,7 @@ const ChartLegendContent = React.forwardRef<
         )}
       >
         {payload.map((item) => {
-          const key = `${nameKey || item.dataKey || "value"}`
+          const key = `${nameKey ?? (typeof item === "object" && item !== null && "dataKey" in item && typeof (item as any).dataKey === "string" ? (item as any).dataKey : "value")}`
           const itemConfig = getPayloadConfigFromPayload(config, item, key)
 
           return (

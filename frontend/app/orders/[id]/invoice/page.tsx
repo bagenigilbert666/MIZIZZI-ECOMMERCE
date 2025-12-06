@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useParams } from "next/navigation"
 import Link from "next/link"
 import { ArrowLeft, Download, Printer } from "lucide-react"
 
@@ -104,7 +104,10 @@ function InvoiceSkeleton() {
   )
 }
 
-export default function InvoicePage({ params }: { params: { id: string } }) {
+export default function InvoicePage() {
+  const params = useParams()
+  const orderId = params?.orderId as string
+
   const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -113,9 +116,11 @@ export default function InvoicePage({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     const fetchOrder = async () => {
+      if (!orderId) return
+
       try {
         setLoading(true)
-        const data = await orderService.getOrderById(params.id)
+        const data = await orderService.getOrderById(orderId)
         setOrder(data)
       } catch (err: any) {
         console.error("Failed to fetch order:", err)
@@ -131,15 +136,13 @@ export default function InvoicePage({ params }: { params: { id: string } }) {
     }
 
     fetchOrder()
-  }, [params.id, toast])
+  }, [orderId, toast])
 
   const handlePrint = () => {
     window.print()
   }
 
   const handleDownloadPDF = () => {
-    // In a real application, you would generate a PDF here
-    // For now, we'll just show a toast
     toast({
       title: "PDF Download",
       description: "Invoice PDF download started.",
@@ -170,10 +173,8 @@ export default function InvoicePage({ params }: { params: { id: string } }) {
     )
   }
 
-  // Generate invoice number if not available
   const invoiceNumber = `INV-${order.id}-001`
 
-  // Company information - replace with your actual company info
   const companyInfo = {
     name: "Your Store Name",
     address: "123 Commerce St",
@@ -192,7 +193,7 @@ export default function InvoicePage({ params }: { params: { id: string } }) {
           <h1 className="text-2xl font-bold">Invoice #{invoiceNumber}</h1>
           <div className="flex flex-wrap gap-2">
             <Button variant="outline" size="sm" asChild>
-              <Link href={`/orders/${order.id}`}>
+              <Link href={`/orders/${orderId}`}>
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 Back to Order
               </Link>
@@ -291,7 +292,7 @@ export default function InvoicePage({ params }: { params: { id: string } }) {
                 <Separator className="my-2" />
                 <div className="flex justify-between font-medium py-2">
                   <span>Total</span>
-                  <span>${((order.total_amount ?? order.total) ?? 0).toFixed(2)}</span>
+                  <span>${(order.total_amount ?? order.total ?? 0).toFixed(2)}</span>
                 </div>
               </div>
             </div>

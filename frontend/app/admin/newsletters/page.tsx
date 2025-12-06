@@ -33,7 +33,7 @@ import {
 import { formatDate } from "@/lib/utils"
 
 export default function NewslettersPage() {
-  const { isAuthenticated, isLoading: authLoading } = useAdminAuth()
+  const { isAuthenticated, isLoading: authLoading, getToken } = useAdminAuth()
   const router = useRouter()
   const [newsletters, setNewsletters] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -89,7 +89,25 @@ export default function NewslettersPage() {
 
   const handleToggleNewsletter = async (id: string) => {
     try {
-      await adminService.toggleNewsletter(id)
+      const svc: any = adminService as any
+
+      // Prefer the service method if present; otherwise fallback to a simple API PATCH.
+      if (typeof svc.toggleNewsletter === "function") {
+        await svc.toggleNewsletter(id)
+      } else {
+        const token = getToken?.()
+        const res = await fetch(`/api/admin/newsletters/${encodeURIComponent(id)}/toggle`, {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        })
+        if (!res.ok) {
+          throw new Error(`Toggle API failed with status ${res.status}`)
+        }
+      }
+
       setNewsletters(
         newsletters.map((newsletter) =>
           newsletter.id === id ? { ...newsletter, is_active: !newsletter.is_active } : newsletter,
@@ -112,7 +130,23 @@ export default function NewslettersPage() {
   const handleDeleteNewsletter = async (id: string) => {
     if (window.confirm("Are you sure you want to delete this newsletter subscription?")) {
       try {
-        await adminService.deleteNewsletter(id)
+        const svc: any = adminService as any
+        if (typeof svc.deleteNewsletter === "function") {
+          await svc.deleteNewsletter(id)
+        } else {
+          const token = getToken?.()
+          const res = await fetch(`/api/admin/newsletters/${encodeURIComponent(id)}`, {
+            method: "DELETE",
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+          })
+          if (!res.ok) {
+            throw new Error(`Delete API failed with status ${res.status}`)
+          }
+        }
+
         setNewsletters(newsletters.filter((newsletter) => newsletter.id !== id))
         toast({
           title: "Success",
@@ -131,7 +165,37 @@ export default function NewslettersPage() {
 
   const handleExportNewsletters = async () => {
     try {
-      const data = await adminService.exportNewsletters({ is_active: statusFilter === "active" ? true : undefined })
+      const svc: any = adminService as any
+      let data: any
+
+      if (typeof svc.exportNewsletters === "function") {
+        data = await svc.exportNewsletters({ is_active: statusFilter === "active" ? true : undefined })
+      } else {
+        const token = getToken?.()
+        const query = statusFilter === "active" ? "?is_active=true" : ""
+        const res = await fetch(`/api/admin/newsletters/export${query}`, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        })
+        if (!res.ok) {
+          throw new Error(`Export API failed with status ${res.status}`)
+        }
+        // Expecting JSON with { csv_data, filename, message }, fallback to text as last resort
+        const contentType = res.headers.get("content-type") || ""
+        if (contentType.includes("application/json")) {
+          data = await res.json()
+        } else {
+          const text = await res.text()
+          data = {
+            csv_data: text,
+            filename: `newsletters-${new Date().toISOString()}.csv`,
+            message: "newsletter subscribers",
+          }
+        }
+      }
 
       // Create a blob from the CSV data
       const blob = new Blob([data.csv_data], { type: "text/csv" })
@@ -163,7 +227,7 @@ export default function NewslettersPage() {
   if (authLoading || !isAuthenticated) {
     return (
       <div className="flex h-full items-center justify-center">
-        <Loader size="lg" />
+        <Loader />
       </div>
     )
   }
@@ -215,7 +279,7 @@ export default function NewslettersPage() {
 
             {isLoading ? (
               <div className="flex h-[400px] items-center justify-center">
-                <Loader size="lg" />
+                <Loader />
               </div>
             ) : (
               <>
@@ -298,8 +362,10 @@ export default function NewslettersPage() {
                   <PaginationContent>
                     <PaginationItem>
                       <PaginationPrevious
-                        onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
-                        disabled={currentPage === 1}
+                        onClick={() =>
+                          currentPage > 1 ? setCurrentPage((prev) => Math.max(prev - 1, 1)) : undefined
+                        }
+                        aria-disabled={currentPage === 1}
                       />
                     </PaginationItem>
                     {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
@@ -325,8 +391,10 @@ export default function NewslettersPage() {
                     })}
                     <PaginationItem>
                       <PaginationNext
-                        onClick={() => setCurrentPage((prev) => Math.min(prev + 1, totalPages))}
-                        disabled={currentPage === totalPages}
+                        onClick={() =>
+                          currentPage < totalPages ? setCurrentPage((prev) => Math.min(prev + 1, totalPages)) : undefined
+                        }
+                        aria-disabled={currentPage === totalPages}
                       />
                     </PaginationItem>
                   </PaginationContent>

@@ -87,7 +87,7 @@ export function WishlistButton({
           description: "Product removed from wishlist",
         })
       } else {
-        await addToWishlist(productId, productDetails)
+        await addToWishlist({ product_id: productId })
         toast({
           description: "Product added to wishlist",
         })

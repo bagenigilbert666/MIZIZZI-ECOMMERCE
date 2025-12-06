@@ -205,7 +205,7 @@ export function WebSocketDebugger() {
           <Button variant="outline" onClick={handleConnect} disabled={isConnected || isConnecting} className="mr-2">
             {isConnecting ? (
               <>
-                <Loader size="sm" className="mr-2" />
+                <Loader />
                 Connecting...
               </>
             ) : (

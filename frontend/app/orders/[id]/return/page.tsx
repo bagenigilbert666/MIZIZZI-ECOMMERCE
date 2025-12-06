@@ -71,7 +71,18 @@ export default function ReturnOrderPage() {
   const params = useParams()
   const router = useRouter()
   const { toast } = useToast()
-  const orderId = params.id as string
+  // Safely resolve orderId: prefer params (SSR/static).
+  const rawOrderId = params?.id
+  const orderId = Array.isArray(rawOrderId) ? rawOrderId[0] : rawOrderId ?? ""
+
+  // If orderId is not available yet (e.g. during certain client navigations), render a small fallback.
+  if (!orderId) {
+    return (
+      <div className="min-h-[200px] flex items-center justify-center">
+        <p className="text-sm text-neutral-600">Invalid or missing order identifier.</p>
+      </div>
+    )
+  }
 
   const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(true)

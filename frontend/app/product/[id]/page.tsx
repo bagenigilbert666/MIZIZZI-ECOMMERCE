@@ -10,6 +10,10 @@ export const metadata = {
   description: "View detailed information about this product",
 }
 
+interface PageProps {
+  params: Promise<{ id: string }>
+}
+
 // Helper function to determine product type
 function determineProductType(product: any) {
   // Check if it's a luxury product
@@ -143,10 +147,10 @@ async function ProductDetails({ id }: { id: string }) {
   }
 }
 
-// Main page component
-export default async function Page({ params }: { params: { id: string } }) {
+// Main page component - Using proper interface type
+export default async function Page({ params }: PageProps) {
   // Properly await the params in Next.js 15
-  const id = (await params).id
+  const { id } = await params
 
   return (
     <Suspense fallback={<ProductLoading />}>

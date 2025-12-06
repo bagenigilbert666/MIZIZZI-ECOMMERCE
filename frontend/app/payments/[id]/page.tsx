@@ -35,7 +35,8 @@ export default function TransactionDetailsPage({ params }: { params: Promise<{ i
   const fetchTransactionDetails = async () => {
     setLoading(true)
     try {
-      const response = await paymentService.getTransaction(Number.parseInt(transactionId))
+      // paymentService.getTransaction expects a string ID — pass transactionId directly
+      const response = await paymentService.getTransaction(transactionId)
       if (response) {
         setTransaction(response)
       } else {
@@ -207,7 +208,7 @@ export default function TransactionDetailsPage({ params }: { params: Promise<{ i
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-500">Reference</p>
-                <p className="text-base">{transaction.reference}</p>
+                <p className="text-base">{(transaction as any).reference}</p>
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-500">Date</p>
@@ -221,7 +222,7 @@ export default function TransactionDetailsPage({ params }: { params: Promise<{ i
               <p className="text-sm font-medium text-gray-500">Order Information</p>
               <div className="mt-2 flex items-center justify-between">
                 <div>
-                  <p className="text-base font-medium">Order #{transaction.order_number}</p>
+                  <p className="text-base font-medium">Order #{(transaction as any).order_number}</p>
                 </div>
                 <Button
                   variant="outline"
@@ -235,24 +236,24 @@ export default function TransactionDetailsPage({ params }: { params: Promise<{ i
               </div>
             </div>
 
-            {transaction.completed_at && (
+            {(transaction as any).completed_at && (
               <>
                 <Separator />
                 <div>
                   <p className="text-sm font-medium text-gray-500">Completed At</p>
-                  <p className="text-base">{formatDate(transaction.completed_at)}</p>
+                  <p className="text-base">{formatDate(String((transaction as any).completed_at))}</p>
                 </div>
               </>
             )}
 
-            {transaction.transaction_data && (
+            {(transaction as any).transaction_data && (
               <>
                 <Separator />
                 <div>
                   <p className="text-sm font-medium text-gray-500 mb-2">Transaction Details</p>
                   <div className="bg-gray-50 p-3 rounded-md text-sm">
                     <pre className="whitespace-pre-wrap break-words font-mono text-xs">
-                      {JSON.stringify(transaction.transaction_data, null, 2)}
+                      {JSON.stringify((transaction as any).transaction_data, null, 2)}
                     </pre>
                   </div>
                 </div>

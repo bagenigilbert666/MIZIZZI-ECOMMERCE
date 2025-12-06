@@ -67,24 +67,33 @@ export default function EditAddressPage() {
     const fetchAddress = async () => {
       try {
         setIsLoading(true)
-        const response = await adminService.getAddress(addressId)
-        setAddress(response)
+        // adminService does not expose getAddress; use getAddresses and find the matching item
+        const response = await adminService.getAddresses()
+        const found = Array.isArray(response)
+          ? response.find((a: any) => String(a.id) === String(addressId) || String(a._id) === String(addressId))
+          : null
+
+        if (!found) {
+          throw new Error("Address not found")
+        }
+
+        setAddress(found)
 
         // Populate form data
         setFormData({
-          first_name: response.first_name || "",
-          last_name: response.last_name || "",
-          address_line1: response.address_line1 || "",
-          address_line2: response.address_line2 || "",
-          city: response.city || "",
-          state: response.state || "",
-          postal_code: response.postal_code || "",
-          country: response.country || "",
-          phone: response.phone || "",
-          alternative_phone: response.alternative_phone || "",
-          address_type: response.address_type || "shipping",
-          is_default: response.is_default || false,
-          additional_info: response.additional_info || "",
+          first_name: found.first_name || "",
+          last_name: found.last_name || "",
+          address_line1: found.address_line1 || "",
+          address_line2: found.address_line2 || "",
+          city: found.city || "",
+          state: found.state || "",
+          postal_code: found.postal_code || "",
+          country: found.country || "",
+          phone: found.phone || "",
+          alternative_phone: found.alternative_phone || "",
+          address_type: found.address_type || "shipping",
+          is_default: found.is_default || false,
+          additional_info: found.additional_info || "",
         })
       } catch (error) {
         console.error("Failed to fetch address:", error)
@@ -139,7 +148,7 @@ export default function EditAddressPage() {
         return
       }
 
-      await adminService.updateAddress(addressId, formData)
+      await adminService.updateAddress(Number(addressId), formData)
 
       toast({
         title: "Success",
