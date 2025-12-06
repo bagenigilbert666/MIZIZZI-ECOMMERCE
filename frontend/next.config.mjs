@@ -1,3 +1,8 @@
+// Tip: If you see warnings about ambiguous classes like `delay-[400ms]`
+// either replace them in templates with escaped brackets (e.g. `delay-&lsqb;400ms&rsqb;`)
+// or add a safelist in tailwind.config.js/cjs to keep arbitrary delay classes.
+// See /home/.../tailwind.config.cjs for an example safelist added to this repo.
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   env: {

@@ -1,10 +1,10 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useCallback, memo } from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import { useState, useEffect, useCallback, memo, useRef } from "react"
+import { motion, AnimatePresence, type PanInfo } from "framer-motion"
 import Link from "next/link"
-import { ChevronRight } from "lucide-react"
+import { ChevronRight, ChevronLeft, Sparkles } from "lucide-react"
 import Image from "next/image"
 import type { Product as BaseProduct } from "@/types"
 import { productService } from "@/services/product"
@@ -102,7 +102,7 @@ const ProductCard = memo(({ product, isMobile }: { product: Product; isMobile: b
   const imageUrl = getProductImageUrl(product)
 
   return (
-    <Link href={`/product/${product.slug || product.id}`} prefetch={false} className="block h-full">
+    <Link href={`/product/${product.slug || product.id}`} prefetch={false}>
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -113,7 +113,7 @@ const ProductCard = memo(({ product, isMobile }: { product: Product; isMobile: b
         className="h-full"
       >
         <div className="group h-full overflow-hidden bg-white rounded-lg border border-gray-100 transition-all duration-300 ease-out hover:shadow-[0_6px_16px_rgba(0,0,0,0.08)] hover:border-gray-200 flex-shrink-0">
-          <div className={`relative overflow-hidden bg-[#f5f5f7] aspect-[4/3]`}>
+          <div className={`relative overflow-hidden bg-[#f5f5f7] ${isMobile ? "aspect-square" : "aspect-[4/3]"}`}>
             <AnimatePresence>
               {(showPlaceholder || imageError) && (
                 <motion.div
@@ -144,9 +144,7 @@ const ProductCard = memo(({ product, isMobile }: { product: Product; isMobile: b
                 alt={product.name}
                 fill
                 sizes={
-                  isMobile
-                    ? "50vw"
-                    : "(max-width: 640px) 45vw, (max-width: 768px) 30vw, (max-width: 1024px) 25vw, (max-width: 1280px) 20vw, 16vw"
+                  isMobile ? "25vw" : "(max-width: 640px) 25vw, (max-width: 768px) 20vw, (max-width: 1024px) 16vw, 14vw"
                 }
                 className="object-cover transition-opacity duration-300"
                 loading="lazy"
@@ -172,7 +170,8 @@ const ProductCard = memo(({ product, isMobile }: { product: Product; isMobile: b
             )}
           </div>
 
-          <div className={`space-y-0.5 ${isMobile ? "p-2" : "p-3"}`}>
+          <div className={`space-y-0.5 ${isMobile ? "p-1" : "p-3"}`}>
+            {/* Daily Finds Badge */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -252,41 +251,60 @@ const ProductCard = memo(({ product, isMobile }: { product: Product; isMobile: b
 
 ProductCard.displayName = "ProductCard"
 
-const DailyFindsSkeleton = ({ count = 12 }: { count?: number }) => (
+const DailyFindsSkeleton = ({ isMobile }: { isMobile: boolean }) => (
   <section className="w-full mb-4 sm:mb-8">
-    <div className="w-full bg-white rounded-lg overflow-hidden shadow-sm">
-      <div className="bg-white flex items-center justify-between px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-b border-gray-100">
-        <div className="h-5 w-40 bg-gray-200 rounded animate-pulse sm:h-6" />
-        <div className="h-4 w-16 bg-gray-200 rounded animate-pulse sm:h-5 sm:w-20" />
+    <div className="w-full">
+      <div className="bg-cherry-900 text-white flex items-center justify-between px-2 sm:px-4 py-1.5 sm:py-2">
+        <div className="flex items-center gap-1 sm:gap-2">
+          <div className={`bg-white/20 rounded animate-pulse ${isMobile ? "h-4 w-16" : "h-5 w-20"}`}></div>
+        </div>
+        <div className={`bg-white/20 rounded animate-pulse ${isMobile ? "h-4 w-12" : "h-5 w-16"}`}></div>
       </div>
 
-      <div className="p-3 sm:p-4 md:p-6">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2 md:grid-cols-4 md:gap-3 lg:grid-cols-5 lg:gap-3 xl:grid-cols-5 xl:gap-3 2xl:grid-cols-6 2xl:gap-4">
-          {[...Array(count)].map((_, i) => (
+      <div className={isMobile ? "p-1" : "p-2"}>
+        <div className="flex gap-[1px] bg-gray-100">
+          {[...Array(isMobile ? 4 : 6)].map((_, index) => (
             <motion.div
-              key={i}
-              role="listitem"
+              key={index}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.04, duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-              className="flex flex-col bg-white"
+              transition={{ delay: index * 0.05, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+              className={`bg-white flex-shrink-0 ${isMobile ? "p-2 w-[calc(25%-1px)]" : "p-4 w-[200px]"}`}
             >
-              <div className="relative aspect-[4/3] w-full overflow-hidden bg-[#f5f5f7]">
+              <div
+                className={`w-full mb-2 bg-[#f5f5f7] flex items-center justify-center relative overflow-hidden ${isMobile ? "aspect-square" : "aspect-[4/3]"}`}
+              >
                 <motion.div
-                  animate={{ backgroundPosition: ["0% 0%", "100% 100%"], opacity: [0.5, 0.8, 0.5] }}
-                  transition={{ duration: 1.4, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
+                  animate={{
+                    backgroundPosition: ["0% 0%", "100% 100%"],
+                    opacity: [0.5, 0.8, 0.5],
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: Number.POSITIVE_INFINITY,
+                    ease: "linear",
+                  }}
                   className="absolute inset-0 bg-gradient-to-r from-[#f5f5f7] via-[#e0e0e3] to-[#f5f5f7] bg-[length:400%_400%]"
                 />
+                <motion.div
+                  animate={{
+                    scale: [1, 1.05, 1],
+                    opacity: [0.6, 1, 0.6],
+                  }}
+                  transition={{
+                    duration: 2,
+                    repeat: Number.POSITIVE_INFINITY,
+                    ease: "easeInOut",
+                  }}
+                  className="text-center z-10"
+                >
+                  <Sparkles className={`text-orange-400 mx-auto ${isMobile ? "h-4 w-4" : "h-6 w-6"}`} />
+                </motion.div>
               </div>
-              <div className="space-y-2 p-2 sm:p-3">
-                <Skeleton className="h-3 w-3/4 rounded-full bg-[#f5f5f7]" />
-                <Skeleton className="h-3 w-1/2 rounded-full bg-[#f5f5f7]" />
-                <Skeleton className="h-4 w-1/3 rounded-full bg-[#f5f5f7]" />
-                <div className="flex gap-1.5 pt-1">
-                  <Skeleton className="h-3 w-3 rounded-full bg-[#f5f5f7]" />
-                  <Skeleton className="h-3 w-3 rounded-full bg-[#f5f5f7]" />
-                  <Skeleton className="h-3 w-3 rounded-full bg-[#f5f5f7]" />
-                </div>
+              <Skeleton className={`w-1/3 mb-2 bg-[#f5f5f7] rounded-full ${isMobile ? "h-3" : "h-4"}`} />
+              <Skeleton className={`w-2/3 bg-[#f5f5f7] rounded-full ${isMobile ? "h-3" : "h-4"}`} />
+              <div className="flex gap-1.5 pt-1">
+                <Skeleton className={`bg-[#f5f5f7] rounded-full ${isMobile ? "h-3 w-3" : "h-4 w-4"}`} />
               </div>
             </motion.div>
           ))}
@@ -300,8 +318,35 @@ export function DailyFinds() {
   const [dailyFinds, setDailyFinds] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [currentIndex, setCurrentIndex] = useState(0)
+  const [isHovering, setIsHovering] = useState(false)
+  const [hoverSide, setHoverSide] = useState<"left" | "right" | null>(null)
+  const [isDragging, setIsDragging] = useState(false)
+  const [touchStart, setTouchStart] = useState<{ x: number; y: number } | null>(null)
+  const [touchEnd, setTouchEnd] = useState<{ x: number; y: number } | null>(null)
+  const carouselRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
+
   const isMobile = useMediaQuery("(max-width: 640px)")
+  const isSmallMobile = useMediaQuery("(max-width: 480px)")
+  const isTablet = useMediaQuery("(max-width: 1024px)")
+
+  const itemsPerView = isSmallMobile ? 3 : isMobile ? 3 : isTablet ? 5 : 6
+  const mobileItemWidth = "calc((100vw - 32px) / 3)"
+  const itemWidthPx = isSmallMobile ? 110 : isMobile ? 120 : 180
+
+  // Track scroll position for mobile indicator
+  const [mobileScrollIndex, setMobileScrollIndex] = useState(0)
+  useEffect(() => {
+    if (!isMobile || !carouselRef.current) return
+    const handleScroll = () => {
+      const scrollLeft = carouselRef.current!.scrollLeft
+      setMobileScrollIndex(Math.round(scrollLeft / itemWidthPx))
+    }
+    const el = carouselRef.current
+    el.addEventListener("scroll", handleScroll)
+    return () => el.removeEventListener("scroll", handleScroll)
+  }, [isMobile, itemWidthPx])
 
   const fetchDailyFinds = useCallback(async () => {
     try {
@@ -311,9 +356,17 @@ export function DailyFinds() {
       const products = await productService.getDailyFindProducts(12)
 
       if (products && products.length > 0) {
-        setDailyFinds(products.slice(0, 12))
+        const processedProducts = products.map((product) => ({
+          ...product,
+          image_urls: (product.image_urls || []).map((url) => {
+            if (typeof url === "string" && !url.startsWith("http")) {
+              return cloudinaryService.generateOptimizedUrl(url)
+            }
+            return url
+          }),
+        }))
+        setDailyFinds(processedProducts.slice(0, 12))
       } else {
-        // Fallback handled by backend now, but keeping empty check
         setDailyFinds([])
       }
     } catch (error) {
@@ -344,46 +397,356 @@ export function DailyFinds() {
     }
   }, [fetchDailyFinds])
 
+  useEffect(() => {
+    const handleProductImagesUpdated = (event: CustomEvent) => {
+      const { productId } = event.detail
+      console.log("[v0] Daily Finds: Product images updated event received for product:", productId)
+
+      setDailyFinds([])
+      setLoading(true)
+
+      setTimeout(() => {
+        fetchDailyFinds()
+      }, 500)
+    }
+
+    window.addEventListener("productImagesUpdated", handleProductImagesUpdated as EventListener)
+
+    return () => {
+      window.removeEventListener("productImagesUpdated", handleProductImagesUpdated as EventListener)
+    }
+  }, [fetchDailyFinds])
+
   const handleViewAll = (e: React.MouseEvent) => {
     e.preventDefault()
-    router.push("/products")
+    router.push("/daily-finds")
   }
+
+  // Carousel navigation functions
+  const maxIndex = Math.max(0, dailyFinds.length - itemsPerView)
+
+  const goToPrevious = useCallback(() => {
+    setCurrentIndex((prev) => Math.max(0, prev - 1))
+  }, [])
+
+  const goToNext = useCallback(() => {
+    setCurrentIndex((prev) => Math.min(maxIndex, prev + 1))
+  }, [maxIndex])
+
+  const handleMouseMove = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!carouselRef.current || isDragging || isMobile) return
+
+      const rect = carouselRef.current.getBoundingClientRect()
+      const x = e.clientX - rect.left
+      const width = rect.width
+      const leftHalf = x < width / 2
+
+      setHoverSide(leftHalf ? "left" : "right")
+    },
+    [isDragging, isMobile],
+  )
+
+  const handleMouseEnter = useCallback(() => {
+    if (!isMobile) {
+      setIsHovering(true)
+    }
+  }, [isMobile])
+
+  const handleMouseLeave = useCallback(() => {
+    setIsHovering(false)
+    setHoverSide(null)
+  }, [])
+
+  const handleTouchStart = useCallback(
+    (e: React.TouchEvent) => {
+      if (!isMobile) return
+
+      const touch = e.touches[0]
+      setTouchStart({
+        x: touch.clientX,
+        y: touch.clientY,
+      })
+      setTouchEnd(null)
+      setIsDragging(true)
+    },
+    [isMobile],
+  )
+
+  const handleTouchMove = useCallback(
+    (e: React.TouchEvent) => {
+      if (!isMobile || !touchStart) return
+
+      const touch = e.touches[0]
+      setTouchEnd({
+        x: touch.clientX,
+        y: touch.clientY,
+      })
+
+      const deltaX = Math.abs(touch.clientX - touchStart.x)
+      const deltaY = Math.abs(touch.clientY - touchStart.y)
+
+      if (deltaX > deltaY && deltaX > 10) {
+        e.preventDefault()
+      }
+    },
+    [isMobile, touchStart],
+  )
+
+  const handleTouchEnd = useCallback(() => {
+    if (!isMobile || !touchStart || !touchEnd) {
+      setIsDragging(false)
+      return
+    }
+
+    const deltaX = touchStart.x - touchEnd.x
+    const deltaY = touchStart.y - touchEnd.y
+    const minSwipeDistance = 50
+
+    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > minSwipeDistance) {
+      if (deltaX > 0) {
+        if (currentIndex < maxIndex) {
+          goToNext()
+        }
+      } else {
+        if (currentIndex > 0) {
+          goToPrevious()
+        }
+      }
+    }
+
+    setTouchStart(null)
+    setTouchEnd(null)
+    setIsDragging(false)
+  }, [isMobile, touchStart, touchEnd, currentIndex, maxIndex, goToPrevious, goToNext])
+
+  const handleDragStart = useCallback(() => {
+    if (isMobile) return
+    setIsDragging(true)
+    setHoverSide(null)
+  }, [isMobile])
+
+  const handleDragEnd = useCallback(
+    (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
+      if (isMobile) return
+      setIsDragging(false)
+
+      const threshold = 50
+      const velocity = info.velocity.x
+      const offset = info.offset.x
+
+      if (Math.abs(offset) > threshold || Math.abs(velocity) > 300) {
+        if (offset > 0 || velocity > 0) {
+          if (currentIndex > 0) {
+            goToPrevious()
+          }
+        } else {
+          if (currentIndex < maxIndex) {
+            goToNext()
+          }
+        }
+      }
+    },
+    [currentIndex, maxIndex, goToPrevious, goToNext, isMobile],
+  )
+
+  useEffect(() => {
+    const currentCarousel = carouselRef.current
+    if (!currentCarousel || isMobile) return
+
+    const handleWheelEvent = (e: WheelEvent) => {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY) || e.shiftKey) {
+        e.preventDefault()
+
+        const threshold = 10
+        const delta = e.deltaX || e.deltaY
+
+        if (Math.abs(delta) > threshold) {
+          if (delta > 0) {
+            if (currentIndex < maxIndex) {
+              goToNext()
+            }
+          } else {
+            if (currentIndex > 0) {
+              goToPrevious()
+            }
+          }
+        }
+      }
+    }
+
+    currentCarousel.addEventListener("wheel", handleWheelEvent, { passive: false })
+
+    return () => {
+      currentCarousel.removeEventListener("wheel", handleWheelEvent)
+    }
+  }, [currentIndex, maxIndex, goToPrevious, goToNext, isMobile])
 
   if (loading) {
-    return <DailyFindsSkeleton count={12} />
+    return <DailyFindsSkeleton isMobile={isMobile} />
   }
 
-  if (error || !dailyFinds || dailyFinds.length === 0) {
+  if (error) {
+    return (
+      <section className="w-full mb-4 sm:mb-8">
+        <div className="w-full p-1 sm:p-2">
+          <div className="mb-2 sm:mb-4">
+            <h2 className="text-base sm:text-lg lg:text-xl font-bold">Daily Finds</h2>
+          </div>
+          <div className="bg-orange-50 p-3 sm:p-4 rounded-md text-orange-700 text-center text-sm">
+            <div className="mx-auto w-12 h-12 mb-2 text-orange-500">
+              <Sparkles className="w-full h-full" />
+            </div>
+            <p className="mb-2">{error}</p>
+            <button
+              onClick={fetchDailyFinds}
+              className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors text-sm"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      </section>
+    )
+  }
+
+  if (!dailyFinds || dailyFinds.length === 0) {
     return null
   }
 
   return (
     <section className="w-full mb-4 sm:mb-8">
-      <div className="w-full bg-white rounded-lg overflow-hidden shadow-sm">
-        <div className="bg-white flex items-center justify-between px-3 sm:px-4 md:px-6 py-3 sm:py-4 border-b border-gray-100">
-          <h2 className="text-sm font-bold text-gray-900 sm:text-base md:text-lg">Daily Finds | Today Only</h2>
+      <div className="w-full">
+        {/* Header matching flash-sales and luxury-deals */}
+        <div className="bg-cherry-900 text-white flex items-center justify-between px-2 sm:px-4 py-1.5 sm:py-2">
+          <div className="flex items-center gap-1 sm:gap-2">
+            <Sparkles className={`text-yellow-300 ${isMobile ? "h-4 w-4" : "h-5 w-5"}`} />
+            <h2 className={`font-bold whitespace-nowrap ${isMobile ? "text-xs" : "text-sm sm:text-base"}`}>
+              {isMobile ? "Daily Finds" : "Daily Finds | Today Only"}
+            </h2>
+          </div>
 
           <button
             onClick={handleViewAll}
-            className="flex items-center gap-1 text-xs font-semibold text-[#f68b1e] transition-colors hover:text-[#d97a19] sm:text-sm"
+            className={`flex items-center gap-0.5 sm:gap-1 font-medium hover:underline whitespace-nowrap ${
+              isMobile ? "text-[10px]" : "text-xs sm:text-sm"
+            }`}
           >
             See All
-            <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
+            <ChevronRight className={isMobile ? "h-3 w-3" : "h-4 w-4"} />
           </button>
         </div>
 
-        <div className="p-3 sm:p-4 md:p-6">
-          <motion.div
-            role="list"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-            className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-2 md:grid-cols-4 md:gap-3 lg:grid-cols-5 lg:gap-3 xl:grid-cols-5 xl:gap-3 2xl:grid-cols-6 2xl:gap-4"
+        {/* Carousel Container */}
+        <div className={isMobile ? "p-1" : "p-2"}>
+          <div
+            ref={carouselRef}
+            className={`relative bg-gray-100 ${isMobile ? "overflow-hidden" : "overflow-hidden"}`}
+            style={{
+              maxWidth: isMobile ? "100%" : undefined,
+              width: isMobile ? "100%" : undefined,
+            }}
+            onMouseMove={handleMouseMove}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+            onTouchStart={handleTouchStart}
+            onTouchMove={handleTouchMove}
+            onTouchEnd={handleTouchEnd}
           >
-            {dailyFinds.map((product, index) => (
-              <ProductCard key={`${product.id}-${index}`} product={product} isMobile={isMobile} />
-            ))}
-          </motion.div>
+            {/* Carousel Track */}
+            {isMobile ? (
+              <div
+                className="flex gap-1 w-full overflow-x-auto scrollbar-hide px-2"
+                style={{
+                  scrollSnapType: "x mandatory",
+                  WebkitOverflowScrolling: "touch",
+                  paddingBottom: "8px",
+                }}
+              >
+                {dailyFinds.map((product, index) => (
+                  <div
+                    key={product.id}
+                    className="flex-shrink-0 pointer-events-auto"
+                    style={{
+                      width: mobileItemWidth,
+                      minWidth: isSmallMobile ? "100px" : "110px",
+                      maxWidth: "130px",
+                      scrollSnapAlign: "start",
+                    }}
+                  >
+                    <ProductCard product={product} isMobile={true} />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <motion.div
+                className="flex gap-[1px]"
+                drag="x"
+                dragConstraints={{ left: 0, right: 0 }}
+                dragElastic={0.1}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                animate={{
+                  x: `-${currentIndex * (isTablet ? 20 : 16.666)}%`,
+                }}
+                transition={{
+                  type: "spring",
+                  stiffness: 300,
+                  damping: 30,
+                  mass: 0.8,
+                }}
+                style={{
+                  cursor: isDragging ? "grabbing" : "grab",
+                }}
+              >
+                {dailyFinds.map((product, index) => (
+                  <motion.div
+                    key={product.id}
+                    className="flex-shrink-0 pointer-events-auto"
+                    style={{ width: `${isTablet ? 20 : 16.666}%` }}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: index * 0.05 }}
+                  >
+                    <ProductCard product={product} isMobile={false} />
+                  </motion.div>
+                ))}
+              </motion.div>
+            )}
+
+            {/* Navigation Arrows - Desktop only */}
+            <AnimatePresence>
+              {!isMobile && isHovering && !isDragging && hoverSide === "left" && currentIndex > 0 && (
+                <motion.button
+                  initial={{ opacity: 0, x: -20, scale: 0.8 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={{ opacity: 0, x: -20, scale: 0.8 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  onClick={goToPrevious}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white border border-gray-200 text-gray-700 hover:text-gray-900 p-2 rounded-full shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:shadow-xl"
+                  aria-label="Previous products"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </motion.button>
+              )}
+            </AnimatePresence>
+
+            <AnimatePresence>
+              {!isMobile && isHovering && !isDragging && hoverSide === "right" && currentIndex < maxIndex && (
+                <motion.button
+                  initial={{ opacity: 0, x: 20, scale: 0.8 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={{ opacity: 0, x: 20, scale: 0.8 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  onClick={goToNext}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white border border-gray-200 text-gray-700 hover:text-gray-900 p-2 rounded-full shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:shadow-xl"
+                  aria-label="Next products"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </motion.button>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
     </section>

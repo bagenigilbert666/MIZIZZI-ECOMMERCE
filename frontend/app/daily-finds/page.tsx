@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
-import { Search, X, Clock, Gift, ChevronLeft, ChevronRight } from "lucide-react"
+import { Search, X, Sparkles, Sun, ChevronLeft, ChevronRight } from "lucide-react"
 import Image from "next/image"
 import type { Product } from "@/types"
 import { productService } from "@/services/product"
@@ -11,18 +11,17 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 
-// Carousel items with daily finds theme
 const carouselItems = [
   {
     image: "https://images.unsplash.com/photo-1607083206968-13611e3d76db?w=1200&q=80",
     title: "Daily Finds",
-    subtitle: "Today Only",
+    subtitle: "Today's Best Deals",
     description: "Special deals that refresh every day",
   },
   {
     image: "https://images.unsplash.com/photo-1556742111-a301076d9d18?w=1200&q=80",
     title: "Limited Time",
-    subtitle: "24hr Deals",
+    subtitle: "24hr Specials",
     description: "Grab them before they're gone",
   },
   {
@@ -142,15 +141,15 @@ export default function DailyFindsPage() {
   if (loading && products.length === 0) {
     return (
       <div className="min-h-screen bg-neutral-50">
-        <div className="container py-8 px-4 sm:px-6 lg:px-8">
-          <div className="h-[180px] bg-neutral-200 animate-pulse mb-8 rounded-2xl"></div>
+        <div className="container py-6 px-4 sm:px-6 lg:px-8">
+          <div className="h-[180px] sm:h-[220px] bg-neutral-200 animate-pulse mb-8 rounded-2xl"></div>
           <div className="grid grid-cols-3 gap-1 sm:gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7">
             {[...Array(14)].map((_, index) => (
               <div key={index} className="bg-white rounded-lg p-1.5 border border-gray-100">
                 <div className="aspect-square bg-neutral-100 animate-pulse rounded mb-1.5"></div>
                 <div className="h-2 w-10 bg-neutral-100 rounded animate-pulse mb-1"></div>
                 <div className="h-3 w-full bg-neutral-100 rounded animate-pulse mb-1"></div>
-                <div className="h-3 w-12 bg-neutral-100 rounded animate-pulse"></div>
+                <div className="h-3 w-14 bg-neutral-100 rounded animate-pulse"></div>
               </div>
             ))}
           </div>
@@ -163,10 +162,10 @@ export default function DailyFindsPage() {
   if (error && products.length === 0) {
     return (
       <div className="min-h-screen bg-neutral-50">
-        <div className="container py-8 px-4 sm:px-6 lg:px-8">
+        <div className="container py-6 px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-2 mb-8">
             <h1 className="text-2xl sm:text-3xl font-semibold text-neutral-900">Daily Finds</h1>
-            <Gift className="h-6 w-6 text-purple-500" />
+            <Sun className="h-6 w-6 text-orange-500" />
           </div>
           <div className="bg-white rounded-2xl p-8 text-center shadow-sm">
             <p className="text-red-600 mb-4">{error}</p>
@@ -185,16 +184,15 @@ export default function DailyFindsPage() {
   return (
     <div className="min-h-screen bg-neutral-50">
       <div className="container py-6 px-4 sm:px-6 lg:px-8">
-        {/* Header */}
         <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <h1 className="text-2xl sm:text-3xl font-semibold text-neutral-900 tracking-tight">Daily Finds</h1>
-              <Gift className="h-6 w-6 text-purple-500" />
+              <Sun className="h-6 w-6 text-orange-500" />
             </div>
 
-            <div className="flex items-center gap-2 bg-purple-500 text-white px-3 py-1.5 rounded-full">
-              <Clock className="h-3.5 w-3.5" />
+            <div className="flex items-center gap-2 bg-orange-500 text-white px-3 py-1.5 rounded-full">
+              <Sparkles className="h-3.5 w-3.5" />
               <span className="text-xs font-medium">Today Only</span>
             </div>
           </div>
@@ -217,7 +215,6 @@ export default function DailyFindsPage() {
           </div>
         </div>
 
-        {/* Carousel */}
         <div className="mb-8 relative overflow-hidden rounded-2xl bg-neutral-900">
           <div className="relative h-[180px] sm:h-[220px] w-full">
             {carouselItems.map((item, index) => (
@@ -256,8 +253,8 @@ export default function DailyFindsPage() {
                       }}
                       transition={{ duration: 0.6, delay: 0.2, ease: [0.4, 0, 0.2, 1] }}
                     >
-                      <div className="inline-flex items-center gap-1.5 bg-purple-500 px-2.5 py-0.5 rounded-full mb-2">
-                        <Gift className="h-3 w-3 text-white" />
+                      <div className="inline-flex items-center gap-1.5 bg-orange-500 px-2.5 py-0.5 rounded-full mb-2">
+                        <Sun className="h-3 w-3 text-white" />
                         <span className="text-[10px] font-semibold text-white tracking-wide uppercase">
                           {item.title}
                         </span>
@@ -319,7 +316,6 @@ export default function DailyFindsPage() {
           </Select>
         </div>
 
-        {/* Compact product grid matching flash sales style */}
         <div className="grid grid-cols-3 gap-1 sm:gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7">
           <AnimatePresence mode="popLayout">
             {filteredProducts.map((product, index) => (
@@ -342,14 +338,14 @@ export default function DailyFindsPage() {
                         className="object-cover transition-transform duration-300 group-hover:scale-105"
                       />
                       {product.sale_price && product.sale_price < product.price && (
-                        <div className="absolute left-0 top-1.5 bg-purple-500 text-white text-[9px] font-semibold px-1.5 py-0.5">
+                        <div className="absolute left-0 top-1.5 bg-orange-500 text-white text-[9px] font-semibold px-1.5 py-0.5">
                           -{calculateDiscount(product.price, product.sale_price)}%
                         </div>
                       )}
                     </div>
                     <div className="p-1.5 sm:p-2 space-y-0.5">
-                      <span className="inline-block rounded-sm bg-purple-50 px-1 py-0.5 text-[8px] sm:text-[9px] font-medium text-purple-600">
-                        TODAY ONLY
+                      <span className="inline-block rounded-sm bg-orange-50 px-1 py-0.5 text-[8px] sm:text-[9px] font-medium text-orange-600">
+                        DAILY FIND
                       </span>
                       <h3 className="line-clamp-2 text-[10px] sm:text-xs font-medium text-gray-900 leading-tight">
                         {product.name}
@@ -396,7 +392,7 @@ export default function DailyFindsPage() {
         {filteredProducts.length === 0 && !loading && (
           <div className="bg-white rounded-2xl p-10 text-center shadow-sm">
             <div className="w-16 h-16 bg-neutral-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Gift className="h-8 w-8 text-neutral-300" />
+              <Sun className="h-8 w-8 text-neutral-300" />
             </div>
             <p className="text-neutral-600 mb-4">No daily finds match your search.</p>
             <Button onClick={() => setSearchQuery("")} variant="outline" className="rounded-full px-6">
