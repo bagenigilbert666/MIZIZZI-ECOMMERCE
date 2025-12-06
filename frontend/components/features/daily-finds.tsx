@@ -4,7 +4,7 @@ import type React from "react"
 import { useState, useEffect, useCallback, memo, useRef } from "react"
 import { motion, AnimatePresence, type PanInfo } from "framer-motion"
 import Link from "next/link"
-import { ChevronRight, ChevronLeft, Sparkles } from "lucide-react"
+import { ChevronRight, ChevronLeft, Sparkles, Star } from "lucide-react"
 import Image from "next/image"
 import type { Product as BaseProduct } from "@/types"
 import { productService } from "@/services/product"
@@ -13,7 +13,7 @@ import { useRouter } from "next/navigation"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { cloudinaryService } from "@/services/cloudinary-service"
 
-type Product = BaseProduct & { color_options?: string[]; stock?: number }
+type Product = BaseProduct & { color_options?: string[]; stock?: number; rating?: number; reviews_count?: number }
 
 function getProductImageUrl(product: Product): string {
   // Check for image_urls array first
@@ -53,7 +53,7 @@ const LogoPlaceholder = () => (
       initial={{ scale: 0.9, opacity: 0 }}
       animate={{ scale: 1, opacity: 1 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
-      className="relative h-12 w-12 sm:h-16 sm:w-16"
+      className="relative h-8 w-8"
     >
       <Image
         src="/images/screenshot-20from-202025-02-18-2013-30-22.png"
@@ -65,64 +65,76 @@ const LogoPlaceholder = () => (
   </div>
 )
 
+const StarRating = ({ rating = 4, reviewCount = 0 }: { rating?: number; reviewCount?: number }) => {
+  return (
+    <div className="flex items-center gap-1">
+      <div className="flex">
+        {[1, 2, 3, 4, 5].map((star) => (
+          <Star
+            key={star}
+            className={`h-2.5 w-2.5 ${
+              star <= Math.floor(rating)
+                ? "fill-yellow-400 text-yellow-400"
+                : star - 0.5 <= rating
+                  ? "fill-yellow-400/50 text-yellow-400"
+                  : "fill-gray-200 text-gray-200"
+            }`}
+          />
+        ))}
+      </div>
+      {reviewCount > 0 && <span className="text-[9px] text-gray-400">({reviewCount.toLocaleString()})</span>}
+    </div>
+  )
+}
+
 const ProductCard = memo(({ product, isMobile }: { product: Product; isMobile: boolean }) => {
   const [imageLoaded, setImageLoaded] = useState(false)
   const [imageError, setImageError] = useState(false)
   const [showPlaceholder, setShowPlaceholder] = useState(true)
-  const [isHovering, setIsHovering] = useState(false)
 
   const discountPercentage = product.sale_price
     ? Math.round(((product.price - (product.sale_price as number)) / product.price) * 100)
     : 0
 
-  // Handle image load success
   const handleImageLoad = () => {
     setImageLoaded(true)
-    // Add a small delay to show the smooth transition
-    setTimeout(() => {
-      setShowPlaceholder(false)
-    }, 400)
+    setTimeout(() => setShowPlaceholder(false), 300)
   }
 
-  // Handle image load error
   const handleImageError = () => {
     setImageError(true)
     setImageLoaded(false)
-    // Keep placeholder visible on error
   }
 
-  // Reset states when product changes
   useEffect(() => {
     setImageLoaded(false)
     setImageError(false)
     setShowPlaceholder(true)
   }, [product.id])
 
-  // Determine the image URL to use
   const imageUrl = getProductImageUrl(product)
+
+  // Generate random rating and reviews for demo
+  const rating = product.rating || 3 + Math.random() * 2
+  const reviewCount = product.reviews_count || Math.floor(Math.random() * 5000) + 100
 
   return (
     <Link href={`/product/${product.slug || product.id}`} prefetch={false}>
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-        onHoverStart={() => setIsHovering(true)}
-        onHoverEnd={() => setIsHovering(false)}
-        whileHover={{ y: -4, scale: 1.02 }}
+        transition={{ duration: 0.3 }}
+        whileHover={{ y: -2 }}
         className="h-full"
       >
-        <div className="group h-full overflow-hidden bg-white rounded-lg border border-gray-100 transition-all duration-300 ease-out hover:shadow-[0_6px_16px_rgba(0,0,0,0.08)] hover:border-gray-200 flex-shrink-0">
-          <div className={`relative overflow-hidden bg-[#f5f5f7] ${isMobile ? "aspect-square" : "aspect-[4/3]"}`}>
+        <div className="group h-full overflow-hidden bg-white border-r border-gray-100 transition-all duration-200 hover:shadow-sm">
+          {/* Image Container - Square aspect ratio */}
+          <div className="relative aspect-square overflow-hidden bg-[#f8f8f8]">
             <AnimatePresence>
               {(showPlaceholder || imageError) && (
                 <motion.div
                   initial={{ opacity: 1 }}
-                  exit={{
-                    opacity: 0,
-                    scale: 1.1,
-                    transition: { duration: 0.6, ease: "easeInOut" },
-                  }}
+                  exit={{ opacity: 0, transition: { duration: 0.3 } }}
                   className="absolute inset-0 z-10"
                 >
                   <LogoPlaceholder />
@@ -131,117 +143,54 @@ const ProductCard = memo(({ product, isMobile }: { product: Product; isMobile: b
             </AnimatePresence>
 
             <motion.div
-              initial={{ opacity: 0, scale: 1.1 }}
-              animate={{
-                opacity: imageLoaded ? 1 : 0,
-                scale: imageLoaded ? (isHovering ? 1.05 : 1) : 1.1,
-              }}
-              transition={{ duration: 0.3, ease: "easeOut" }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: imageLoaded ? 1 : 0 }}
+              transition={{ duration: 0.3 }}
               className="absolute inset-0"
             >
               <Image
                 src={imageUrl || "/placeholder.svg"}
                 alt={product.name}
                 fill
-                sizes={
-                  isMobile ? "25vw" : "(max-width: 640px) 25vw, (max-width: 768px) 20vw, (max-width: 1024px) 16vw, 14vw"
-                }
-                className="object-cover transition-opacity duration-300"
+                sizes={isMobile ? "25vw" : "16vw"}
+                className="object-cover transition-transform duration-300 group-hover:scale-105"
                 loading="lazy"
                 onLoad={handleImageLoad}
                 onError={handleImageError}
-                placeholder="blur"
-                blurDataURL="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiB2aWV3Qm94PSIwIDAgMTAwIDEwMCIgdmVyc2lvbj0iMS4xIiB4bWxuczpsaW5rPSJodHRwOi8vd3d3LnczLm9yZy8xOTk5L3hsaW5rIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSMjZWVlZWVlIiAvPjwvc3ZnPg=="
               />
             </motion.div>
 
-            {/* Sale Badge with Apple-like styling */}
-            {product.sale_price && (
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.5, duration: 0.3 }}
-                className={`absolute left-0 top-1 rounded-full bg-[#fa5252] px-1 py-0.5 font-medium text-white z-20 ${
-                  isMobile ? "text-[8px]" : "text-[10px]"
-                }`}
-              >
+            {/* Discount Badge - Orange like Kilimall */}
+            {product.sale_price && discountPercentage > 0 && (
+              <div className="absolute top-1 left-1 bg-[#f85606] text-white text-[9px] font-medium px-1 py-0.5 rounded-sm z-20">
                 -{discountPercentage}%
-              </motion.div>
+              </div>
             )}
           </div>
 
-          <div className={`space-y-0.5 ${isMobile ? "p-1" : "p-3"}`}>
-            {/* Daily Finds Badge */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.3, duration: 0.3 }}
-              className="mb-1"
+          {/* Product Info - Compact like product-grid */}
+          <div className={isMobile ? "p-1.5" : "p-2"}>
+            {/* Product Name - 2 lines max */}
+            <h3
+              className={`text-gray-800 line-clamp-2 leading-tight mb-1 ${isMobile ? "text-[10px] min-h-[24px]" : "text-xs min-h-[32px]"}`}
             >
-              <span
-                className={`inline-block rounded-sm bg-red-50 px-1 py-0.5 font-medium text-red-700 ${
-                  isMobile ? "text-[8px]" : "text-[10px]"
-                }`}
-              >
-                TODAY ONLY
+              {product.name}
+            </h3>
+
+            {/* Price - Orange/Red like Kilimall */}
+            <div className="mb-1">
+              <span className={`font-semibold text-[#f85606] ${isMobile ? "text-xs" : "text-sm"}`}>
+                KSh {(product.sale_price || product.price).toLocaleString()}
               </span>
-            </motion.div>
+              {product.sale_price && (
+                <span className={`text-gray-400 line-through ml-1 ${isMobile ? "text-[8px]" : "text-[10px]"}`}>
+                  KSh {product.price.toLocaleString()}
+                </span>
+              )}
+            </div>
 
-            {/* Product details with Apple-like typography and staggered animation */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4, duration: 0.3 }}
-              className="space-y-1"
-            >
-              <h3
-                className={`line-clamp-2 font-medium leading-tight text-gray-900 ${isMobile ? "text-xs" : "text-sm"}`}
-              >
-                {product.name}
-              </h3>
-
-              {/* Pricing with Apple-like styling */}
-              <div>
-                <motion.span
-                  className={`font-semibold text-gray-900 ${isMobile ? "text-sm" : "text-base"}`}
-                  animate={{ scale: [1, 1.05, 1] }}
-                  transition={{ duration: 2, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
-                >
-                  KSh {(product.sale_price || product.price).toLocaleString()}
-                </motion.span>
-                {product.sale_price && (
-                  <div className={`text-gray-500 line-through ${isMobile ? "text-xs" : "text-sm"}`}>
-                    KSh {product.price.toLocaleString()}
-                  </div>
-                )}
-              </div>
-            </motion.div>
-
-            {/* Apple-like "Available" indicator */}
-            {(product.stock ?? 0) > 0 && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5, duration: 0.3 }}
-                className="flex items-center mt-2"
-              >
-                <div className="h-1.5 w-1.5 rounded-full bg-green-500 mr-1.5"></div>
-                <span className={`text-gray-500 ${isMobile ? "text-[8px]" : "text-[10px]"}`}>Available</span>
-              </motion.div>
-            )}
-
-            {/* Out of stock indicator */}
-            {(product.stock ?? 0) === 0 && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.5, duration: 0.3 }}
-                className="flex items-center mt-2"
-              >
-                <div className="h-1.5 w-1.5 rounded-full bg-gray-300 mr-1.5"></div>
-                <span className={`text-gray-500 ${isMobile ? "text-[8px]" : "text-[10px]"}`}>Out of stock</span>
-              </motion.div>
-            )}
+            {/* Star Rating */}
+            <StarRating rating={rating} reviewCount={reviewCount} />
           </div>
         </div>
       </motion.div>
@@ -261,52 +210,21 @@ const DailyFindsSkeleton = ({ isMobile }: { isMobile: boolean }) => (
         <div className={`bg-white/20 rounded animate-pulse ${isMobile ? "h-4 w-12" : "h-5 w-16"}`}></div>
       </div>
 
-      <div className={isMobile ? "p-1" : "p-2"}>
-        <div className="flex gap-[1px] bg-gray-100">
+      <div className="p-1 bg-white border border-t-0 border-gray-100">
+        <div className="flex gap-0">
           {[...Array(isMobile ? 4 : 6)].map((_, index) => (
-            <motion.div
+            <div
               key={index}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-              className={`bg-white flex-shrink-0 ${isMobile ? "p-2 w-[calc(25%-1px)]" : "p-4 w-[200px]"}`}
+              className={`bg-white flex-shrink-0 border-r border-gray-100 ${isMobile ? "w-[calc(25vw-8px)]" : "w-[160px]"}`}
             >
-              <div
-                className={`w-full mb-2 bg-[#f5f5f7] flex items-center justify-center relative overflow-hidden ${isMobile ? "aspect-square" : "aspect-[4/3]"}`}
-              >
-                <motion.div
-                  animate={{
-                    backgroundPosition: ["0% 0%", "100% 100%"],
-                    opacity: [0.5, 0.8, 0.5],
-                  }}
-                  transition={{
-                    duration: 2,
-                    repeat: Number.POSITIVE_INFINITY,
-                    ease: "linear",
-                  }}
-                  className="absolute inset-0 bg-gradient-to-r from-[#f5f5f7] via-[#e0e0e3] to-[#f5f5f7] bg-[length:400%_400%]"
-                />
-                <motion.div
-                  animate={{
-                    scale: [1, 1.05, 1],
-                    opacity: [0.6, 1, 0.6],
-                  }}
-                  transition={{
-                    duration: 2,
-                    repeat: Number.POSITIVE_INFINITY,
-                    ease: "easeInOut",
-                  }}
-                  className="text-center z-10"
-                >
-                  <Sparkles className={`text-orange-400 mx-auto ${isMobile ? "h-4 w-4" : "h-6 w-6"}`} />
-                </motion.div>
+              <div className="aspect-square bg-gray-100 animate-pulse" />
+              <div className="p-1.5 space-y-1.5">
+                <Skeleton className="h-2.5 w-full" />
+                <Skeleton className="h-2.5 w-3/4" />
+                <Skeleton className="h-3 w-1/2" />
+                <Skeleton className="h-2.5 w-2/3" />
               </div>
-              <Skeleton className={`w-1/3 mb-2 bg-[#f5f5f7] rounded-full ${isMobile ? "h-3" : "h-4"}`} />
-              <Skeleton className={`w-2/3 bg-[#f5f5f7] rounded-full ${isMobile ? "h-3" : "h-4"}`} />
-              <div className="flex gap-1.5 pt-1">
-                <Skeleton className={`bg-[#f5f5f7] rounded-full ${isMobile ? "h-3 w-3" : "h-4 w-4"}`} />
-              </div>
-            </motion.div>
+            </div>
           ))}
         </div>
       </div>
@@ -331,9 +249,8 @@ export function DailyFinds() {
   const isSmallMobile = useMediaQuery("(max-width: 480px)")
   const isTablet = useMediaQuery("(max-width: 1024px)")
 
-  const itemsPerView = isSmallMobile ? 3 : isMobile ? 3 : isTablet ? 5 : 6
-  const mobileItemWidth = "calc((100vw - 32px) / 3)"
-  const itemWidthPx = isSmallMobile ? 110 : isMobile ? 120 : 180
+  const itemsPerView = isSmallMobile ? 4 : isMobile ? 4 : isTablet ? 5 : 7
+  const itemWidthPx = isSmallMobile ? 90 : isMobile ? 100 : 160
 
   // Track scroll position for mobile indicator
   const [mobileScrollIndex, setMobileScrollIndex] = useState(0)
@@ -576,10 +493,7 @@ export function DailyFinds() {
     }
 
     currentCarousel.addEventListener("wheel", handleWheelEvent, { passive: false })
-
-    return () => {
-      currentCarousel.removeEventListener("wheel", handleWheelEvent)
-    }
+    return () => currentCarousel.removeEventListener("wheel", handleWheelEvent)
   }, [currentIndex, maxIndex, goToPrevious, goToNext, isMobile])
 
   if (loading) {
@@ -589,20 +503,17 @@ export function DailyFinds() {
   if (error) {
     return (
       <section className="w-full mb-4 sm:mb-8">
-        <div className="w-full p-1 sm:p-2">
-          <div className="mb-2 sm:mb-4">
-            <h2 className="text-base sm:text-lg lg:text-xl font-bold">Daily Finds</h2>
-          </div>
-          <div className="bg-orange-50 p-3 sm:p-4 rounded-md text-orange-700 text-center text-sm">
-            <div className="mx-auto w-12 h-12 mb-2 text-orange-500">
-              <Sparkles className="w-full h-full" />
+        <div className="w-full">
+          <div className="bg-cherry-900 text-white flex items-center justify-between px-2 sm:px-4 py-1.5 sm:py-2">
+            <div className="flex items-center gap-1 sm:gap-2">
+              <Sparkles className={isMobile ? "h-3.5 w-3.5" : "h-4 w-4"} />
+              <span className={`font-semibold ${isMobile ? "text-xs" : "text-sm"}`}>Daily Finds</span>
             </div>
-            <p className="mb-2">{error}</p>
-            <button
-              onClick={fetchDailyFinds}
-              className="px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors text-sm"
-            >
-              Try Again
+          </div>
+          <div className="p-6 bg-white border border-t-0 border-gray-100 text-center">
+            <p className="text-sm text-gray-600 mb-3">{error}</p>
+            <button onClick={() => fetchDailyFinds()} className="text-sm text-[#f85606] hover:underline font-medium">
+              Try again
             </button>
           </div>
         </div>
@@ -610,145 +521,115 @@ export function DailyFinds() {
     )
   }
 
-  if (!dailyFinds || dailyFinds.length === 0) {
+  if (dailyFinds.length === 0) {
     return null
   }
 
   return (
     <section className="w-full mb-4 sm:mb-8">
       <div className="w-full">
-        {/* Header matching flash-sales and luxury-deals */}
+        {/* Header */}
         <div className="bg-cherry-900 text-white flex items-center justify-between px-2 sm:px-4 py-1.5 sm:py-2">
           <div className="flex items-center gap-1 sm:gap-2">
-            <Sparkles className={`text-yellow-300 ${isMobile ? "h-4 w-4" : "h-5 w-5"}`} />
-            <h2 className={`font-bold whitespace-nowrap ${isMobile ? "text-xs" : "text-sm sm:text-base"}`}>
-              {isMobile ? "Daily Finds" : "Daily Finds | Today Only"}
-            </h2>
+            <Sparkles className={isMobile ? "h-3.5 w-3.5" : "h-4 w-4"} />
+            <span className={`font-semibold ${isMobile ? "text-xs" : "text-sm"}`}>Daily Finds</span>
           </div>
-
           <button
             onClick={handleViewAll}
-            className={`flex items-center gap-0.5 sm:gap-1 font-medium hover:underline whitespace-nowrap ${
-              isMobile ? "text-[10px]" : "text-xs sm:text-sm"
-            }`}
+            className={`flex items-center gap-0.5 font-medium hover:underline ${isMobile ? "text-[10px]" : "text-xs"}`}
           >
             See All
-            <ChevronRight className={isMobile ? "h-3 w-3" : "h-4 w-4"} />
+            <ChevronRight className={isMobile ? "h-3 w-3" : "h-3.5 w-3.5"} />
           </button>
         </div>
 
         {/* Carousel Container */}
-        <div className={isMobile ? "p-1" : "p-2"}>
-          <div
-            ref={carouselRef}
-            className={`relative bg-gray-100 ${isMobile ? "overflow-hidden" : "overflow-hidden"}`}
-            style={{
-              maxWidth: isMobile ? "100%" : undefined,
-              width: isMobile ? "100%" : undefined,
-            }}
-            onMouseMove={handleMouseMove}
-            onMouseEnter={handleMouseEnter}
-            onMouseLeave={handleMouseLeave}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-          >
-            {/* Carousel Track */}
-            {isMobile ? (
-              <div
-                className="flex gap-1 w-full overflow-x-auto scrollbar-hide px-2"
-                style={{
-                  scrollSnapType: "x mandatory",
-                  WebkitOverflowScrolling: "touch",
-                  paddingBottom: "8px",
-                }}
-              >
-                {dailyFinds.map((product, index) => (
-                  <div
-                    key={product.id}
-                    className="flex-shrink-0 pointer-events-auto"
-                    style={{
-                      width: mobileItemWidth,
-                      minWidth: isSmallMobile ? "100px" : "110px",
-                      maxWidth: "130px",
-                      scrollSnapAlign: "start",
-                    }}
+        <div
+          ref={carouselRef}
+          className="relative bg-white border border-t-0 border-gray-100 overflow-hidden"
+          onMouseEnter={handleMouseEnter}
+          onMouseLeave={handleMouseLeave}
+          onMouseMove={handleMouseMove}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+        >
+          {/* Desktop Navigation Arrows */}
+          {!isMobile && (
+            <>
+              <AnimatePresence>
+                {isHovering && hoverSide === "left" && currentIndex > 0 && (
+                  <motion.button
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -10 }}
+                    transition={{ duration: 0.2 }}
+                    onClick={goToPrevious}
+                    className="absolute left-2 top-1/2 -translate-y-1/2 z-30 bg-white/95 rounded-full p-1.5 shadow-lg hover:bg-white transition-colors"
+                    aria-label="Previous"
                   >
-                    <ProductCard product={product} isMobile={true} />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <motion.div
-                className="flex gap-[1px]"
-                drag="x"
-                dragConstraints={{ left: 0, right: 0 }}
-                dragElastic={0.1}
-                onDragStart={handleDragStart}
-                onDragEnd={handleDragEnd}
-                animate={{
-                  x: `-${currentIndex * (isTablet ? 20 : 16.666)}%`,
-                }}
-                transition={{
-                  type: "spring",
-                  stiffness: 300,
-                  damping: 30,
-                  mass: 0.8,
-                }}
-                style={{
-                  cursor: isDragging ? "grabbing" : "grab",
-                }}
-              >
-                {dailyFinds.map((product, index) => (
-                  <motion.div
-                    key={product.id}
-                    className="flex-shrink-0 pointer-events-auto"
-                    style={{ width: `${isTablet ? 20 : 16.666}%` }}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: index * 0.05 }}
+                    <ChevronLeft className="h-4 w-4 text-gray-700" />
+                  </motion.button>
+                )}
+              </AnimatePresence>
+              <AnimatePresence>
+                {isHovering && hoverSide === "right" && currentIndex < maxIndex && (
+                  <motion.button
+                    initial={{ opacity: 0, x: 10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 10 }}
+                    transition={{ duration: 0.2 }}
+                    onClick={goToNext}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 z-30 bg-white/95 rounded-full p-1.5 shadow-lg hover:bg-white transition-colors"
+                    aria-label="Next"
                   >
-                    <ProductCard product={product} isMobile={false} />
-                  </motion.div>
-                ))}
-              </motion.div>
-            )}
+                    <ChevronRight className="h-4 w-4 text-gray-700" />
+                  </motion.button>
+                )}
+              </AnimatePresence>
+            </>
+          )}
 
-            {/* Navigation Arrows - Desktop only */}
-            <AnimatePresence>
-              {!isMobile && isHovering && !isDragging && hoverSide === "left" && currentIndex > 0 && (
-                <motion.button
-                  initial={{ opacity: 0, x: -20, scale: 0.8 }}
-                  animate={{ opacity: 1, x: 0, scale: 1 }}
-                  exit={{ opacity: 0, x: -20, scale: 0.8 }}
-                  transition={{ duration: 0.2, ease: "easeOut" }}
-                  onClick={goToPrevious}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white border border-gray-200 text-gray-700 hover:text-gray-900 p-2 rounded-full shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:shadow-xl"
-                  aria-label="Previous products"
+          {/* Products */}
+          {isMobile ? (
+            // Mobile: Native scroll
+            <div
+              className="flex overflow-x-auto scrollbar-hide scroll-smooth"
+              style={{ scrollSnapType: "x mandatory" }}
+            >
+              {dailyFinds.map((product) => (
+                <div
+                  key={product.id}
+                  className="flex-shrink-0"
+                  style={{ width: `${itemWidthPx}px`, scrollSnapAlign: "start" }}
                 >
-                  <ChevronLeft className="h-4 w-4" />
-                </motion.button>
-              )}
-            </AnimatePresence>
-
-            <AnimatePresence>
-              {!isMobile && isHovering && !isDragging && hoverSide === "right" && currentIndex < maxIndex && (
-                <motion.button
-                  initial={{ opacity: 0, x: 20, scale: 0.8 }}
-                  animate={{ opacity: 1, x: 0, scale: 1 }}
-                  exit={{ opacity: 0, x: 20, scale: 0.8 }}
-                  transition={{ duration: 0.2, ease: "easeOut" }}
-                  onClick={goToNext}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 z-10 bg-white/90 hover:bg-white border border-gray-200 text-gray-700 hover:text-gray-900 p-2 rounded-full shadow-lg backdrop-blur-sm transition-all duration-200 hover:scale-110 hover:shadow-xl"
-                  aria-label="Next products"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </motion.button>
-              )}
-            </AnimatePresence>
-          </div>
+                  <ProductCard product={product} isMobile={isMobile} />
+                </div>
+              ))}
+            </div>
+          ) : (
+            // Desktop: Animated carousel
+            <motion.div
+              drag="x"
+              dragConstraints={{ left: 0, right: 0 }}
+              dragElastic={0.1}
+              onDragStart={handleDragStart}
+              onDragEnd={handleDragEnd}
+              className="flex cursor-grab active:cursor-grabbing"
+              animate={{ x: -currentIndex * itemWidthPx }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+            >
+              {dailyFinds.map((product) => (
+                <div key={product.id} className="flex-shrink-0" style={{ width: `${itemWidthPx}px` }}>
+                  <ProductCard product={product} isMobile={isMobile} />
+                </div>
+              ))}
+            </motion.div>
+          )}
         </div>
       </div>
     </section>
   )
 }
+
+export default DailyFinds
