@@ -101,20 +101,14 @@ const ProductGridSkeleton = () => (
 
 export default function Home() {
   return (
-    <div
-      className="flex min-h-screen flex-col pb-8 overflow-x-hidden overflow-y-auto w-full max-w-full box-border"
-      style={{ backgroundColor: "var(--color-background)" }}
-    >
+    <div className="flex flex-col pb-8 w-full" style={{ backgroundColor: "var(--color-background)" }}>
       <NetworkStatus className="mx-auto w-full max-w-[1200px] px-1 sm:px-2 md:px-4 pt-2" />
 
-      <div
-        className="w-full mt-2 sm:mt-3 sm:py-2 overflow-hidden"
-        style={{ backgroundColor: "var(--color-background)" }}
-      >
+      <div className="w-full mt-2 sm:mt-3 sm:py-2" style={{ backgroundColor: "var(--color-background)" }}>
         <Carousel />
       </div>
 
-      <div className="mx-auto w-full max-w-[1200px] px-2 sm:px-3 md:px-4 overflow-x-hidden box-border mt-3 sm:mt-4">
+      <div className="mx-auto w-full max-w-[1200px] px-2 sm:px-3 md:px-4 mt-3 sm:mt-4">
         <motion.div
           className="mb-3 rounded-lg bg-white overflow-hidden shadow-sm"
           initial={{ opacity: 0, y: 20 }}
@@ -125,7 +119,7 @@ export default function Home() {
         </motion.div>
       </div>
 
-      <div className="mx-auto w-full max-w-[1200px] px-2 sm:px-3 md:px-4 overflow-x-hidden box-border">
+      <div className="mx-auto w-full max-w-[1200px] px-2 sm:px-3 md:px-4">
         <div className="grid gap-3 sm:gap-4 md:gap-8 py-2 sm:py-4">
           <section className="rounded-lg bg-white shadow-sm overflow-hidden">
             <FlashSales />

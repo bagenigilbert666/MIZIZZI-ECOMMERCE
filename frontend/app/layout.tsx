@@ -3,13 +3,14 @@ import "./globals.css"
 import { Providers as AppProviders } from "./providers"
 import { Providers as StateProviders } from "@/components/providers/index"
 import type React from "react"
-import { defaultMetadata, defaultViewport } from "@/lib/metadata-utils"
+import { defaultMetadata } from "@/lib/metadata-utils"
 import { LayoutRenderer } from "@/components/layout/layout-renderer"
 import { NotificationProvider } from "@/contexts/notification/notification-context"
 import { PageTransitionWrapper } from "@/components/transitions/page-transition-wrapper"
 import { VerificationHandler } from "@/components/auth/verification-handler"
 import Script from "next/script"
 import { ThemeProvider } from "@/contexts/theme-context"
+import type { Viewport } from "next"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -21,7 +22,14 @@ const inter = Inter({
 })
 
 export const metadata = defaultMetadata
-export const viewport = defaultViewport
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover",
+}
 
 export default function RootLayout({
   children,
@@ -29,7 +37,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning className="fixed inset-0 overflow-hidden">
       <head>
         {/* Suppress React DevTools warning in development */}
         {process.env.NODE_ENV === "development" && (
@@ -53,7 +61,7 @@ export default function RootLayout({
           />
         )}
       </head>
-      <body className={`${inter.className} ${inter.variable}`} suppressHydrationWarning>
+      <body className={`${inter.className} ${inter.variable} fixed inset-0 overflow-hidden`} suppressHydrationWarning>
         <Script src="https://accounts.google.com/gsi/client" strategy="beforeInteractive" />
 
         <ThemeProvider>
@@ -63,7 +71,9 @@ export default function RootLayout({
                 <PageTransitionWrapper />
                 {/* Add the VerificationHandler to handle auth state persistence */}
                 <VerificationHandler />
-                <LayoutRenderer>{children}</LayoutRenderer>
+                <div className="h-full w-full overflow-y-auto overflow-x-hidden overscroll-none">
+                  <LayoutRenderer>{children}</LayoutRenderer>
+                </div>
                 {/* Add the cart notification component */}
               </NotificationProvider>
             </AppProviders>
