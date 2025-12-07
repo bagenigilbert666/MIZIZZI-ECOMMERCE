@@ -100,12 +100,12 @@ const LogoPlaceholder = () => (
 )
 
 const CategoryCardSkeleton = ({ index }: { index: number }) => (
-  <div className="flex-shrink-0 min-w-[150px] sm:min-w-[170px] md:min-w-[190px] flex-1">
+  <div className="flex-shrink-0 min-w-[120px] sm:min-w-[150px] md:min-w-[180px] flex-1">
     <div className="relative overflow-hidden rounded-lg w-full h-full bg-white shadow-md">
       <div className="aspect-square w-full overflow-hidden bg-white">
         <LogoPlaceholder />
       </div>
-      <div className="absolute bottom-0 left-0 w-full p-3 space-y-2">
+      <div className="absolute bottom-0 left-0 w-full p-2 sm:p-3 space-y-2">
         <div className="h-4 w-3/4 bg-gray-300 rounded animate-pulse" />
         <div className="h-3 w-1/2 bg-gray-300 rounded animate-pulse" />
       </div>
@@ -207,22 +207,22 @@ const CategoryCard = ({
     <Link
       href={`/category/${category.slug}`}
       key={`carousel-${category.id || index}`}
-      className="flex-shrink-0 min-w-[150px] sm:min-w-[170px] md:min-w-[190px] flex-1"
+      className="flex-shrink-0 min-w-[120px] sm:min-w-[150px] md:min-w-[180px] flex-1"
       prefetch={true}
     >
       <motion.div
-        className="group relative overflow-hidden rounded-lg w-full h-full bg-white shadow-md transition-all duration-300"
+        className="group relative overflow-hidden rounded-lg w-full h-full bg-white shadow-sm transition-all duration-300"
         whileHover={{ scale: 1.05, y: -6 }}
         transition={{ duration: 0.2, ease: "easeOut" }}
         layout
       >
         <FastCategoryImage src={category.image_url} alt={category.name} isPriority={isPriority} />
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 to-black/20" />
-        <div className="absolute bottom-0 left-0 w-full p-3">
-          <h3 className="text-sm font-semibold text-white sm:text-base group-hover:text-cherry-200 transition-colors">
+        <div className="absolute bottom-0 left-0 w-full p-2 sm:p-3">
+          <h3 className="text-xs font-semibold text-white sm:text-sm md:text-base group-hover:text-cherry-200 transition-colors">
             {category.name}
           </h3>
-          <div className="flex items-center text-xs text-white/90 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex items-center text-xs text-white/90 mt-0.5 sm:mt-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <span>Shop Now</span>
             <ArrowRight className="ml-1 h-3 w-3" />
           </div>
@@ -310,7 +310,7 @@ export function CategoryGrid() {
 
   return (
     <div className="w-full max-w-full">
-      <div className="bg-gradient-to-r from-cherry-900 to-cherry-800 py-3 sm:py-4 mb-3 sm:mb-4 sm:rounded-t-lg">
+      <div className="bg-[#8B1538] py-3 sm:py-4 mb-3 sm:mb-4 sm:rounded-t-lg">
         <div className="flex items-center justify-between px-3 sm:px-6">
           <h2 className="text-lg sm:text-xl md:text-2xl font-bold text-white">Shop By Category</h2>
           <Link
@@ -324,10 +324,10 @@ export function CategoryGrid() {
         </div>
       </div>
 
-      <div className="relative px-2 sm:px-4 group overflow-hidden">
+      <div className="relative px-1 sm:px-4 group overflow-hidden">
         <div
           ref={carouselRef}
-          className="flex overflow-x-auto scrollbar-hide gap-3 sm:gap-4 pb-4 w-full overscroll-x-contain max-w-full"
+          className="flex overflow-x-auto scrollbar-hide gap-2 sm:gap-3 md:gap-4 pb-3 sm:pb-4 w-full overscroll-x-contain max-w-full"
           style={{
             scrollbarWidth: "none",
             msOverflowStyle: "none",
