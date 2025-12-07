@@ -170,7 +170,7 @@ export function Carousel() {
           className={cn(
             "relative w-full overflow-hidden",
             "rounded-xl border border-gray-100 shadow-sm",
-            "h-[140px] xs:h-[160px] sm:h-[400px] md:h-[450px] lg:h-[500px] xl:h-[400px]",
+            "h-[200px] xs:h-[220px] sm:h-[400px] md:h-[450px] lg:h-[500px] xl:h-[400px]",
           )}
           onMouseEnter={pause}
           onMouseLeave={resume}
