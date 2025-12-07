@@ -596,14 +596,14 @@ export function LuxuryDeals() {
           <div className="mb-2 sm:mb-4">
             <h2 className="text-base sm:text-lg lg:text-xl font-bold">Luxury Deals</h2>
           </div>
-          <div className="bg-amber-50 p-3 sm:p-4 rounded-md text-amber-700 text-center text-sm">
-            <div className="mx-auto w-12 h-12 mb-2 text-amber-500">
+          <div className="bg-red-50 p-3 sm:p-4 rounded-md text-[#8B1538] text-center text-sm">
+            <div className="mx-auto w-12 h-12 mb-2 text-[#8B1538]">
               <Crown className="w-full h-full" />
             </div>
             <p className="mb-2">{error}</p>
             <button
               onClick={fetchLuxuryDeals}
-              className="px-4 py-2 bg-amber-600 text-white rounded-md hover:bg-amber-700 transition-colors text-sm"
+              className="px-4 py-2 bg-[#8B1538] text-white rounded-md hover:bg-[#6d1029] transition-colors text-sm"
             >
               Try Again
             </button>
@@ -621,7 +621,7 @@ export function LuxuryDeals() {
     <section className="w-full mb-4 sm:mb-8">
       <div className="w-full">
         {/* Jumia-style Luxury Deals Header - Responsive */}
-        <div className="bg-[#c44000] text-white flex items-center justify-between px-2 sm:px-4 py-1.5 sm:py-2">
+        <div className="bg-[#8B1538] text-white flex items-center justify-between px-2 sm:px-4 py-1.5 sm:py-2">
           <div className="flex items-center gap-1 sm:gap-2">
             <Crown className={`text-yellow-300 fill-yellow-300 ${isMobile ? "h-4 w-4" : "h-5 w-5"}`} />
             <h2 className={`font-bold whitespace-nowrap ${isMobile ? "text-sm" : "text-base sm:text-lg"}`}>

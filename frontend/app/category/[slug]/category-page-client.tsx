@@ -229,7 +229,7 @@ export default function CategoryPageClient({
                   </div>
                 }
               >
-                <ProductGrid categorySlug={slug} limit={24} />
+                <ProductGrid category={slug} limit={24} />
               </Suspense>
             </div>
           </div>

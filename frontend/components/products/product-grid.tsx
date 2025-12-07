@@ -33,7 +33,7 @@ const StarRating = ({ rating = 4, reviewCount = 0 }: { rating?: number; reviewCo
         {[1, 2, 3, 4, 5].map((star) => (
           <Star
             key={star}
-            className={`h-3 w-3 ${
+            className={`h-3 w-3 sm:h-3.5 sm:w-3.5 ${
               star <= Math.floor(rating)
                 ? "fill-yellow-400 text-yellow-400"
                 : star - 0.5 <= rating
@@ -43,7 +43,9 @@ const StarRating = ({ rating = 4, reviewCount = 0 }: { rating?: number; reviewCo
           />
         ))}
       </div>
-      {reviewCount > 0 && <span className="text-[10px] text-gray-400">({reviewCount.toLocaleString()})</span>}
+      {reviewCount > 0 && (
+        <span className="text-[10px] sm:text-xs text-gray-400">({reviewCount.toLocaleString()})</span>
+      )}
     </div>
   )
 }
@@ -89,7 +91,7 @@ const ProductCard = memo(({ product, index }: { product: Product; index: number 
         className="h-full"
       >
         <div className="group h-full overflow-hidden bg-white border-b border-r border-gray-100 transition-all duration-200 hover:shadow-sm">
-          {/* Image Container - Square aspect ratio */}
+          {/* Image Container - Square aspect ratio with consistent sizing */}
           <div className="relative aspect-square overflow-hidden bg-[#f8f8f8]">
             <AnimatePresence>
               {(showPlaceholder || imageError) && (
@@ -122,24 +124,24 @@ const ProductCard = memo(({ product, index }: { product: Product; index: number 
             </motion.div>
 
             {product.sale_price && discountPercentage > 0 && (
-              <div className="absolute top-1 left-1 bg-[#8B1538] text-white text-[10px] font-medium px-1.5 py-0.5 rounded-sm z-20">
+              <div className="absolute top-1 left-1 bg-[#8B1538] text-white text-[10px] sm:text-xs font-medium px-1.5 py-0.5 rounded-sm z-20">
                 -{discountPercentage}%
               </div>
             )}
           </div>
 
-          {/* Product Info */}
-          <div className="p-2">
-            {/* Product Name */}
-            <h3 className="text-gray-800 text-xs line-clamp-2 leading-tight mb-1.5 min-h-[32px]">{product.name}</h3>
+          <div className="p-2 sm:p-3">
+            {/* Product Name - Increased font size to match flash-sales */}
+            <h3 className="text-gray-800 text-xs sm:text-sm line-clamp-2 leading-tight mb-1.5 min-h-[32px] sm:min-h-[40px]">
+              {product.name}
+            </h3>
 
-            {/* Price */}
             <div className="mb-1.5">
-              <span className="font-semibold text-[#8B1538] text-sm">
+              <span className="font-semibold text-[#8B1538] text-sm sm:text-base">
                 KSh {(product.sale_price || product.price).toLocaleString()}
               </span>
               {product.sale_price && (
-                <span className="text-gray-400 line-through ml-1.5 text-[10px]">
+                <span className="text-gray-400 line-through ml-1.5 text-[10px] sm:text-xs">
                   KSh {product.price.toLocaleString()}
                 </span>
               )}
@@ -164,7 +166,7 @@ const ProductGridSkeleton = ({ count = 12 }: { count?: number }) => (
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: i * 0.02, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-        className="bg-white p-2"
+        className="bg-white p-2 sm:p-3"
       >
         <div className="aspect-square w-full bg-[#f5f5f7] flex items-center justify-center relative overflow-hidden mb-2">
           <motion.div
@@ -194,11 +196,11 @@ const ProductGridSkeleton = ({ count = 12 }: { count?: number }) => (
             <Package className="h-6 w-6 text-gray-300 mx-auto" />
           </motion.div>
         </div>
-        <Skeleton className="h-3 w-3/4 bg-[#f5f5f7] rounded-full mb-2" />
-        <Skeleton className="h-3 w-1/2 bg-[#f5f5f7] rounded-full mb-2" />
+        <Skeleton className="h-3 sm:h-4 w-3/4 bg-[#f5f5f7] rounded-full mb-2" />
+        <Skeleton className="h-3 sm:h-4 w-1/2 bg-[#f5f5f7] rounded-full mb-2" />
         <div className="flex gap-1">
           {[...Array(5)].map((_, j) => (
-            <Skeleton key={j} className="h-3 w-3 bg-[#f5f5f7] rounded-full" />
+            <Skeleton key={j} className="h-3 w-3 sm:h-3.5 sm:w-3.5 bg-[#f5f5f7] rounded-full" />
           ))}
         </div>
       </motion.div>
@@ -214,26 +216,50 @@ interface ProductGridProps {
 export function ProductGrid({ limit = 12, category }: ProductGridProps) {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(true)
 
-  const fetchProducts = useCallback(async () => {
-    try {
-      setLoading(true)
-      setError(null)
+  const fetchProducts = useCallback(
+    async (pageNum = 1, append = false) => {
+      try {
+        if (append) {
+          setLoadingMore(true)
+        } else {
+          setLoading(true)
+        }
+        setError(null)
 
-      const data = await productService.getProducts({
-        limit,
-        category_slug: category,
-      })
+        const data = await productService.getProducts({
+          limit,
+          category_slug: category,
+          page: pageNum,
+        })
 
-      setProducts(data || [])
-    } catch (err) {
-      console.error("Error fetching products:", err)
-      setError("Failed to load products")
-    } finally {
-      setLoading(false)
-    }
-  }, [limit, category])
+        if (append) {
+          setProducts((prev) => [...prev, ...(data || [])])
+        } else {
+          setProducts(data || [])
+        }
+
+        setHasMore((data || []).length >= limit)
+      } catch (err) {
+        console.error("Error fetching products:", err)
+        setError("Failed to load products")
+      } finally {
+        setLoading(false)
+        setLoadingMore(false)
+      }
+    },
+    [limit, category],
+  )
+
+  const handleShowMore = async () => {
+    const nextPage = page + 1
+    setPage(nextPage)
+    await fetchProducts(nextPage, true)
+  }
 
   useEffect(() => {
     fetchProducts()
@@ -246,6 +272,7 @@ export function ProductGrid({ limit = 12, category }: ProductGridProps) {
 
       setProducts([])
       setLoading(true)
+      setPage(1)
 
       setTimeout(() => {
         fetchProducts()
@@ -265,12 +292,12 @@ export function ProductGrid({ limit = 12, category }: ProductGridProps) {
 
   if (error) {
     return (
-      <div className="bg-red-50 p-4 rounded-md text-red-700 text-center">
-        <ShoppingBag className="h-8 w-8 mx-auto mb-2 text-red-500" />
+      <div className="bg-red-50 p-4 rounded-md text-[#8B1538] text-center">
+        <ShoppingBag className="h-8 w-8 mx-auto mb-2 text-[#8B1538]" />
         <p className="mb-2">{error}</p>
         <button
-          onClick={fetchProducts}
-          className="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors text-sm"
+          onClick={() => fetchProducts()}
+          className="px-4 py-2 bg-[#8B1538] text-white rounded-md hover:bg-[#6d1029] transition-colors text-sm"
         >
           Try Again
         </button>
@@ -288,10 +315,80 @@ export function ProductGrid({ limit = 12, category }: ProductGridProps) {
   }
 
   return (
-    <div className="grid grid-cols-2 gap-[1px] bg-gray-100 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-      {products.map((product, index) => (
-        <ProductCard key={product.id} product={product} index={index} />
-      ))}
+    <div className="flex flex-col">
+      <div className="grid grid-cols-2 gap-[1px] bg-gray-100 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+        {products.map((product, index) => (
+          <ProductCard key={`${product.id}-${index}`} product={product} index={index} />
+        ))}
+      </div>
+
+      {hasMore && (
+        <div className="flex justify-center py-6 bg-white">
+          <button
+            onClick={handleShowMore}
+            disabled={loadingMore}
+            className="group relative flex items-center justify-center gap-2 px-8 py-3 bg-[#8B1538] text-white font-medium rounded-full hover:bg-[#6d1029] transition-all duration-300 disabled:opacity-80 disabled:cursor-not-allowed min-w-[160px] shadow-md hover:shadow-lg"
+          >
+            <AnimatePresence mode="wait">
+              {loadingMore ? (
+                <motion.div
+                  key="spinner"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  className="flex items-center justify-center"
+                >
+                  <div className="relative w-6 h-6">
+                    {/* Outer ring with gradient segments */}
+                    <svg className="w-6 h-6 animate-spin" viewBox="0 0 24 24">
+                      <defs>
+                        <linearGradient id="spinnerGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="white" stopOpacity="1" />
+                          <stop offset="50%" stopColor="white" stopOpacity="0.5" />
+                          <stop offset="100%" stopColor="white" stopOpacity="0" />
+                        </linearGradient>
+                      </defs>
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        fill="none"
+                        stroke="url(#spinnerGradient)"
+                        strokeWidth="2.5"
+                        strokeLinecap="round"
+                        strokeDasharray="50 15"
+                      />
+                    </svg>
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.span
+                  key="text"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex items-center gap-2"
+                >
+                  Show More
+                  <motion.svg
+                    className="w-4 h-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    whileHover={{ y: 2 }}
+                    transition={{ duration: 0.2 }}
+                  >
+                    <polyline points="6 9 12 15 18 9" />
+                  </motion.svg>
+                </motion.span>
+              )}
+            </AnimatePresence>
+          </button>
+        </div>
+      )}
     </div>
   )
 }
