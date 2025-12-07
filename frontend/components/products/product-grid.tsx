@@ -1,5 +1,5 @@
 "use client"
-import { useState, useEffect, useCallback, memo } from "react"
+import { useState, useEffect, useCallback, memo, useRef } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
 import Link from "next/link"
@@ -50,110 +50,131 @@ const StarRating = ({ rating = 4, reviewCount = 0 }: { rating?: number; reviewCo
   )
 }
 
-const ProductCard = memo(({ product, index }: { product: Product; index: number }) => {
-  const [imageLoaded, setImageLoaded] = useState(false)
-  const [imageError, setImageError] = useState(false)
-  const [showPlaceholder, setShowPlaceholder] = useState(true)
+const ProductCard = memo(
+  ({ product, index, isNewlyLoaded = false }: { product: Product; index: number; isNewlyLoaded?: boolean }) => {
+    const [imageLoaded, setImageLoaded] = useState(false)
+    const [imageError, setImageError] = useState(false)
+    const [showPlaceholder, setShowPlaceholder] = useState(true)
 
-  const discountPercentage = product.sale_price
-    ? Math.round(((product.price - product.sale_price) / product.price) * 100)
-    : 0
+    const discountPercentage = product.sale_price
+      ? Math.round(((product.price - product.sale_price) / product.price) * 100)
+      : 0
 
-  const handleImageLoad = () => {
-    setImageLoaded(true)
-    setTimeout(() => setShowPlaceholder(false), 300)
-  }
+    const handleImageLoad = () => {
+      setImageLoaded(true)
+      setTimeout(() => setShowPlaceholder(false), 300)
+    }
 
-  const handleImageError = () => {
-    setImageError(true)
-    setImageLoaded(false)
-  }
+    const handleImageError = () => {
+      setImageError(true)
+      setImageLoaded(false)
+    }
 
-  useEffect(() => {
-    setImageLoaded(false)
-    setImageError(false)
-    setShowPlaceholder(true)
-  }, [product.id])
+    useEffect(() => {
+      setImageLoaded(false)
+      setImageError(false)
+      setShowPlaceholder(true)
+    }, [product.id])
 
-  const imageUrl =
-    (product.image_urls && product.image_urls[0]) || product.thumbnail_url || "/diverse-fashion-display.png"
+    const imageUrl =
+      (product.image_urls && product.image_urls[0]) || product.thumbnail_url || "/diverse-fashion-display.png"
 
-  const rating = product.rating || 3 + Math.random() * 2
-  const reviewCount = product.review_count || Math.floor(Math.random() * 5000) + 100
+    const rating = product.rating || 3 + Math.random() * 2
+    const reviewCount = product.review_count || Math.floor(Math.random() * 5000) + 100
 
-  return (
-    <Link href={`/product/${product.slug || product.id}`} prefetch={false}>
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3, delay: index * 0.02 }}
-        whileHover={{ y: -2 }}
-        className="h-full"
-      >
-        <div className="group h-full overflow-hidden bg-white border-b border-r border-gray-100 transition-all duration-200 hover:shadow-sm">
-          <div className="relative aspect-square overflow-hidden bg-[#f8f8f8]">
-            <AnimatePresence>
-              {(showPlaceholder || imageError) && (
-                <motion.div
-                  initial={{ opacity: 1 }}
-                  exit={{ opacity: 0, transition: { duration: 0.3 } }}
-                  className="absolute inset-0 z-10"
-                >
-                  <LogoPlaceholder />
-                </motion.div>
-              )}
-            </AnimatePresence>
+    const cardVariants = {
+      hidden: {
+        opacity: 0,
+        y: 30,
+        scale: 0.95,
+      },
+      visible: {
+        opacity: 1,
+        y: 0,
+        scale: 1,
+        transition: {
+          type: "spring",
+          stiffness: 100,
+          damping: 15,
+          delay: isNewlyLoaded ? index * 0.05 : index * 0.02,
+        },
+      },
+    }
 
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: imageLoaded ? 1 : 0 }}
-              transition={{ duration: 0.3 }}
-              className="absolute inset-0"
-            >
-              <Image
-                src={imageUrl || "/placeholder.svg"}
-                alt={product.name}
-                fill
-                sizes="(max-width: 640px) 33vw, (max-width: 1024px) 25vw, 16vw"
-                className="object-cover transition-transform duration-300 group-hover:scale-105"
-                loading="lazy"
-                onLoad={handleImageLoad}
-                onError={handleImageError}
-              />
-            </motion.div>
+    return (
+      <Link href={`/product/${product.slug || product.id}`} prefetch={false}>
+        <motion.div
+          variants={cardVariants}
+          initial="hidden"
+          animate="visible"
+          whileHover={{ y: -2, transition: { duration: 0.2 } }}
+          className="h-full"
+        >
+          <div className="group h-full overflow-hidden bg-white border-b border-r border-gray-100 transition-all duration-200 hover:shadow-sm">
+            <div className="relative aspect-square overflow-hidden bg-[#f8f8f8]">
+              <AnimatePresence>
+                {(showPlaceholder || imageError) && (
+                  <motion.div
+                    initial={{ opacity: 1 }}
+                    exit={{ opacity: 0, transition: { duration: 0.3 } }}
+                    className="absolute inset-0 z-10"
+                  >
+                    <LogoPlaceholder />
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
-            {product.sale_price && discountPercentage > 0 && (
-              <div className="absolute top-0.5 left-0.5 sm:top-1 sm:left-1 bg-[#8B1538] text-white text-[8px] sm:text-[10px] md:text-xs font-medium px-1 sm:px-1.5 py-0.5 rounded-sm z-20">
-                -{discountPercentage}%
-              </div>
-            )}
-          </div>
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: imageLoaded ? 1 : 0 }}
+                transition={{ duration: 0.3 }}
+                className="absolute inset-0"
+              >
+                <Image
+                  src={imageUrl || "/placeholder.svg"}
+                  alt={product.name}
+                  fill
+                  sizes="(max-width: 640px) 33vw, (max-width: 1024px) 25vw, 16vw"
+                  className="object-cover transition-transform duration-300 group-hover:scale-105"
+                  loading="lazy"
+                  onLoad={handleImageLoad}
+                  onError={handleImageError}
+                />
+              </motion.div>
 
-          <div className="p-1.5 sm:p-2 md:p-3">
-            {/* Product Name - Smaller text for 3-col mobile */}
-            <h3 className="text-gray-800 text-[10px] sm:text-xs md:text-sm line-clamp-2 leading-tight mb-1 sm:mb-1.5 min-h-[24px] sm:min-h-[32px] md:min-h-[40px]">
-              {product.name}
-            </h3>
-
-            <div className="mb-1 sm:mb-1.5">
-              <span className="font-semibold text-[#8B1538] text-[11px] sm:text-sm md:text-base">
-                KSh {(product.sale_price || product.price).toLocaleString()}
-              </span>
-              {product.sale_price && (
-                <span className="text-gray-400 line-through ml-1 sm:ml-1.5 text-[8px] sm:text-[10px] md:text-xs">
-                  KSh {product.price.toLocaleString()}
-                </span>
+              {product.sale_price && discountPercentage > 0 && (
+                <div className="absolute top-0.5 left-0.5 sm:top-1 sm:left-1 bg-[#8B1538] text-white text-[8px] sm:text-[10px] md:text-xs font-medium px-1 sm:px-1.5 py-0.5 rounded-sm z-20">
+                  -{discountPercentage}%
+                </div>
               )}
             </div>
 
-            {/* Star Rating */}
-            <StarRating rating={rating} reviewCount={reviewCount} />
+            <div className="p-1.5 sm:p-2 md:p-3">
+              {/* Product Name - Smaller text for 3-col mobile */}
+              <h3 className="text-gray-800 text-[10px] sm:text-xs md:text-sm line-clamp-2 leading-tight mb-1 sm:mb-1.5 min-h-[24px] sm:min-h-[32px] md:min-h-[40px]">
+                {product.name}
+              </h3>
+
+              <div className="mb-1 sm:mb-1.5">
+                <span className="font-semibold text-[#8B1538] text-[11px] sm:text-sm md:text-base">
+                  KSh {(product.sale_price || product.price).toLocaleString()}
+                </span>
+                {product.sale_price && (
+                  <span className="text-gray-400 line-through ml-1 sm:ml-1.5 text-[8px] sm:text-[10px] md:text-xs">
+                    KSh {product.price.toLocaleString()}
+                  </span>
+                )}
+              </div>
+
+              {/* Star Rating */}
+              <StarRating rating={rating} reviewCount={reviewCount} />
+            </div>
           </div>
-        </div>
-      </motion.div>
-    </Link>
-  )
-})
+        </motion.div>
+      </Link>
+    )
+  },
+)
 
 ProductCard.displayName = "ProductCard"
 
@@ -219,6 +240,11 @@ export function ProductGrid({ limit = 12, category }: ProductGridProps) {
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
+  const [newlyLoadedStartIndex, setNewlyLoadedStartIndex] = useState<number | null>(null)
+
+  const productsLengthRef = useRef(0)
+
+  const initialLoadDone = useRef(false)
 
   const fetchProducts = useCallback(
     async (pageNum = 1, append = false) => {
@@ -230,16 +256,26 @@ export function ProductGrid({ limit = 12, category }: ProductGridProps) {
         }
         setError(null)
 
+        console.log("[v0] Fetching products - page:", pageNum, "append:", append)
+
         const data = await productService.getProducts({
           limit,
           category_slug: category,
           page: pageNum,
         })
 
+        console.log("[v0] Received products:", data?.length || 0)
+
         if (append) {
-          setProducts((prev) => [...prev, ...(data || [])])
+          setProducts((prev) => {
+            setNewlyLoadedStartIndex(prev.length)
+            productsLengthRef.current = prev.length + (data || []).length
+            return [...prev, ...(data || [])]
+          })
         } else {
+          setNewlyLoadedStartIndex(null)
           setProducts(data || [])
+          productsLengthRef.current = (data || []).length
         }
 
         setHasMore((data || []).length >= limit)
@@ -255,14 +291,25 @@ export function ProductGrid({ limit = 12, category }: ProductGridProps) {
   )
 
   const handleShowMore = async () => {
+    console.log("[v0] Show More clicked - current page:", page)
     const nextPage = page + 1
     setPage(nextPage)
     await fetchProducts(nextPage, true)
   }
 
   useEffect(() => {
-    fetchProducts()
-  }, [fetchProducts])
+    if (!initialLoadDone.current) {
+      initialLoadDone.current = true
+      fetchProducts()
+    }
+  }, []) // Empty dependency - only run on mount
+
+  useEffect(() => {
+    if (initialLoadDone.current) {
+      setPage(1)
+      fetchProducts(1, false)
+    }
+  }, [category, limit])
 
   useEffect(() => {
     const handleProductImagesUpdated = (event: CustomEvent) => {
@@ -271,8 +318,10 @@ export function ProductGrid({ limit = 12, category }: ProductGridProps) {
       setProducts([])
       setLoading(true)
       setPage(1)
+      initialLoadDone.current = false
 
       setTimeout(() => {
+        initialLoadDone.current = true
         fetchProducts()
       }, 500)
     }
@@ -316,7 +365,14 @@ export function ProductGrid({ limit = 12, category }: ProductGridProps) {
     <div className="flex flex-col">
       <div className="grid grid-cols-3 gap-[1px] bg-gray-100 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
         {products.map((product, index) => (
-          <ProductCard key={`${product.id}-${index}`} product={product} index={index} />
+          <ProductCard
+            key={`${product.id}-${index}`}
+            product={product}
+            index={
+              newlyLoadedStartIndex !== null && index >= newlyLoadedStartIndex ? index - newlyLoadedStartIndex : index
+            }
+            isNewlyLoaded={newlyLoadedStartIndex !== null && index >= newlyLoadedStartIndex}
+          />
         ))}
       </div>
 
@@ -325,40 +381,40 @@ export function ProductGrid({ limit = 12, category }: ProductGridProps) {
           <button
             onClick={handleShowMore}
             disabled={loadingMore}
-            className="group relative flex items-center justify-center gap-2 px-8 sm:px-10 py-2.5 sm:py-3 bg-white text-gray-700 font-semibold rounded-full border-2 border-gray-300 hover:border-[#8B1538] hover:text-[#8B1538] hover:bg-[#8B1538]/5 transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed min-w-[160px] sm:min-w-[180px] tracking-wide uppercase text-xs sm:text-sm shadow-sm hover:shadow-md"
+            className="relative flex items-center justify-center px-12 sm:px-16 py-2.5 sm:py-3 bg-white text-gray-600 font-medium rounded-full border border-gray-300 hover:border-gray-400 hover:text-gray-800 transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed min-w-[180px] sm:min-w-[200px] tracking-widest uppercase text-xs sm:text-sm"
+            style={{ boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}
           >
             <AnimatePresence mode="wait">
               {loadingMore ? (
                 <motion.div
                   key="spinner"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  className="flex items-center gap-2 sm:gap-3"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  className="flex items-center justify-center"
                 >
-                  {/* Apple-like star/segment spinner with color */}
+                  {/* Apple-style colored star spinner */}
                   <div className="relative w-5 h-5">
-                    {[...Array(8)].map((_, i) => (
+                    {[...Array(12)].map((_, i) => (
                       <motion.span
                         key={i}
-                        className="absolute left-1/2 top-0 w-[2px] h-[6px] rounded-full origin-[50%_10px]"
+                        className="absolute left-1/2 top-0 w-[2px] h-[5px] rounded-full origin-[50%_10px]"
                         style={{
-                          transform: `rotate(${i * 45}deg)`,
-                          background: `linear-gradient(to bottom, #8B1538, #c44060)`,
+                          transform: `translateX(-50%) rotate(${i * 30}deg)`,
+                          backgroundColor: "#8B1538",
                         }}
                         animate={{
-                          opacity: [0.2, 1, 0.2],
+                          opacity: [0.15, 1, 0.15],
                         }}
                         transition={{
-                          duration: 0.8,
+                          duration: 1,
                           repeat: Number.POSITIVE_INFINITY,
-                          delay: i * 0.1,
-                          ease: "easeInOut",
+                          delay: i * (1 / 12),
+                          ease: "linear",
                         }}
                       />
                     ))}
                   </div>
-                  <span className="text-[#8B1538]">Loading...</span>
                 </motion.div>
               ) : (
                 <motion.span key="text" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
