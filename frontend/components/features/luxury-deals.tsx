@@ -197,9 +197,15 @@ const LuxuryDealsSkeleton = ({ isMobile }: { isMobile: boolean }) => (
           {[...Array(isMobile ? 4 : 6)].map((_, index) => (
             <div key={index} className={`bg-white flex-shrink-0 ${isMobile ? "p-2 w-[calc(25%-1px)]" : "p-3 flex-1"}`}>
               <div
-                className={`w-full mb-2 bg-gray-100 relative overflow-hidden ${isMobile ? "aspect-square" : "aspect-square"}`}
+                className={`w-full mb-2 bg-white relative overflow-hidden flex items-center justify-center ${isMobile ? "aspect-square" : "aspect-square"}`}
               >
-                <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100" />
+                <Image
+                  src="/images/screenshot-20from-202025-02-18-2013-30-22.png"
+                  alt="Loading"
+                  width={isMobile ? 48 : 64}
+                  height={isMobile ? 48 : 64}
+                  className="object-contain opacity-60"
+                />
               </div>
               <div className="space-y-2">
                 <div className="h-3 bg-gray-100 rounded w-3/4 relative overflow-hidden">
@@ -255,10 +261,13 @@ export function LuxuryDeals() {
     }
   }, [])
 
-  const handleViewAll = (e: React.MouseEvent) => {
-    e.preventDefault()
-    router.push("/luxury")
-  }
+  const handleViewAll = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault()
+      router.push("/luxury")
+    },
+    [router],
+  )
 
   const maxIndex = Math.max(0, luxuryDeals.length - itemsPerView)
 
