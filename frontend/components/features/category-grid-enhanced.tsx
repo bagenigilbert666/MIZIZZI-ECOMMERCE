@@ -162,7 +162,7 @@ const LogoPlaceholder = () => (
   <div className="absolute inset-0 flex items-center justify-center bg-white">
     <motion.div
       initial={{ scale: 0.9, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
+      animate={{ scale: 1, opacity: 0.5 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
       className="relative h-10 w-10 sm:h-12 sm:w-12"
     >
@@ -171,23 +171,60 @@ const LogoPlaceholder = () => (
         alt="Loading"
         fill
         className="object-contain"
-        priority
       />
     </motion.div>
   </div>
 )
 
 const CategoryCardSkeleton = ({ index }: { index: number }) => (
-  <div className="flex-shrink-0 min-w-[120px] sm:min-w-[150px] md:min-w-[180px] flex-1">
+  <div
+    className="flex-shrink-0 min-w-[120px] sm:min-w-[150px] md:min-w-[180px] flex-1"
+    style={{ animationDelay: `${index * 100}ms` }}
+  >
     <div className="relative overflow-hidden rounded-lg w-full h-full bg-white shadow-md">
-      <div className="aspect-square w-full overflow-hidden bg-white">
-        <LogoPlaceholder />
+      <div className="aspect-square w-full overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 relative">
+        {/* Shimmer effect */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div
+            className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite]"
+            style={{
+              background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.6) 50%, transparent 100%)",
+              animationDelay: `${index * 150}ms`,
+            }}
+          />
+        </div>
+        {/* Centered logo */}
+        <div className="absolute inset-0 flex items-center justify-center">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 0.5 }}
+            transition={{ duration: 0.3, delay: index * 0.05 }}
+            className="relative h-10 w-10 sm:h-12 sm:w-12"
+          >
+            <Image
+              src="/images/screenshot-20from-202025-02-18-2013-30-22.png"
+              alt="Loading"
+              fill
+              className="object-contain"
+            />
+          </motion.div>
+        </div>
       </div>
+      {/* Gradient overlay */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+      {/* Text placeholders */}
       <div className="absolute bottom-0 left-0 w-full p-2 sm:p-3 space-y-2">
-        <div className="h-4 w-3/4 bg-gray-300 rounded animate-pulse" />
-        <div className="h-3 w-1/2 bg-gray-300 rounded animate-pulse" />
+        <div className="h-4 w-3/4 bg-white/30 rounded-full animate-pulse" />
+        <div className="h-3 w-1/2 bg-white/20 rounded-full animate-pulse" />
       </div>
     </div>
+    <style jsx>{`
+      @keyframes shimmer {
+        100% {
+          transform: translateX(200%);
+        }
+      }
+    `}</style>
   </div>
 )
 
@@ -206,26 +243,23 @@ const FastCategoryImage = ({
   const [imageError, setImageError] = useState(false)
   const [showPlaceholder, setShowPlaceholder] = useState(!hasValidSrc)
 
-  console.log("[v0] FastCategoryImage:", { alt, src, hasValidSrc, imageUrl })
-
   const handleImageLoad = () => {
-    console.log("[v0] Image loaded successfully:", alt, imageUrl)
     setImageLoaded(true)
     setShowPlaceholder(false)
   }
 
   const handleImageError = () => {
-    console.log("[v0] Image failed to load:", alt, imageUrl)
     setImageError(true)
     setImageLoaded(false)
     setShowPlaceholder(true)
   }
 
   useEffect(() => {
+    const isValid = src && src.trim() !== "" && src !== "null" && src !== "undefined"
     setImageLoaded(false)
     setImageError(false)
-    setShowPlaceholder(!hasValidSrc)
-  }, [src, hasValidSrc])
+    setShowPlaceholder(!isValid)
+  }, [src])
 
   if (!imageUrl) {
     return (
@@ -253,7 +287,15 @@ const FastCategoryImage = ({
         )}
       </AnimatePresence>
 
-      <div className="absolute inset-0">
+      <motion.div
+        initial={{ opacity: hasValidSrc ? 1 : 0, scale: 1 }}
+        animate={{
+          opacity: imageError ? 0 : 1,
+          scale: 1,
+        }}
+        transition={{ duration: 0.2, ease: "easeOut" }}
+        className="absolute inset-0"
+      >
         <img
           src={imageUrl || "/placeholder.svg"}
           alt={alt}
@@ -264,7 +306,7 @@ const FastCategoryImage = ({
           onLoad={handleImageLoad}
           onError={handleImageError}
         />
-      </div>
+      </motion.div>
     </div>
   )
 }

@@ -185,45 +185,98 @@ ProductCard.displayName = "ProductCard"
 const FlashSalesSkeleton = ({ isMobile }: { isMobile: boolean }) => (
   <section className="w-full mb-4 sm:mb-8">
     <div className="w-full">
+      {/* Header - matches real header styling */}
       <div className="bg-[#8B1538] text-white flex items-center justify-between px-2 sm:px-4 py-1.5 sm:py-2">
         <div className="flex items-center gap-1 sm:gap-2">
           <Zap className={`text-yellow-300 fill-yellow-300 ${isMobile ? "h-4 w-4" : "h-5 w-5"}`} />
           <span className={`font-bold ${isMobile ? "text-sm" : "text-base"}`}>Flash Sales</span>
         </div>
         <div className="flex items-center gap-2">
+          {/* Timer placeholders with pulse animation */}
           <div className="flex gap-1">
             {[0, 1, 2].map((i) => (
-              <div key={i} className="bg-white/20 rounded px-1.5 py-0.5 min-w-[24px] text-center">
-                <span className="text-xs font-mono">--</span>
+              <div key={i} className="bg-white/20 rounded px-1.5 py-0.5 min-w-[24px] text-center animate-pulse">
+                <span className="text-xs font-mono text-white/60">--</span>
               </div>
             ))}
           </div>
+          <div className="flex items-center gap-0.5 sm:gap-1 text-white/60 text-xs sm:text-sm">
+            <span>See All</span>
+            <ChevronRight className={isMobile ? "h-3.5 w-3.5" : "h-4 w-4"} />
+          </div>
         </div>
       </div>
+
+      {/* Product grid skeleton */}
       <div className={isMobile ? "p-1" : "p-2"}>
         <div className="flex gap-[1px] bg-gray-100 overflow-hidden">
           {[...Array(isMobile ? 4 : 6)].map((_, index) => (
-            <div key={index} className={`bg-white flex-shrink-0 ${isMobile ? "p-2 w-[calc(25%-1px)]" : "p-3 flex-1"}`}>
+            <div
+              key={index}
+              className={`bg-white flex-shrink-0 ${isMobile ? "p-2 w-[calc(25%-1px)]" : "p-3 flex-1"}`}
+              style={{ animationDelay: `${index * 100}ms` }}
+            >
+              {/* Image placeholder with shimmer */}
               <div
-                className={`w-full mb-2 bg-white relative overflow-hidden flex items-center justify-center ${isMobile ? "aspect-square" : "aspect-square"}`}
+                className={`w-full mb-2 bg-gradient-to-br from-gray-50 to-gray-100 relative overflow-hidden flex items-center justify-center ${isMobile ? "aspect-square" : "aspect-square"}`}
               >
+                {/* Shimmer effect */}
+                <div
+                  className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite]"
+                  style={{
+                    background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)",
+                    animationDelay: `${index * 150}ms`,
+                  }}
+                />
+                {/* Logo placeholder */}
                 <Image
                   src="/images/screenshot-20from-202025-02-18-2013-30-22.png"
                   alt="Loading"
-                  width={isMobile ? 48 : 64}
-                  height={isMobile ? 48 : 64}
-                  className="object-contain opacity-60"
+                  width={isMobile ? 32 : 48}
+                  height={isMobile ? 32 : 48}
+                  className="object-contain opacity-40"
                 />
               </div>
+
+              {/* Text placeholders with varying widths */}
               <div className="space-y-2">
-                <div className="h-3 bg-gray-100 rounded w-3/4 relative overflow-hidden">
-                  <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100" />
+                <div className="h-3 bg-gradient-to-r from-gray-200 to-gray-100 rounded-full w-full relative overflow-hidden">
+                  <div
+                    className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite]"
+                    style={{
+                      background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.8) 50%, transparent 100%)",
+                      animationDelay: `${index * 150 + 100}ms`,
+                    }}
+                  />
                 </div>
-                <div className="h-3 bg-gray-100 rounded w-1/2 relative overflow-hidden">
-                  <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100" />
+                <div className="h-3 bg-gradient-to-r from-gray-200 to-gray-100 rounded-full w-2/3 relative overflow-hidden">
+                  <div
+                    className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite]"
+                    style={{
+                      background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.8) 50%, transparent 100%)",
+                      animationDelay: `${index * 150 + 200}ms`,
+                    }}
+                  />
                 </div>
-                <div className="h-4 bg-gray-100 rounded w-2/3 relative overflow-hidden">
-                  <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100" />
+                {/* Price placeholder */}
+                <div className="h-4 bg-[#8B1538]/10 rounded-full w-1/2 relative overflow-hidden">
+                  <div
+                    className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite]"
+                    style={{
+                      background: "linear-gradient(90deg, transparent 0%, rgba(139,21,56,0.1) 50%, transparent 100%)",
+                      animationDelay: `${index * 150 + 300}ms`,
+                    }}
+                  />
+                </div>
+                {/* Star rating placeholder */}
+                <div className="flex gap-0.5">
+                  {[...Array(5)].map((_, i) => (
+                    <div
+                      key={i}
+                      className="h-3 w-3 bg-yellow-100 rounded-full animate-pulse"
+                      style={{ animationDelay: `${i * 50}ms` }}
+                    />
+                  ))}
                 </div>
               </div>
             </div>
@@ -234,7 +287,7 @@ const FlashSalesSkeleton = ({ isMobile }: { isMobile: boolean }) => (
     <style jsx>{`
       @keyframes shimmer {
         100% {
-          transform: translateX(100%);
+          transform: translateX(200%);
         }
       }
     `}</style>

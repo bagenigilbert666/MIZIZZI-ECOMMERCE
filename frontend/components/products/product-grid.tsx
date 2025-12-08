@@ -5,7 +5,6 @@ import Image from "next/image"
 import Link from "next/link"
 import { productService } from "@/services/product"
 import { ShoppingBag, Star, Package } from "lucide-react"
-import { Skeleton } from "@/components/ui/skeleton"
 import type { Product } from "@/types"
 
 const LogoPlaceholder = () => (
@@ -186,43 +185,69 @@ const ProductGridSkeleton = ({ count = 12 }: { count?: number }) => (
             key={i}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.02, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            transition={{ delay: i * 0.03, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
             className="bg-white p-1.5 sm:p-2 md:p-3"
           >
-            <div className="aspect-square w-full bg-[#f5f5f7] flex items-center justify-center relative overflow-hidden mb-1.5 sm:mb-2">
-              <motion.div
-                animate={{
-                  backgroundPosition: ["0% 0%", "100% 100%"],
-                  opacity: [0.5, 0.8, 0.5],
+            {/* Image placeholder with shimmer */}
+            <div className="aspect-square w-full bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center relative overflow-hidden mb-1.5 sm:mb-2 rounded-lg">
+              {/* Shimmer effect */}
+              <div
+                className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite]"
+                style={{
+                  background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)",
+                  animationDelay: `${i * 100}ms`,
                 }}
-                transition={{
-                  duration: 2,
-                  repeat: Number.POSITIVE_INFINITY,
-                  ease: "linear",
-                }}
-                className="absolute inset-0 bg-gradient-to-r from-[#f5f5f7] via-[#e0e0e3] to-[#f5f5f7] bg-[length:400%_400%]"
               />
+              {/* Centered package icon */}
               <motion.div
                 animate={{
                   scale: [1, 1.05, 1],
-                  opacity: [0.6, 1, 0.6],
+                  opacity: [0.4, 0.6, 0.4],
                 }}
                 transition={{
                   duration: 2,
                   repeat: Number.POSITIVE_INFINITY,
                   ease: "easeInOut",
+                  delay: i * 0.1,
                 }}
                 className="text-center z-10"
               >
-                <Package className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-gray-300 mx-auto" />
+                <Package className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-gray-300" />
               </motion.div>
             </div>
-            <Skeleton className="h-2.5 sm:h-3 md:h-4 w-3/4 bg-[#f5f5f7] rounded-full mb-1.5 sm:mb-2" />
-            <Skeleton className="h-2.5 sm:h-3 md:h-4 w-1/2 bg-[#f5f5f7] rounded-full mb-1.5 sm:mb-2" />
-            <div className="flex gap-0.5 sm:gap-1">
-              {[...Array(5)].map((_, j) => (
-                <Skeleton key={j} className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-3.5 md:w-3.5 bg-[#f5f5f7] rounded-full" />
-              ))}
+
+            {/* Text placeholders */}
+            <div className="space-y-1.5 sm:space-y-2">
+              <div className="h-2.5 sm:h-3 md:h-3.5 w-full bg-gray-200/80 rounded-full relative overflow-hidden">
+                <div
+                  className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite]"
+                  style={{
+                    background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.8) 50%, transparent 100%)",
+                    animationDelay: `${i * 100 + 50}ms`,
+                  }}
+                />
+              </div>
+              <div className="h-2.5 sm:h-3 md:h-3.5 w-2/3 bg-gray-200/60 rounded-full" />
+              {/* Price placeholder with brand color tint */}
+              <div className="h-3 sm:h-3.5 md:h-4 w-1/2 bg-[#8B1538]/10 rounded-full relative overflow-hidden">
+                <div
+                  className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite]"
+                  style={{
+                    background: "linear-gradient(90deg, transparent 0%, rgba(139,21,56,0.1) 50%, transparent 100%)",
+                    animationDelay: `${i * 100 + 100}ms`,
+                  }}
+                />
+              </div>
+              {/* Star rating placeholder */}
+              <div className="flex gap-0.5 sm:gap-1">
+                {[...Array(5)].map((_, j) => (
+                  <div
+                    key={j}
+                    className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-3.5 md:w-3.5 bg-yellow-100 rounded-full"
+                    style={{ animationDelay: `${j * 50}ms` }}
+                  />
+                ))}
+              </div>
             </div>
           </motion.div>
         ))}
@@ -231,7 +256,7 @@ const ProductGridSkeleton = ({ count = 12 }: { count?: number }) => (
     <style jsx>{`
       @keyframes shimmer {
         100% {
-          transform: translateX(100%);
+          transform: translateX(200%);
         }
       }
     `}</style>
