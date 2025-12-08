@@ -1,8 +1,8 @@
 "use client"
 
-import React, { useState, useEffect, useMemo } from "react"
+import React, { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Gem, Shirt, Watch, Crown, Award, Timer, TrendingUp, Users, type LucideIcon } from "lucide-react"
+import { Gem, Shirt, Watch, Crown, Award, Timer, TrendingUp, Users, Package, type LucideIcon } from "lucide-react"
 
 const iconMap: Record<string, LucideIcon> = {
   Gem,
@@ -31,53 +31,6 @@ const STORAGE_KEY = "mizizzi_product_showcase_cache"
 const STORAGE_EXPIRY_KEY = "mizizzi_product_showcase_cache_expiry"
 const CACHE_DURATION = 24 * 60 * 60 * 1000
 
-const FALLBACK_DATA: ProductCategory[] = [
-  {
-    id: 1,
-    title: "TRENDY BAGS",
-    metric: "1,200+",
-    description: "Stylish & Durable Bags",
-    icon_name: "Gem",
-    image: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&w=800&q=80",
-    gradient: "from-pink-500 to-rose-600",
-    features: ["Handbags", "Backpacks", "Totes", "Crossbody"],
-    is_active: true,
-  },
-  {
-    id: 2,
-    title: "WOMEN'S BRAIDS",
-    metric: "850+",
-    description: "Beautiful African Braids",
-    icon_name: "Crown",
-    image: "https://images.unsplash.com/photo-1522337360788-8b13dee7a37e?auto=format&fit=crop&w=800&q=80",
-    gradient: "from-yellow-500 to-amber-600",
-    features: ["Braided Wigs", "Extensions", "Natural Look", "Trendy Styles"],
-    is_active: true,
-  },
-  {
-    id: 3,
-    title: "SHIRTS & TOPS",
-    metric: "2,300+",
-    description: "Fashionable Shirts & Tops",
-    icon_name: "Shirt",
-    image: "https://images.unsplash.com/photo-1562157873-818bc0726f68?auto=format&fit=crop&w=800&q=80",
-    gradient: "from-blue-500 to-indigo-600",
-    features: ["Casual", "Formal", "Printed", "Cotton"],
-    is_active: true,
-  },
-  {
-    id: 4,
-    title: "TROUSERS & JEANS",
-    metric: "1,050+",
-    description: "Comfortable Trousers & Jeans",
-    icon_name: "Watch",
-    image: "https://images.unsplash.com/photo-1542272604-787c3835535d?auto=format&fit=crop&w=800&q=80",
-    gradient: "from-green-500 to-emerald-600",
-    features: ["Denim", "Slim Fit", "Wide Leg", "Trendy"],
-    is_active: true,
-  },
-]
-
 const getCachedData = (): ProductCategory[] | null => {
   if (typeof window === "undefined") return null
   try {
@@ -102,14 +55,82 @@ const setCachedData = (items: ProductCategory[]) => {
   } catch {}
 }
 
+const ProductShowcaseSkeleton = () => (
+  <section
+    className="h-full w-full max-w-md md:max-w-lg mx-auto rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br from-gray-100 to-gray-200 border border-gray-200 relative"
+    aria-label="Loading product showcase"
+  >
+    {/* Animated shimmer overlay */}
+    <div className="absolute inset-0 overflow-hidden">
+      <motion.div
+        className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent"
+        animate={{ translateX: ["100%", "-100%"] }}
+        transition={{ duration: 1.5, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
+      />
+    </div>
+
+    <div className="relative z-10 h-full p-5 md:p-7 flex flex-col justify-between">
+      {/* Header skeleton */}
+      <div className="flex items-center gap-3 mb-4">
+        <div className="p-3 rounded-xl bg-gradient-to-br from-primary/20 to-primary/30 animate-pulse">
+          <Package className="h-6 w-6 text-primary/50" />
+        </div>
+        <div className="h-4 w-32 bg-gray-300 rounded animate-pulse" />
+      </div>
+
+      {/* Metric skeleton */}
+      <div className="mb-3">
+        <div className="h-8 w-24 bg-gray-300 rounded mb-2 animate-pulse" />
+        <div className="h-3 w-40 bg-gray-300/70 rounded animate-pulse" />
+      </div>
+
+      {/* Features skeleton */}
+      <div className="space-y-2 mt-2">
+        {[0, 1, 2, 3].map((i) => (
+          <motion.div
+            key={i}
+            className="flex items-center gap-3"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: i * 0.1 }}
+          >
+            <div className="w-2 h-2 rounded-full bg-primary/30 animate-pulse" />
+            <div className="h-3 bg-gray-300/70 rounded animate-pulse" style={{ width: `${60 + i * 10}%` }} />
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Brand text */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
+        <p className="text-xs text-gray-400 font-medium">Loading products...</p>
+      </div>
+    </div>
+
+    {/* Dots skeleton */}
+    <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 flex gap-1.5 z-20">
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} className={`h-0.5 rounded-full bg-gray-400/30 ${i === 0 ? "w-8" : "w-2"}`} />
+      ))}
+    </div>
+  </section>
+)
+
 export const ProductShowcase = React.memo(() => {
-  const [categories, setCategories] = useState<ProductCategory[]>(() => {
-    if (typeof window === "undefined") return FALLBACK_DATA
-    return getCachedData() || FALLBACK_DATA
+  const [categories, setCategories] = useState<ProductCategory[] | null>(() => {
+    if (typeof window === "undefined") return null
+    return getCachedData()
   })
   const [currentCategory, setCurrentCategory] = useState(0)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    // Check cache on mount (for SSR hydration)
+    const cached = getCachedData()
+    if (cached) {
+      setCategories(cached)
+      setIsLoading(false)
+    }
+
     const fetchCategories = async () => {
       try {
         const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
@@ -134,7 +155,9 @@ export const ProductShowcase = React.memo(() => {
           }
         }
       } catch {
-        // Silent fail - already showing cached/fallback data
+        // Silent fail
+      } finally {
+        setIsLoading(false)
       }
     }
 
@@ -142,18 +165,23 @@ export const ProductShowcase = React.memo(() => {
   }, [])
 
   useEffect(() => {
+    if (!categories || categories.length === 0) return
     const interval = setInterval(() => {
       setCurrentCategory((prev) => (prev + 1) % categories.length)
     }, 10000)
     return () => clearInterval(interval)
-  }, [categories.length])
+  }, [categories])
+
+  if (isLoading || !categories || categories.length === 0) {
+    return <ProductShowcaseSkeleton />
+  }
 
   const category = categories[currentCategory]
   const IconComponent = iconMap[category?.icon_name] || iconMap.Gem
 
-  const displayFeatures = useMemo(() => category?.features?.slice(0, 4) || [], [category?.features])
+  const displayFeatures = category?.features?.slice(0, 4) || []
 
-  if (!category) return null
+  if (!category) return <ProductShowcaseSkeleton />
 
   return (
     <section

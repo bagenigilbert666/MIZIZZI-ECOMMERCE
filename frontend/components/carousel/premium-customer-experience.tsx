@@ -1,8 +1,8 @@
 "use client"
 
-import React, { useState, useEffect, useMemo } from "react"
+import React, { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Gem, Shirt, Watch, Crown, Award, Timer, TrendingUp, Users, type LucideIcon } from "lucide-react"
+import { Gem, Shirt, Watch, Crown, Award, Timer, TrendingUp, Users, Sparkles, type LucideIcon } from "lucide-react"
 
 const iconMap: Record<string, LucideIcon> = {
   Gem,
@@ -31,53 +31,6 @@ const STORAGE_KEY = "mizizzi_premium_experience_cache"
 const STORAGE_EXPIRY_KEY = "mizizzi_premium_experience_cache_expiry"
 const CACHE_DURATION = 24 * 60 * 60 * 1000
 
-const FALLBACK_DATA: PremiumExperience[] = [
-  {
-    id: 1,
-    title: "MIZIZZI EXCELLENCE",
-    metric: "98.7%",
-    description: "Customer Satisfaction Rate",
-    icon_name: "Award",
-    image: "https://images.unsplash.com/photo-1607083206869-4c7672e72a8a?auto=format&fit=crop&w=800&q=80",
-    gradient: "from-amber-500 to-yellow-600",
-    features: ["Premium Service", "Quality Guarantee", "Expert Curation", "Authentic Products"],
-    is_active: true,
-  },
-  {
-    id: 2,
-    title: "KENYA DELIVERY",
-    metric: "24H",
-    description: "Average Delivery Time",
-    icon_name: "Timer",
-    image: "https://images.unsplash.com/photo-1586528116311-ad8dd3c8310d?auto=format&fit=crop&w=800&q=80",
-    gradient: "from-emerald-500 to-green-600",
-    features: ["Nairobi Same Day", "Nationwide Express", "Secure Packaging", "Live Tracking"],
-    is_active: true,
-  },
-  {
-    id: 3,
-    title: "CUSTOMER SAVINGS",
-    metric: "KSh 156K",
-    description: "Total Savings This Month",
-    icon_name: "TrendingUp",
-    image: "https://images.unsplash.com/photo-1556742049-0cfed4f6a45d?auto=format&fit=crop&w=800&q=80",
-    gradient: "from-rose-500 to-red-600",
-    features: ["Best Prices", "Flash Deals", "Bulk Discounts", "Loyalty Rewards"],
-    is_active: true,
-  },
-  {
-    id: 4,
-    title: "MIZIZZI FAMILY",
-    metric: "12.8K",
-    description: "Happy Customers & Growing",
-    icon_name: "Users",
-    image: "https://images.unsplash.com/photo-1529156069898-49953e39b3ac?auto=format&fit=crop&w=800&q=80",
-    gradient: "from-purple-500 to-indigo-600",
-    features: ["Community Driven", "Cultural Pride", "Local Support", "African Heritage"],
-    is_active: true,
-  },
-]
-
 const getCachedData = (): PremiumExperience[] | null => {
   if (typeof window === "undefined") return null
   try {
@@ -102,14 +55,82 @@ const setCachedData = (items: PremiumExperience[]) => {
   } catch {}
 }
 
+const PremiumExperienceSkeleton = () => (
+  <section
+    className="h-full w-full max-w-md md:max-w-lg mx-auto rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br from-amber-50 to-orange-100 border border-amber-200 relative"
+    aria-label="Loading premium experience"
+  >
+    {/* Animated shimmer overlay */}
+    <div className="absolute inset-0 overflow-hidden">
+      <motion.div
+        className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/50 to-transparent"
+        animate={{ translateX: ["100%", "-100%"] }}
+        transition={{ duration: 1.5, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
+      />
+    </div>
+
+    <div className="relative z-10 h-full p-5 md:p-7 flex flex-col justify-between">
+      {/* Header skeleton */}
+      <div className="flex items-center gap-3 mb-4">
+        <div className="p-3 rounded-xl bg-gradient-to-br from-amber-300/40 to-orange-400/40 animate-pulse">
+          <Sparkles className="h-6 w-6 text-amber-600/50" />
+        </div>
+        <div className="h-4 w-36 bg-amber-300/50 rounded animate-pulse" />
+      </div>
+
+      {/* Metric skeleton */}
+      <div className="mb-3">
+        <div className="h-8 w-20 bg-amber-300/50 rounded mb-2 animate-pulse" />
+        <div className="h-3 w-44 bg-amber-200/50 rounded animate-pulse" />
+      </div>
+
+      {/* Features skeleton */}
+      <div className="space-y-2 mt-2">
+        {[0, 1, 2, 3].map((i) => (
+          <motion.div
+            key={i}
+            className="flex items-center gap-3"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: i * 0.1 }}
+          >
+            <div className="w-2 h-2 rounded-full bg-amber-400/50 animate-pulse" />
+            <div className="h-3 bg-amber-200/50 rounded animate-pulse" style={{ width: `${55 + i * 12}%` }} />
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Brand text */}
+      <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
+        <p className="text-xs text-amber-600/60 font-medium">Loading experience...</p>
+      </div>
+    </div>
+
+    {/* Dots skeleton */}
+    <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 flex gap-1.5 z-20">
+      {[0, 1, 2, 3].map((i) => (
+        <div key={i} className={`h-0.5 rounded-full bg-amber-400/40 ${i === 0 ? "w-8" : "w-2"}`} />
+      ))}
+    </div>
+  </section>
+)
+
 export const PremiumCustomerExperience = React.memo(() => {
-  const [experiences, setExperiences] = useState<PremiumExperience[]>(() => {
-    if (typeof window === "undefined") return FALLBACK_DATA
-    return getCachedData() || FALLBACK_DATA
+  const [experiences, setExperiences] = useState<PremiumExperience[] | null>(() => {
+    if (typeof window === "undefined") return null
+    return getCachedData()
   })
   const [currentExperience, setCurrentExperience] = useState(0)
+  const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    // Check cache on mount (for SSR hydration)
+    const cached = getCachedData()
+    if (cached) {
+      setExperiences(cached)
+      setIsLoading(false)
+    }
+
     const fetchExperiences = async () => {
       try {
         const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
@@ -134,7 +155,9 @@ export const PremiumCustomerExperience = React.memo(() => {
           }
         }
       } catch {
-        // Silent fail - already showing cached/fallback data
+        // Silent fail
+      } finally {
+        setIsLoading(false)
       }
     }
 
@@ -142,18 +165,23 @@ export const PremiumCustomerExperience = React.memo(() => {
   }, [])
 
   useEffect(() => {
+    if (!experiences || experiences.length === 0) return
     const interval = setInterval(() => {
       setCurrentExperience((prev) => (prev + 1) % experiences.length)
     }, 10000)
     return () => clearInterval(interval)
-  }, [experiences.length])
+  }, [experiences])
+
+  if (isLoading || !experiences || experiences.length === 0) {
+    return <PremiumExperienceSkeleton />
+  }
 
   const experience = experiences[currentExperience]
   const IconComponent = iconMap[experience?.icon_name] || iconMap.Award
 
-  const displayFeatures = useMemo(() => experience?.features?.slice(0, 4) || [], [experience?.features])
+  const displayFeatures = experience?.features?.slice(0, 4) || []
 
-  if (!experience) return null
+  if (!experience) return <PremiumExperienceSkeleton />
 
   return (
     <section

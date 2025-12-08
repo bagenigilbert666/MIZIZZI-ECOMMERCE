@@ -1,11 +1,13 @@
 """
 User-facing products routes for Mizizzi E-commerce platform.
 Handles public product viewing, searching, and browsing functionality.
+OPTIMIZED with Redis caching and lightweight JSON responses.
 """
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
-from sqlalchemy import or_, func
+from sqlalchemy import or_, func, text
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import load_only, joinedload
 from datetime import datetime
 import re
 
@@ -14,13 +16,58 @@ from app.models.models import (
     Product, ProductVariant, ProductImage, Category, Brand,
     User, UserRole
 )
+from app.utils.redis_cache import product_cache, cached_response, invalidate_on_change
 
 # Create blueprint for user-facing product routes
 products_routes = Blueprint('products_routes', __name__, url_prefix='/api/products')
 
 # ----------------------
-# Helper Functions
+# Lightweight Serializers (Optimized for speed)
 # ----------------------
+
+def serialize_product_lightweight(product):
+    """
+    FAST: Lightweight serialization for list views.
+    Returns only essential fields for maximum speed.
+    """
+    try:
+        # Get first image URL efficiently
+        image_url = None
+        if product.thumbnail_url:
+            image_url = product.thumbnail_url
+        elif hasattr(product, 'image_urls') and product.image_urls:
+            if isinstance(product.image_urls, list) and len(product.image_urls) > 0:
+                image_url = product.image_urls[0]
+            elif isinstance(product.image_urls, str):
+                image_url = product.image_urls.split(',')[0]
+        
+        return {
+            'id': product.id,
+            'name': product.name,
+            'slug': product.slug,
+            'price': float(product.price) if product.price else 0,
+            'sale_price': float(product.sale_price) if product.sale_price else None,
+            'discount_percentage': product.discount_percentage,
+            'image_url': image_url,
+            'thumbnail_url': image_url,
+            'stock': product.stock,
+            'is_featured': product.is_featured,
+            'is_new': product.is_new,
+            'is_sale': product.is_sale,
+            'is_flash_sale': product.is_flash_sale,
+            'is_luxury_deal': product.is_luxury_deal,
+            'is_trending': product.is_trending,
+            'is_top_pick': product.is_top_pick,
+            'is_daily_find': product.is_daily_find,
+            'is_new_arrival': product.is_new_arrival,
+            'rating': 4.5,  # Default rating, fetch from reviews if needed
+            'category_id': product.category_id,
+            'brand_id': product.brand_id,
+        }
+    except Exception as e:
+        current_app.logger.error(f"Error in lightweight serialize: {e}")
+        return None
+
 
 def serialize_product(product, include_variants=False, include_images=False):
     """
@@ -60,8 +107,8 @@ def serialize_product(product, include_variants=False, include_images=False):
             'stock': product.stock,
             'category_id': product.category_id,
             'brand_id': product.brand_id,
-            'image_urls': image_urls,  # Use the synced image URLs
-            'thumbnail_url': image_urls[0] if image_urls else product.thumbnail_url,  # Use first image as thumbnail
+            'image_urls': image_urls,
+            'thumbnail_url': image_urls[0] if image_urls else product.thumbnail_url,
             'is_featured': product.is_featured,
             'is_new': product.is_new,
             'is_sale': product.is_sale,
@@ -202,36 +249,57 @@ def health_check():
     return jsonify({
         'status': 'ok',
         'service': 'products_routes',
+        'cache_connected': product_cache.is_connected,
         'timestamp': datetime.utcnow().isoformat()
     }), 200
 
+
 # ----------------------
-# Public Products List
+# Cache Management Endpoints
+# ----------------------
+
+@products_routes.route('/cache/status', methods=['GET'])
+def cache_status():
+    """Get cache status and info."""
+    return jsonify({
+        'connected': product_cache.is_connected,
+        'type': 'redis' if product_cache.is_connected else 'memory',
+        'stats': product_cache.stats,
+        'timestamp': datetime.utcnow().isoformat()
+    }), 200
+
+
+@products_routes.route('/cache/invalidate', methods=['POST'])
+def invalidate_cache():
+    """Invalidate all product caches (admin only)."""
+    if not is_admin_user():
+        return jsonify({'error': 'Admin access required'}), 403
+    
+    products_cleared = product_cache.invalidate_products()
+    featured_cleared = product_cache.invalidate_featured()
+    
+    return jsonify({
+        'success': True,
+        'products_cleared': products_cleared,
+        'featured_cleared': featured_cleared
+    }), 200
+
+
+# ----------------------
+# Public Products List (OPTIMIZED with Redis)
 # ----------------------
 
 @products_routes.route('/', methods=['GET'])
 @limiter.limit("600 per minute")
+@cached_response("products", ttl=30, key_params=[
+    "page", "per_page", "category_id", "brand_id", "min_price", "max_price",
+    "is_featured", "is_new", "is_sale", "is_flash_sale", "is_luxury_deal",
+    "is_new_arrival", "search", "sort_by", "sort_order"
+])
 def get_products():
     """
     Get products with filtering, sorting, and pagination.
-    
-    Query Parameters:
-        - page: Page number (default: 1)
-        - per_page: Items per page (default: 20)
-        - category_id: Filter by category ID
-        - brand_id: Filter by brand ID
-        - min_price: Minimum price filter
-        - max_price: Maximum price filter
-        - is_featured: Filter featured products (true/false)
-        - is_new: Filter new products (true/false)
-        - is_sale: Filter sale products (true/false)
-        - is_flash_sale: Filter flash sale products (true/false)
-        - is_luxury_deal: Filter luxury deal products (true/false)
-        - is_new_arrival: Filter new arrival products (true/false)
-        - search: Search in product name and description
-        - sort_by: Sort field (name, price, created_at, updated_at)
-        - sort_order: Sort order (asc, desc)
-        - include_inactive: Include inactive products (admin only)
+    OPTIMIZED: Uses Redis caching and lightweight serialization.
     """
     try:
         # Get query parameters
@@ -241,19 +309,42 @@ def get_products():
         brand_id = request.args.get('brand_id', type=int)
         min_price = request.args.get('min_price', type=float)
         max_price = request.args.get('max_price', type=float)
-        is_featured = request.args.get('is_featured', type=bool)
-        is_new = request.args.get('is_new', type=bool)
-        is_sale = request.args.get('is_sale', type=bool)
-        is_flash_sale = request.args.get('is_flash_sale', type=bool)
-        is_luxury_deal = request.args.get('is_luxury_deal', type=bool)
-        is_new_arrival = request.args.get('is_new_arrival', type=bool)
+        is_featured = request.args.get('is_featured', type=str)
+        is_new = request.args.get('is_new', type=str)
+        is_sale = request.args.get('is_sale', type=str)
+        is_flash_sale = request.args.get('is_flash_sale', type=str)
+        is_luxury_deal = request.args.get('is_luxury_deal', type=str)
+        is_new_arrival = request.args.get('is_new_arrival', type=str)
         search = request.args.get('search', '').strip()
         sort_by = request.args.get('sort_by', 'created_at')
         sort_order = request.args.get('sort_order', 'desc')
         include_inactive = request.args.get('include_inactive', False, type=bool)
         
-        # Build query
-        query = Product.query
+        # Convert string booleans
+        def str_to_bool(val):
+            if val is None:
+                return None
+            return val.lower() in ('true', '1', 'yes')
+        
+        is_featured = str_to_bool(is_featured)
+        is_new = str_to_bool(is_new)
+        is_sale = str_to_bool(is_sale)
+        is_flash_sale = str_to_bool(is_flash_sale)
+        is_luxury_deal = str_to_bool(is_luxury_deal)
+        is_new_arrival = str_to_bool(is_new_arrival)
+        
+        query = Product.query.options(
+            load_only(
+                Product.id, Product.name, Product.slug, Product.price,
+                Product.sale_price, Product.stock, Product.thumbnail_url,
+                Product.image_urls, Product.discount_percentage,
+                Product.is_featured, Product.is_new, Product.is_sale,
+                Product.is_flash_sale, Product.is_luxury_deal, Product.is_trending,
+                Product.is_top_pick, Product.is_daily_find, Product.is_new_arrival,
+                Product.is_active, Product.is_visible, Product.category_id,
+                Product.brand_id, Product.created_at, Product.sort_order
+            )
+        )
         
         # Filter by active status (unless admin requests inactive products)
         if not (include_inactive and is_admin_user()):
@@ -263,7 +354,7 @@ def get_products():
         if not is_admin_user():
             query = query.filter(Product.is_visible == True)
         
-        # Apply filters
+        # Apply filters using indexed columns
         if category_id:
             query = query.filter(Product.category_id == category_id)
         
@@ -305,8 +396,8 @@ def get_products():
                 )
             )
         
-        # Sorting
-        valid_sort_fields = ['name', 'price', 'created_at', 'updated_at', 'stock']
+        # Sorting (using indexed columns for speed)
+        valid_sort_fields = ['name', 'price', 'created_at', 'updated_at', 'stock', 'sort_order']
         if sort_by in valid_sort_fields:
             sort_column = getattr(Product, sort_by)
             if sort_order.lower() == 'desc':
@@ -326,14 +417,10 @@ def get_products():
         except SQLAlchemyError as e:
             current_app.logger.error(f"Database error during pagination: {str(e)}")
             return jsonify({'error': 'Database error occurred'}), 500
-        except Exception as e:
-            current_app.logger.error(f"Unexpected error during pagination: {str(e)}")
-            return jsonify({'error': 'Database error occurred'}), 500
         
-        # Serialize products
         products = []
         for product in pagination.items:
-            serialized = serialize_product(product)
+            serialized = serialize_product_lightweight(product)
             if serialized:
                 products.append(serialized)
         
@@ -356,14 +443,106 @@ def get_products():
         current_app.logger.error(f"Error getting products: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
+
 # ----------------------
-# Get Product by ID
+# Flash Sale Products (OPTIMIZED)
+# ----------------------
+
+@products_routes.route('/flash-sale', methods=['GET'])
+@limiter.limit("600 per minute")
+@cached_response("flash_sale", ttl=30, key_params=["limit", "page"])
+def get_flash_sale_products():
+    """
+    Get flash sale products.
+    OPTIMIZED: Redis cached, lightweight response.
+    """
+    try:
+        limit = min(request.args.get('limit', 20, type=int), 50)
+        
+        # Optimized query with indexed column is_flash_sale
+        products = Product.query.options(
+            load_only(
+                Product.id, Product.name, Product.slug, Product.price,
+                Product.sale_price, Product.thumbnail_url, Product.image_urls,
+                Product.discount_percentage, Product.stock,
+                Product.is_flash_sale, Product.is_sale
+            )
+        ).filter(
+            Product.is_active == True,
+            Product.is_visible == True,
+            Product.is_flash_sale == True
+        ).order_by(
+            Product.discount_percentage.desc()
+        ).limit(limit).all()
+        
+        return jsonify({
+            'items': [serialize_product_lightweight(p) for p in products if p],
+            'total': len(products),
+            'cached_at': datetime.utcnow().isoformat()
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting flash sale products: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+# ----------------------
+# Luxury Deals Products (OPTIMIZED)
+# ----------------------
+
+@products_routes.route('/luxury-deals', methods=['GET'])
+@limiter.limit("600 per minute")
+@cached_response("luxury_deals", ttl=30, key_params=["limit", "page"])
+def get_luxury_deals_products():
+    """
+    Get luxury deals products.
+    OPTIMIZED: Redis cached, lightweight response.
+    """
+    try:
+        limit = min(request.args.get('limit', 20, type=int), 50)
+        
+        # Optimized query with indexed column is_luxury_deal
+        products = Product.query.options(
+            load_only(
+                Product.id, Product.name, Product.slug, Product.price,
+                Product.sale_price, Product.thumbnail_url, Product.image_urls,
+                Product.discount_percentage, Product.stock,
+                Product.is_luxury_deal, Product.created_at
+            )
+        ).filter(
+            Product.is_active == True,
+            Product.is_visible == True,
+            Product.is_luxury_deal == True
+        ).order_by(
+            Product.created_at.desc()
+        ).limit(limit).all()
+        
+        return jsonify({
+            'items': [serialize_product_lightweight(p) for p in products if p],
+            'total': len(products),
+            'cached_at': datetime.utcnow().isoformat()
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting luxury deals products: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+# ----------------------
+# Get Product by ID (with caching for single product)
 # ----------------------
 
 @products_routes.route('/<int:product_id>', methods=['GET'])
 def get_product_by_id(product_id):
     """Get a product by ID."""
     try:
+        # Check cache first
+        cache_key = f"mizizzi:product:{product_id}"
+        cached = product_cache.get(cache_key)
+        if cached:
+            current_app.logger.info(f"[CACHE HIT] product:{product_id}")
+            return jsonify(cached), 200
+        
         product = db.session.get(Product, product_id)
         
         if not product:
@@ -374,20 +553,33 @@ def get_product_by_id(product_id):
             if not product.is_active or not product.is_visible:
                 return jsonify({'error': 'Product not found'}), 404
         
-        return jsonify(serialize_product(product, include_variants=True, include_images=True)), 200
+        serialized = serialize_product(product, include_variants=True, include_images=True)
+        
+        # Cache for 60 seconds (single products can be cached longer)
+        product_cache.set(cache_key, serialized, ttl=60)
+        
+        return jsonify(serialized), 200
         
     except Exception as e:
         current_app.logger.error(f"Error getting product {product_id}: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
+
 # ----------------------
 # Get Product by Slug
 # ----------------------
 
-@products_routes.route('/<string:slug>', methods=['GET'])
+@products_routes.route('/slug/<string:slug>', methods=['GET'])
 def get_product_by_slug(slug):
     """Get a product by slug."""
     try:
+        # Check cache first
+        cache_key = f"mizizzi:product:slug:{slug}"
+        cached = product_cache.get(cache_key)
+        if cached:
+            current_app.logger.info(f"[CACHE HIT] product:slug:{slug}")
+            return jsonify(cached), 200
+        
         product = Product.query.filter_by(slug=slug).first()
         
         if not product:
@@ -398,11 +590,17 @@ def get_product_by_slug(slug):
             if not product.is_active or not product.is_visible:
                 return jsonify({'error': 'Product not found'}), 404
         
-        return jsonify(serialize_product(product, include_variants=True, include_images=True)), 200
+        serialized = serialize_product(product, include_variants=True, include_images=True)
+        
+        # Cache for 60 seconds
+        product_cache.set(cache_key, serialized, ttl=60)
+        
+        return jsonify(serialized), 200
         
     except Exception as e:
         current_app.logger.error(f"Error getting product by slug {slug}: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
+
 
 # ----------------------
 # Product Variants (Read-only for users)
@@ -429,6 +627,7 @@ def get_product_variants(product_id):
     except Exception as e:
         current_app.logger.error(f"Error getting variants for product {product_id}: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
+
 
 # ----------------------
 # Product Images (Read-only for users)
@@ -461,6 +660,7 @@ def get_product_images(product_id):
         current_app.logger.error(f"Error getting images for product {product_id}: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
+
 @products_routes.route('/product-images/<int:image_id>', methods=['GET'])
 def get_product_image(image_id):
     """Get a specific product image."""
@@ -482,13 +682,15 @@ def get_product_image(image_id):
         current_app.logger.error(f"Error getting image {image_id}: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
+
 # ----------------------
-# Search and Filter Endpoints
+# Search and Filter Endpoints (OPTIMIZED)
 # ----------------------
 
 @products_routes.route('/search', methods=['GET'])
+@cached_response("search", ttl=30, key_params=["q", "page", "per_page"])
 def search_products():
-    """Advanced product search endpoint."""
+    """Advanced product search endpoint with caching."""
     try:
         # Get search parameters
         query_text = request.args.get('q', '').strip()
@@ -498,9 +700,15 @@ def search_products():
         if not query_text:
             return jsonify({'error': 'Search query is required'}), 400
         
-        # Build search query
+        # Build search query with optimized columns
         search_term = f"%{query_text}%"
-        query = Product.query.filter(
+        query = Product.query.options(
+            load_only(
+                Product.id, Product.name, Product.slug, Product.price,
+                Product.sale_price, Product.thumbnail_url, Product.image_urls,
+                Product.discount_percentage, Product.stock, Product.sku
+            )
+        ).filter(
             Product.is_active == True,
             Product.is_visible == True,
             Product.is_searchable == True,
@@ -520,11 +728,7 @@ def search_products():
         )
         
         # Serialize products
-        products = []
-        for product in pagination.items:
-            serialized = serialize_product(product)
-            if serialized:
-                products.append(serialized)
+        products = [serialize_product_lightweight(p) for p in pagination.items if p]
         
         return jsonify({
             'query': query_text,
@@ -543,14 +747,22 @@ def search_products():
         current_app.logger.error(f"Error searching products: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
+
 @products_routes.route('/featured', methods=['GET'])
+@cached_response("featured", ttl=30, key_params=["page", "per_page"])
 def get_featured_products():
-    """Get featured products."""
+    """Get featured products with caching."""
     try:
         page = request.args.get('page', 1, type=int)
         per_page = min(request.args.get('per_page', 12, type=int), 50)
         
-        query = Product.query.filter(
+        query = Product.query.options(
+            load_only(
+                Product.id, Product.name, Product.slug, Product.price,
+                Product.sale_price, Product.thumbnail_url, Product.image_urls,
+                Product.discount_percentage, Product.stock, Product.sort_order
+            )
+        ).filter(
             Product.is_active == True,
             Product.is_visible == True,
             Product.is_featured == True
@@ -562,11 +774,7 @@ def get_featured_products():
             error_out=False
         )
         
-        products = []
-        for product in pagination.items:
-            serialized = serialize_product(product)
-            if serialized:
-                products.append(serialized)
+        products = [serialize_product_lightweight(p) for p in pagination.items if p]
         
         return jsonify({
             'items': products,
@@ -584,14 +792,22 @@ def get_featured_products():
         current_app.logger.error(f"Error getting featured products: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
+
 @products_routes.route('/new', methods=['GET'])
+@cached_response("new_products", ttl=30, key_params=["page", "per_page"])
 def get_new_products():
-    """Get new products."""
+    """Get new products with caching."""
     try:
         page = request.args.get('page', 1, type=int)
         per_page = min(request.args.get('per_page', 12, type=int), 50)
         
-        query = Product.query.filter(
+        query = Product.query.options(
+            load_only(
+                Product.id, Product.name, Product.slug, Product.price,
+                Product.sale_price, Product.thumbnail_url, Product.image_urls,
+                Product.discount_percentage, Product.stock
+            )
+        ).filter(
             Product.is_active == True,
             Product.is_visible == True,
             Product.is_new == True
@@ -603,11 +819,7 @@ def get_new_products():
             error_out=False
         )
         
-        products = []
-        for product in pagination.items:
-            serialized = serialize_product(product)
-            if serialized:
-                products.append(serialized)
+        products = [serialize_product_lightweight(p) for p in pagination.items if p]
         
         return jsonify({
             'items': products,
@@ -625,14 +837,22 @@ def get_new_products():
         current_app.logger.error(f"Error getting new products: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
+
 @products_routes.route('/sale', methods=['GET'])
+@cached_response("sale_products", ttl=30, key_params=["page", "per_page"])
 def get_sale_products():
-    """Get products on sale."""
+    """Get products on sale with caching."""
     try:
         page = request.args.get('page', 1, type=int)
         per_page = min(request.args.get('per_page', 12, type=int), 50)
         
-        query = Product.query.filter(
+        query = Product.query.options(
+            load_only(
+                Product.id, Product.name, Product.slug, Product.price,
+                Product.sale_price, Product.thumbnail_url, Product.image_urls,
+                Product.discount_percentage, Product.stock
+            )
+        ).filter(
             Product.is_active == True,
             Product.is_visible == True,
             Product.is_sale == True
@@ -644,11 +864,7 @@ def get_sale_products():
             error_out=False
         )
         
-        products = []
-        for product in pagination.items:
-            serialized = serialize_product(product)
-            if serialized:
-                products.append(serialized)
+        products = [serialize_product_lightweight(p) for p in pagination.items if p]
         
         return jsonify({
             'items': products,
@@ -666,26 +882,196 @@ def get_sale_products():
         current_app.logger.error(f"Error getting sale products: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
+
+# ----------------------
+# Trending Products (OPTIMIZED)
+# ----------------------
+
+@products_routes.route('/trending', methods=['GET'])
+@cached_response("trending", ttl=30, key_params=["limit"])
+def get_trending_products():
+    """Get trending products with caching."""
+    try:
+        limit = min(request.args.get('limit', 12, type=int), 50)
+        
+        products = Product.query.options(
+            load_only(
+                Product.id, Product.name, Product.slug, Product.price,
+                Product.sale_price, Product.thumbnail_url, Product.image_urls,
+                Product.discount_percentage, Product.stock, Product.is_trending
+            )
+        ).filter(
+            Product.is_active == True,
+            Product.is_visible == True,
+            Product.is_trending == True
+        ).limit(limit).all()
+        
+        # Fallback to random products if no trending
+        if not products:
+            products = Product.query.options(
+                load_only(
+                    Product.id, Product.name, Product.slug, Product.price,
+                    Product.sale_price, Product.thumbnail_url, Product.image_urls,
+                    Product.discount_percentage, Product.stock
+                )
+            ).filter(
+                Product.is_active == True,
+                Product.is_visible == True
+            ).order_by(func.random()).limit(limit).all()
+        
+        return jsonify({
+            'items': [serialize_product_lightweight(p) for p in products if p],
+            'total': len(products)
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting trending products: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+# ----------------------
+# Top Picks Products (OPTIMIZED)
+# ----------------------
+
+@products_routes.route('/top-picks', methods=['GET'])
+@cached_response("top_picks", ttl=30, key_params=["limit"])
+def get_top_picks_products():
+    """Get top pick products with caching."""
+    try:
+        limit = min(request.args.get('limit', 12, type=int), 50)
+        
+        products = Product.query.options(
+            load_only(
+                Product.id, Product.name, Product.slug, Product.price,
+                Product.sale_price, Product.thumbnail_url, Product.image_urls,
+                Product.discount_percentage, Product.stock, Product.is_top_pick
+            )
+        ).filter(
+            Product.is_active == True,
+            Product.is_visible == True,
+            Product.is_top_pick == True
+        ).limit(limit).all()
+        
+        # Fallback to highest priced if no top picks
+        if not products:
+            products = Product.query.options(
+                load_only(
+                    Product.id, Product.name, Product.slug, Product.price,
+                    Product.sale_price, Product.thumbnail_url, Product.image_urls,
+                    Product.discount_percentage, Product.stock
+                )
+            ).filter(
+                Product.is_active == True,
+                Product.is_visible == True
+            ).order_by(Product.price.desc()).limit(limit).all()
+        
+        return jsonify({
+            'items': [serialize_product_lightweight(p) for p in products if p],
+            'total': len(products)
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting top picks: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+# ----------------------
+# Daily Finds Products (OPTIMIZED)
+# ----------------------
+
+@products_routes.route('/daily-finds', methods=['GET'])
+@cached_response("daily_finds", ttl=30, key_params=["limit"])
+def get_daily_finds_products():
+    """Get daily find products with caching."""
+    try:
+        limit = min(request.args.get('limit', 12, type=int), 50)
+        
+        products = Product.query.options(
+            load_only(
+                Product.id, Product.name, Product.slug, Product.price,
+                Product.sale_price, Product.thumbnail_url, Product.image_urls,
+                Product.discount_percentage, Product.stock, Product.is_daily_find
+            )
+        ).filter(
+            Product.is_active == True,
+            Product.is_visible == True,
+            Product.is_daily_find == True
+        ).limit(limit).all()
+        
+        # Fallback to flash sales if no daily finds
+        if not products:
+            products = Product.query.options(
+                load_only(
+                    Product.id, Product.name, Product.slug, Product.price,
+                    Product.sale_price, Product.thumbnail_url, Product.image_urls,
+                    Product.discount_percentage, Product.stock, Product.is_flash_sale
+                )
+            ).filter(
+                Product.is_active == True,
+                Product.is_visible == True,
+                Product.is_flash_sale == True
+            ).limit(limit).all()
+        
+        return jsonify({
+            'items': [serialize_product_lightweight(p) for p in products if p],
+            'total': len(products)
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting daily finds: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+# ----------------------
+# New Arrivals Products (OPTIMIZED)
+# ----------------------
+
+@products_routes.route('/new-arrivals', methods=['GET'])
+@cached_response("new_arrivals", ttl=30, key_params=["limit"])
+def get_new_arrivals_products():
+    """Get new arrival products with caching."""
+    try:
+        limit = min(request.args.get('limit', 12, type=int), 50)
+        
+        products = Product.query.options(
+            load_only(
+                Product.id, Product.name, Product.slug, Product.price,
+                Product.sale_price, Product.thumbnail_url, Product.image_urls,
+                Product.discount_percentage, Product.stock, Product.is_new_arrival
+            )
+        ).filter(
+            Product.is_active == True,
+            Product.is_visible == True,
+            Product.is_new_arrival == True
+        ).order_by(Product.created_at.desc()).limit(limit).all()
+        
+        return jsonify({
+            'items': [serialize_product_lightweight(p) for p in products if p],
+            'total': len(products)
+        }), 200
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting new arrivals: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
 # ----------------------
 # Recent Searches
 # ----------------------
 
 @products_routes.route('/recent-searches', methods=['GET'])
+@cached_response("recent_searches", ttl=60, key_params=["limit"])
 def get_recent_searches():
-    """
-    Get recent search terms with actual products.
-    
-    Returns recently searched products based on search frequency and recency.
-    This replaces the frontend's localStorage-only approach with real backend data.
-    """
+    """Get recent search terms with actual products."""
     try:
         limit = min(request.args.get('limit', 8, type=int), 20)
         
-        # For now, we'll return trending/popular products as "recent searches"
-        # In a real implementation, you'd track user search history in the database
-        
-        # Get trending products (most recently created or featured)
-        trending_products = Product.query.filter(
+        # Get trending products as suggestions
+        trending_products = Product.query.options(
+            load_only(
+                Product.id, Product.name, Product.thumbnail_url, Product.price, Product.slug
+            )
+        ).filter(
             Product.is_active == True,
             Product.is_visible == True,
             Product.is_searchable == True
@@ -699,7 +1085,7 @@ def get_recent_searches():
             Product.created_at.desc()
         ).limit(limit).all()
         
-        # Get popular categories for search suggestions
+        # Get popular categories
         popular_categories = db.session.query(
             Category.name
         ).join(Product).filter(
@@ -709,22 +1095,24 @@ def get_recent_searches():
             func.count(Product.id).desc()
         ).limit(5).all()
         
-        # Format response with real product data
         recent_searches = []
         
-        # Add product names as search terms
         for product in trending_products:
+            image_url = product.thumbnail_url
+            if not image_url and hasattr(product, 'image_urls') and product.image_urls:
+                if isinstance(product.image_urls, list):
+                    image_url = product.image_urls[0] if product.image_urls else None
+            
             recent_searches.append({
                 'id': product.id,
                 'name': product.name,
                 'type': 'product',
-                'image': product.thumbnail_url or (product.get_image_urls()[0] if product.get_image_urls() else None),
+                'image': image_url,
                 'price': float(product.price) if product.price else None,
                 'slug': f'/product/{product.id}',
                 'search_term': product.name
             })
         
-        # Add category names as search terms
         for category_name, in popular_categories:
             recent_searches.append({
                 'name': category_name,
@@ -732,7 +1120,6 @@ def get_recent_searches():
                 'search_term': category_name
             })
         
-        # Limit final results
         recent_searches = recent_searches[:limit]
         
         return jsonify({
@@ -745,13 +1132,14 @@ def get_recent_searches():
         current_app.logger.error(f"Error getting recent searches: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
 
+
 # ----------------------
 # OPTIONS handlers for CORS
 # ----------------------
 
 @products_routes.route('/', methods=['OPTIONS'])
 @products_routes.route('/<int:product_id>', methods=['OPTIONS'])
-@products_routes.route('/<string:slug>', methods=['OPTIONS'])
+@products_routes.route('/slug/<string:slug>', methods=['OPTIONS'])
 @products_routes.route('/<int:product_id>/variants', methods=['OPTIONS'])
 @products_routes.route('/<int:product_id>/images', methods=['OPTIONS'])
 @products_routes.route('/product-images/<int:image_id>', methods=['OPTIONS'])
@@ -759,7 +1147,15 @@ def get_recent_searches():
 @products_routes.route('/featured', methods=['OPTIONS'])
 @products_routes.route('/new', methods=['OPTIONS'])
 @products_routes.route('/sale', methods=['OPTIONS'])
+@products_routes.route('/flash-sale', methods=['OPTIONS'])
+@products_routes.route('/luxury-deals', methods=['OPTIONS'])
+@products_routes.route('/trending', methods=['OPTIONS'])
+@products_routes.route('/top-picks', methods=['OPTIONS'])
+@products_routes.route('/daily-finds', methods=['OPTIONS'])
+@products_routes.route('/new-arrivals', methods=['OPTIONS'])
 @products_routes.route('/recent-searches', methods=['OPTIONS'])
+@products_routes.route('/cache/status', methods=['OPTIONS'])
+@products_routes.route('/cache/invalidate', methods=['OPTIONS'])
 def handle_options():
     """Handle OPTIONS requests for CORS."""
     return '', 200
