@@ -2,19 +2,18 @@
 
 import React, { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import dynamic from "next/dynamic"
-import { Loader2 } from 'lucide-react'
+import { Gem, Shirt, Watch, Crown, Award, Timer, TrendingUp, Users, type LucideIcon } from "lucide-react"
 
-const iconMap = {
-  Gem: dynamic(() => import("lucide-react").then(mod => ({ default: mod.Gem }))),
-  Shirt: dynamic(() => import("lucide-react").then(mod => ({ default: mod.Shirt }))),
-  Watch: dynamic(() => import("lucide-react").then(mod => ({ default: mod.Watch }))),
-  Crown: dynamic(() => import("lucide-react").then(mod => ({ default: mod.Crown }))),
-  Award: dynamic(() => import("lucide-react").then(mod => ({ default: mod.Award }))),
-  Timer: dynamic(() => import("lucide-react").then(mod => ({ default: mod.Timer }))),
-  TrendingUp: dynamic(() => import("lucide-react").then(mod => ({ default: mod.TrendingUp }))),
-  Users: dynamic(() => import("lucide-react").then(mod => ({ default: mod.Users }))),
-} as const
+const iconMap: Record<string, LucideIcon> = {
+  Gem,
+  Shirt,
+  Watch,
+  Crown,
+  Award,
+  Timer,
+  TrendingUp,
+  Users,
+}
 
 interface PremiumExperience {
   id: number
@@ -28,7 +27,10 @@ interface PremiumExperience {
   is_active: boolean
 }
 
-// Fallback data for when backend is unavailable
+const STORAGE_KEY = "mizizzi_premium_experience_cache"
+const STORAGE_EXPIRY_KEY = "mizizzi_premium_experience_cache_expiry"
+const CACHE_DURATION = 24 * 60 * 60 * 1000 // 24 hours
+
 const FALLBACK_DATA: PremiumExperience[] = [
   {
     id: 1,
@@ -47,7 +49,8 @@ const FALLBACK_DATA: PremiumExperience[] = [
     metric: "24H",
     description: "Average Delivery Time",
     icon_name: "Timer",
-    image: "https://media.istockphoto.com/id/1073908632/photo/womens-fashion-for-christmas-eve.webp?a=1&s=612x612&w=0&k=20&c=_5Wa7RciLm_QvpatMkAr5xMRr7BPNwGYVZMApdTJYyc=",
+    image:
+      "https://media.istockphoto.com/id/1073908632/photo/womens-fashion-for-christmas-eve.webp?a=1&s=612x612&w=0&k=20&c=_5Wa7RciLm_QvpatMkAr5xMRr7BPNwGYVZMApdTJYyc=",
     gradient: "from-emerald-500 to-green-600",
     features: ["Nairobi Same Day", "Nationwide Express", "Secure Packaging", "Live Tracking"],
     is_active: true,
@@ -58,7 +61,8 @@ const FALLBACK_DATA: PremiumExperience[] = [
     metric: "KSh 156K",
     description: "Total Savings This Month",
     icon_name: "TrendingUp",
-    image: "https://media.istockphoto.com/id/1441553933/photo/3d-illustration.jpg?b=1&s=612x612&w=0&k=20&c=hIc6hAb3XggxvuPdo6adGjN28fJDHrLl_hNnUmwO72s=",
+    image:
+      "https://media.istockphoto.com/id/1441553933/photo/3d-illustration.jpg?b=1&s=612x612&w=0&k=20&c=hIc6hAb3XggxvuPdo6adGjN28fJDHrLl_hNnUmwO72s=",
     gradient: "from-rose-500 to-red-600",
     features: ["Best Prices", "Flash Deals", "Bulk Discounts", "Loyalty Rewards"],
     is_active: true,
@@ -69,30 +73,76 @@ const FALLBACK_DATA: PremiumExperience[] = [
     metric: "12.8K",
     description: "Happy Customers & Growing",
     icon_name: "Users",
-    image: "https://media.istockphoto.com/id/1441553933/photo/3d-illustration.jpg?b=1&s=612x612&w=0&k=20&c=hIc6hAb3XggxvuPdo6adGjN28fJDHrLl_hNnUmwO72s=",
+    image:
+      "https://media.istockphoto.com/id/1441553933/photo/3d-illustration.jpg?b=1&s=612x612&w=0&k=20&c=hIc6hAb3XggxvuPdo6adGjN28fJDHrLl_hNnUmwO72s=",
     gradient: "from-purple-500 to-indigo-600",
     features: ["Community Driven", "Cultural Pride", "Local Support", "African Heritage"],
     is_active: true,
   },
 ]
 
+const getCachedData = (): PremiumExperience[] | null => {
+  if (typeof window === "undefined") return null
+
+  try {
+    const expiry = localStorage.getItem(STORAGE_EXPIRY_KEY)
+    if (expiry && Date.now() > Number.parseInt(expiry, 10)) {
+      localStorage.removeItem(STORAGE_KEY)
+      localStorage.removeItem(STORAGE_EXPIRY_KEY)
+      return null
+    }
+
+    const cached = localStorage.getItem(STORAGE_KEY)
+    if (cached) {
+      return JSON.parse(cached)
+    }
+  } catch (e) {
+    console.error("Error reading premium experience cache:", e)
+  }
+  return null
+}
+
+const setCachedData = (items: PremiumExperience[]) => {
+  if (typeof window === "undefined") return
+
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
+    localStorage.setItem(STORAGE_EXPIRY_KEY, String(Date.now() + CACHE_DURATION))
+  } catch (e) {
+    console.error("Error saving premium experience cache:", e)
+  }
+}
+
+const getInitialData = (): PremiumExperience[] => {
+  if (typeof window === "undefined") return FALLBACK_DATA
+  const cached = getCachedData()
+  return cached && cached.length > 0 ? cached : FALLBACK_DATA
+}
+
 export const PremiumCustomerExperience = React.memo(() => {
   const [experiences, setExperiences] = useState<PremiumExperience[]>(FALLBACK_DATA)
-  const [isLoading, setIsLoading] = useState(true)
   const [currentExperience, setCurrentExperience] = useState(0)
+  const [isHydrated, setIsHydrated] = useState(false)
 
   useEffect(() => {
+    const cached = getCachedData()
+    if (cached && cached.length > 0) {
+      setExperiences(cached)
+    }
+    setIsHydrated(true)
+  }, [])
+
+  useEffect(() => {
+    if (!isHydrated) return
+
     const fetchExperiences = async () => {
       try {
         const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
-        const response = await fetch(
-          `${API_BASE_URL}/api/panels/items?panel_type=premium_experience&position=right`
-        )
+        const response = await fetch(`${API_BASE_URL}/api/panels/items?panel_type=premium_experience&position=right`)
 
         if (response.ok) {
           const data = await response.json()
           if (data.items && data.items.length > 0) {
-            // Map backend data to component format
             const mappedItems = data.items.map((item: any) => ({
               id: item.id,
               title: item.title,
@@ -105,18 +155,16 @@ export const PremiumCustomerExperience = React.memo(() => {
               is_active: item.is_active,
             }))
             setExperiences(mappedItems)
+            setCachedData(mappedItems)
           }
         }
       } catch (error) {
-        console.error("[v0] Error fetching premium experience data:", error)
-        // Keep using fallback data
-      } finally {
-        setIsLoading(false)
+        // Silent fail - already showing cached/fallback data
       }
     }
 
     fetchExperiences()
-  }, [])
+  }, [isHydrated])
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -126,25 +174,16 @@ export const PremiumCustomerExperience = React.memo(() => {
     return () => clearInterval(interval)
   }, [experiences.length])
 
-  if (isLoading) {
-    return (
-      <section className="h-full w-full max-w-md md:max-w-lg mx-auto rounded-2xl overflow-hidden shadow-lg bg-white/80 backdrop-blur-md border border-gray-100 flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </section>
-    )
-  }
-
   const experience = experiences[currentExperience]
   if (!experience) return null
 
-  const IconComponent = iconMap[experience.icon_name as keyof typeof iconMap] || iconMap.Award
+  const IconComponent = iconMap[experience.icon_name] || iconMap.Award
 
   return (
     <section
       className="h-full w-full max-w-md md:max-w-lg mx-auto rounded-2xl overflow-hidden shadow-lg bg-white/80 backdrop-blur-md border border-gray-100 relative"
       aria-label="Premium customer experience"
     >
-      {/* Background Images with Crossfade */}
       <div className="absolute inset-0 rounded-2xl overflow-hidden">
         {experiences.map((exp, index) => (
           <motion.div
@@ -185,7 +224,6 @@ export const PremiumCustomerExperience = React.memo(() => {
         ))}
       </div>
 
-      {/* Content Overlay */}
       <div className="relative z-10 h-full">
         <AnimatePresence mode="wait">
           <motion.div
@@ -215,7 +253,6 @@ export const PremiumCustomerExperience = React.memo(() => {
             }}
             className="h-full p-5 md:p-7 flex flex-col justify-between"
           >
-            {/* Floating Particles */}
             <div className="absolute inset-0 pointer-events-none">
               {[...Array(6)].map((_, i) => (
                 <motion.div
@@ -241,7 +278,6 @@ export const PremiumCustomerExperience = React.memo(() => {
               ))}
             </div>
 
-            {/* Header */}
             <motion.div
               className="flex items-center gap-3 mb-4"
               variants={{
@@ -269,7 +305,7 @@ export const PremiumCustomerExperience = React.memo(() => {
                   ease: "easeInOut",
                 }}
               >
-                {IconComponent && <IconComponent className="h-6 w-6 text-white drop-shadow-lg" />}
+                <IconComponent className="h-6 w-6 text-white drop-shadow-lg" />
               </motion.div>
               <motion.div
                 animate={{
@@ -287,7 +323,6 @@ export const PremiumCustomerExperience = React.memo(() => {
               </motion.div>
             </motion.div>
 
-            {/* Metric */}
             <motion.div
               className="mb-3"
               variants={{
@@ -330,7 +365,6 @@ export const PremiumCustomerExperience = React.memo(() => {
               </motion.p>
             </motion.div>
 
-            {/* Features */}
             <motion.div
               className="relative"
               variants={{
@@ -394,7 +428,6 @@ export const PremiumCustomerExperience = React.memo(() => {
               </div>
             </motion.div>
 
-            {/* Luxury Accent */}
             <motion.div
               className={`absolute top-4 right-4 w-4 h-4 rounded-full bg-gradient-to-r ${experience.gradient} opacity-60`}
               animate={{
@@ -413,7 +446,6 @@ export const PremiumCustomerExperience = React.memo(() => {
         </AnimatePresence>
       </div>
 
-      {/* Subtle Progress Indicator */}
       <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 flex gap-1.5 z-20">
         {experiences.map((_, index) => (
           <motion.div

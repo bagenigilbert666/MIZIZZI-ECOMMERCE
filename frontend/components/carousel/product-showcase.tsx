@@ -2,19 +2,18 @@
 
 import React, { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import dynamic from "next/dynamic"
-import { Loader2 } from 'lucide-react'
+import { Gem, Shirt, Watch, Crown, Award, Timer, TrendingUp, Users, type LucideIcon } from "lucide-react"
 
-const iconMap = {
-  Gem: dynamic(() => import("lucide-react").then(mod => ({ default: mod.Gem })), { ssr: false }),
-  Shirt: dynamic(() => import("lucide-react").then(mod => ({ default: mod.Shirt })), { ssr: false }),
-  Watch: dynamic(() => import("lucide-react").then(mod => ({ default: mod.Watch })), { ssr: false }),
-  Crown: dynamic(() => import("lucide-react").then(mod => ({ default: mod.Crown })), { ssr: false }),
-  Award: dynamic(() => import("lucide-react").then(mod => ({ default: mod.Award })), { ssr: false }),
-  Timer: dynamic(() => import("lucide-react").then(mod => ({ default: mod.Timer })), { ssr: false }),
-  TrendingUp: dynamic(() => import("lucide-react").then(mod => ({ default: mod.TrendingUp })), { ssr: false }),
-  Users: dynamic(() => import("lucide-react").then(mod => ({ default: mod.Users })), { ssr: false }),
-} as const
+const iconMap: Record<string, LucideIcon> = {
+  Gem,
+  Shirt,
+  Watch,
+  Crown,
+  Award,
+  Timer,
+  TrendingUp,
+  Users,
+}
 
 interface ProductCategory {
   id: number
@@ -28,7 +27,10 @@ interface ProductCategory {
   is_active: boolean
 }
 
-// Fallback data for when backend is unavailable
+const STORAGE_KEY = "mizizzi_product_showcase_cache"
+const STORAGE_EXPIRY_KEY = "mizizzi_product_showcase_cache_expiry"
+const CACHE_DURATION = 24 * 60 * 60 * 1000 // 24 hours
+
 const FALLBACK_DATA: ProductCategory[] = [
   {
     id: 1,
@@ -36,7 +38,8 @@ const FALLBACK_DATA: ProductCategory[] = [
     metric: "1,200+",
     description: "Stylish & Durable Bags",
     icon_name: "Gem",
-    image: "https://media.istockphoto.com/id/1441553933/photo/3d-illustration.jpg?b=1&s=612x612&w=0&k=20&c=hIc6hAb3XggxvuPdo6adGjN28fJDHrLl_hNnUmwO72s=",
+    image:
+      "https://media.istockphoto.com/id/1441553933/photo/3d-illustration.jpg?b=1&s=612x612&w=0&k=20&c=hIc6hAb3XggxvuPdo6adGjN28fJDHrLl_hNnUmwO72s=",
     gradient: "from-pink-500 to-rose-600",
     features: ["Handbags", "Backpacks", "Totes", "Crossbody"],
     is_active: true,
@@ -47,7 +50,8 @@ const FALLBACK_DATA: ProductCategory[] = [
     metric: "850+",
     description: "Beautiful African Braids",
     icon_name: "Crown",
-    image: "https://media.istockphoto.com/id/1441553933/photo/3d-illustration.jpg?b=1&s=612x612&w=0&k=20&c=hIc6hAb3XggxvuPdo6adGjN28fJDHrLl_hNnUmwO72s=",
+    image:
+      "https://media.istockphoto.com/id/1441553933/photo/3d-illustration.jpg?b=1&s=612x612&w=0&k=20&c=hIc6hAb3XggxvuPdo6adGjN28fJDHrLl_hNnUmwO72s=",
     gradient: "from-yellow-500 to-amber-600",
     features: ["Braided Wigs", "Extensions", "Natural Look", "Trendy Styles"],
     is_active: true,
@@ -58,7 +62,8 @@ const FALLBACK_DATA: ProductCategory[] = [
     metric: "2,300+",
     description: "Fashionable Shirts & Tops",
     icon_name: "Shirt",
-    image: "https://media.istockphoto.com/id/1441553933/photo/3d-illustration.jpg?b=1&s=612x612&w=0&k=20&c=hIc6hAb3XggxvuPdo6adGjN28fJDHrLl_hNnUmwO72s=",
+    image:
+      "https://media.istockphoto.com/id/1441553933/photo/3d-illustration.jpg?b=1&s=612x612&w=0&k=20&c=hIc6hAb3XggxvuPdo6adGjN28fJDHrLl_hNnUmwO72s=",
     gradient: "from-blue-500 to-indigo-600",
     features: ["Casual", "Formal", "Printed", "Cotton"],
     is_active: true,
@@ -69,31 +74,71 @@ const FALLBACK_DATA: ProductCategory[] = [
     metric: "1,050+",
     description: "Comfortable Trousers & Jeans",
     icon_name: "Watch",
-    image: "https://media.istockphoto.com/id/1441553933/photo/3d-illustration.jpg?b=1&s=612x612&w=0&k=20&c=hIc6hAb3XggxvuPdo6adGjN28fJDHrLl_hNnUmwO72s=",
+    image:
+      "https://media.istockphoto.com/id/1441553933/photo/3d-illustration.jpg?b=1&s=612x612&w=0&k=20&c=hIc6hAb3XggxvuPdo6adGjN28fJDHrLl_hNnUmwO72s=",
     gradient: "from-green-500 to-emerald-600",
     features: ["Denim", "Slim Fit", "Wide Leg", "Trendy"],
     is_active: true,
   },
 ]
 
+const getCachedData = (): ProductCategory[] | null => {
+  if (typeof window === "undefined") return null
+
+  try {
+    const expiry = localStorage.getItem(STORAGE_EXPIRY_KEY)
+    if (expiry && Date.now() > Number.parseInt(expiry, 10)) {
+      localStorage.removeItem(STORAGE_KEY)
+      localStorage.removeItem(STORAGE_EXPIRY_KEY)
+      return null
+    }
+
+    const cached = localStorage.getItem(STORAGE_KEY)
+    if (cached) {
+      return JSON.parse(cached)
+    }
+  } catch (e) {
+    console.error("Error reading product showcase cache:", e)
+  }
+  return null
+}
+
+const setCachedData = (items: ProductCategory[]) => {
+  if (typeof window === "undefined") return
+
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
+    localStorage.setItem(STORAGE_EXPIRY_KEY, String(Date.now() + CACHE_DURATION))
+  } catch (e) {
+    console.error("Error saving product showcase cache:", e)
+  }
+}
+
 export const ProductShowcase = React.memo(() => {
   const [categories, setCategories] = useState<ProductCategory[]>(FALLBACK_DATA)
-  const [isLoading, setIsLoading] = useState(true)
   const [currentCategory, setCurrentCategory] = useState(0)
   const [isTransitioning, setIsTransitioning] = useState(false)
+  const [isHydrated, setIsHydrated] = useState(false)
 
   useEffect(() => {
+    const cached = getCachedData()
+    if (cached && cached.length > 0) {
+      setCategories(cached)
+    }
+    setIsHydrated(true)
+  }, [])
+
+  useEffect(() => {
+    if (!isHydrated) return
+
     const fetchCategories = async () => {
       try {
         const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
-        const response = await fetch(
-          `${API_BASE_URL}/api/panels/items?panel_type=product_showcase&position=left`
-        )
+        const response = await fetch(`${API_BASE_URL}/api/panels/items?panel_type=product_showcase&position=left`)
 
         if (response.ok) {
           const data = await response.json()
           if (data.items && data.items.length > 0) {
-            // Map backend data to component format
             const mappedItems = data.items.map((item: any) => ({
               id: item.id,
               title: item.title,
@@ -106,18 +151,16 @@ export const ProductShowcase = React.memo(() => {
               is_active: item.is_active,
             }))
             setCategories(mappedItems)
+            setCachedData(mappedItems)
           }
         }
       } catch (error) {
-        console.error("[v0] Error fetching product showcase data:", error)
-        // Keep using fallback data
-      } finally {
-        setIsLoading(false)
+        // Silent fail - already showing cached/fallback data
       }
     }
 
     fetchCategories()
-  }, [])
+  }, [isHydrated])
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -132,18 +175,10 @@ export const ProductShowcase = React.memo(() => {
     return () => clearInterval(interval)
   }, [categories.length])
 
-  if (isLoading) {
-    return (
-      <section className="h-full w-full max-w-md md:max-w-lg mx-auto rounded-2xl overflow-hidden shadow-lg bg-white/80 backdrop-blur-md border border-gray-100 flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </section>
-    )
-  }
-
   const category = categories[currentCategory]
   if (!category) return null
 
-  const IconComponent = iconMap[category.icon_name as keyof typeof iconMap] || iconMap.Gem
+  const IconComponent = iconMap[category.icon_name] || iconMap.Gem
 
   return (
     <section
@@ -275,7 +310,7 @@ export const ProductShowcase = React.memo(() => {
                   ease: "easeInOut",
                 }}
               >
-                {IconComponent && <IconComponent className="h-6 w-6 text-white drop-shadow-lg" />}
+                <IconComponent className="h-6 w-6 text-white drop-shadow-lg" />
               </motion.div>
               <motion.div
                 animate={{

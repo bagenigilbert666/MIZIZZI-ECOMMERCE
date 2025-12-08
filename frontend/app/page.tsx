@@ -124,7 +124,8 @@ export default function Home() {
   }, [])
 
   return (
-    <div className="flex flex-col pb-8 w-full" style={{ backgroundColor: "var(--color-background)" }}>
+    <>
+    <div className="page-root flex flex-col pb-8 w-full" style={{ backgroundColor: "var(--color-background)" }}>
       <NetworkStatus className="mx-auto w-full max-w-[1200px] px-1 sm:px-2 md:px-4 pt-2" />
 
       <div className="w-full mt-2 sm:mt-3 sm:py-2" style={{ backgroundColor: "var(--color-background)" }}>
@@ -180,9 +181,7 @@ export default function Home() {
               >
                 View All
                 <motion.span
-                  className="inline-block"
-                  animate={{ x: [0, 4, 0] }}
-                  transition={{ duration: 1.5, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
+                  className="inline-block arrow-animate"
                 >
                   →
                 </motion.span>
@@ -199,5 +198,33 @@ export default function Home() {
         </div>
       </div>
     </div>
+    <style jsx global>{`
+      /* Page-level scroll / touch optimizations */
+      .page-root {
+        touch-action: pan-y; /* allow vertical scrolling gestures without interference */
+        -webkit-overflow-scrolling: touch; /* iOS momentum scrolling */
+        scroll-behavior: smooth; /* smooth programmatic scrolls */
+      }
+
+      /* Small, hardware-accelerated arrow animation using transform only */
+      .arrow-animate {
+        display: inline-block;
+        will-change: transform;
+        animation: arrowMove 1.5s ease-in-out infinite;
+      }
+      @keyframes arrowMove {
+        0% { transform: translateX(0); }
+        50% { transform: translateX(4px); }
+        100% { transform: translateX(0); }
+      }
+
+      /* Optionally hint compositing for carousel / heavy visual components if present */
+      .page-root .carousel,
+      .page-root .category-grid,
+      .page-root .ProductGrid {
+        will-change: transform, opacity;
+      }
+    `}</style>
+    </>
   )
 }

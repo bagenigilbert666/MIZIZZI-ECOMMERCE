@@ -5,6 +5,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { Star, ChevronRight } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { useTopBar } from "@/hooks/use-swr-topbar"
 
 interface TopBarSlide {
   id: number
@@ -23,29 +24,7 @@ interface TopBarSlide {
 
 export function TopBar() {
   const [currentSlide, setCurrentSlide] = useState(0)
-  const [slides, setSlides] = useState<TopBarSlide[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    const fetchSlides = async () => {
-      try {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"}/api/topbar/slides`,
-        )
-        const data = await response.json()
-
-        if (data.success && data.slides.length > 0) {
-          setSlides(data.slides)
-        }
-        setLoading(false)
-      } catch (error) {
-        console.error("[v0] Error fetching topbar slides:", error)
-        setLoading(false)
-      }
-    }
-
-    fetchSlides()
-  }, [])
+  const { slides, isLoading, hasData } = useTopBar()
 
   useEffect(() => {
     if (slides.length === 0) return
@@ -88,7 +67,11 @@ export function TopBar() {
     }
   }
 
-  if (loading || slides.length === 0) {
+  if (isLoading && !hasData) {
+    return null
+  }
+
+  if (slides.length === 0) {
     return null
   }
 

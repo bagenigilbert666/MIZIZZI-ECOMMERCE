@@ -9,18 +9,57 @@ interface SlideData {
   subtitle: string
   image: string
   gradient: string
-  accent_color: string // Note: API returns snake_case
+  accent_color: string
 }
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+const CACHE_KEY = "contact_cta_slides_cache"
+const CACHE_DURATION = 24 * 60 * 60 * 1000 // 24 hours
+
+const getFromLocalStorage = (): SlideData[] | null => {
+  if (typeof window === "undefined") return null
+  try {
+    const cached = localStorage.getItem(CACHE_KEY)
+    if (cached) {
+      const { data, timestamp } = JSON.parse(cached)
+      if (Date.now() - timestamp < CACHE_DURATION && data?.length > 0) {
+        return data
+      }
+    }
+  } catch (error) {
+    console.error("Failed to read from localStorage:", error)
+  }
+  return null
+}
+
+const saveToLocalStorage = (data: SlideData[]) => {
+  if (typeof window === "undefined") return
+  try {
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ data, timestamp: Date.now() }))
+  } catch (error) {
+    console.error("Failed to save to localStorage:", error)
+  }
+}
 
 export const ContactCTA = React.memo(() => {
-  const [slides, setSlides] = useState<SlideData[]>([])
+  const [slides, setSlides] = useState<SlideData[]>(() => {
+    if (typeof window !== "undefined") {
+      return getFromLocalStorage() || []
+    }
+    return []
+  })
   const [currentSlide, setCurrentSlide] = useState(0)
   const [direction, setDirection] = useState(1)
-  const [isLoading, setIsLoading] = useState(true)
+  const [isHydrated, setIsHydrated] = useState(false)
 
   useEffect(() => {
+    const cachedData = getFromLocalStorage()
+    if (cachedData && cachedData.length > 0) {
+      setSlides(cachedData)
+    }
+    setIsHydrated(true)
+
+    // Background fetch to update cache
     const fetchSlides = async () => {
       try {
         const response = await fetch(`${API_BASE_URL}/api/contact-cta/slides`)
@@ -28,12 +67,11 @@ export const ContactCTA = React.memo(() => {
           const data = await response.json()
           if (data.slides && data.slides.length > 0) {
             setSlides(data.slides)
+            saveToLocalStorage(data.slides)
           }
         }
       } catch (error) {
         console.error("Failed to fetch CTA slides:", error)
-      } finally {
-        setIsLoading(false)
       }
     }
 
@@ -50,7 +88,7 @@ export const ContactCTA = React.memo(() => {
     return () => clearInterval(interval)
   }, [slides.length])
 
-  if (isLoading || slides.length === 0) return null
+  if (!isHydrated || slides.length === 0) return null
 
   const currentPromo = slides[currentSlide]
 
@@ -65,7 +103,7 @@ export const ContactCTA = React.memo(() => {
       scale: 1,
       transition: {
         duration: 1.2,
-        ease: [0.25, 0.1, 0.25, 1.0], // Smooth cubic-bezier
+        ease: [0.25, 0.1, 0.25, 1.0],
       },
     },
     exit: (direction: number) => ({
@@ -80,7 +118,7 @@ export const ContactCTA = React.memo(() => {
   }
 
   const contentVariants = {
-    hidden: { y: 10, opacity: 0 }, // Reduced movement further for subtle effect
+    hidden: { y: 10, opacity: 0 },
     visible: {
       y: 0,
       opacity: 1,
@@ -93,7 +131,7 @@ export const ContactCTA = React.memo(() => {
 
   return (
     <section
-      className="relative h-[160px] sm:h-[180px] md:h-[200px] rounded-2xl overflow-hidden shadow-2xl" // Reduced height for cleaner, compact look
+      className="relative h-[160px] sm:h-[180px] md:h-[200px] rounded-2xl overflow-hidden shadow-2xl"
       aria-label="Promotional carousel"
     >
       <AnimatePresence initial={false} custom={direction} mode="popLayout">
@@ -107,11 +145,10 @@ export const ContactCTA = React.memo(() => {
           className="absolute inset-0"
         >
           <div className={`absolute inset-0 bg-gradient-to-br ${currentPromo.gradient}`}>
-            <div className="absolute inset-0 bg-black/10" /> {/* Lighter overlay */}
+            <div className="absolute inset-0 bg-black/10" />
           </div>
 
           <div className="absolute right-0 top-0 bottom-0 w-[60%] md:w-[65%]">
-            {" "}
             <motion.div
               initial={{ opacity: 0, scale: 1.1 }}
               animate={{ opacity: 1, scale: 1 }}
@@ -125,8 +162,7 @@ export const ContactCTA = React.memo(() => {
                 className="object-cover object-center"
                 priority
               />
-              <div className="absolute inset-0 bg-gradient-to-l from-transparent via-transparent to-black/80" />{" "}
-              {/* Stronger gradient for text readability */}
+              <div className="absolute inset-0 bg-gradient-to-l from-transparent via-transparent to-black/80" />
             </motion.div>
           </div>
 
