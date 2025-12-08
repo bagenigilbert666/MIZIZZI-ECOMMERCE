@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useRef, useCallback, useEffect } from "react"
+import { useState, useRef, useCallback, useEffect, memo } from "react"
 import { motion, AnimatePresence, type PanInfo } from "framer-motion"
 import { ChevronRight, ChevronLeft, TrendingUp, Star } from "lucide-react"
 import { useRouter } from "next/navigation"
@@ -10,8 +10,8 @@ import Link from "next/link"
 
 import type { Product } from "@/types"
 import { useMediaQuery } from "@/hooks/use-media-query"
-import { useTrending } from "@/hooks/use-swr-trending"
-import { Skeleton } from "@/components/ui/skeleton"
+import useSWRTrending from "@/hooks/use-swr-trending"
+import { cloudinaryService } from "@/services/cloudinary-service"
 
 const LogoPlaceholder = () => (
   <div className="absolute inset-0 flex items-center justify-center bg-white">
@@ -55,16 +55,36 @@ const StarRating = ({ rating = 4, reviewCount = 0 }: { rating?: number; reviewCo
   )
 }
 
-const ProductCard = ({ product, isMobile }: { product: Product; isMobile: boolean }) => {
+function getProductImageUrl(product: Product): string {
+  if (product.image_urls && product.image_urls.length > 0) {
+    if (typeof product.image_urls[0] === "string" && !product.image_urls[0].startsWith("http")) {
+      return cloudinaryService.generateOptimizedUrl(product.image_urls[0])
+    }
+    return product.image_urls[0]
+  }
+  if (product.thumbnail_url) {
+    if (typeof product.thumbnail_url === "string" && !product.thumbnail_url.startsWith("http")) {
+      return cloudinaryService.generateOptimizedUrl(product.thumbnail_url)
+    }
+    return product.thumbnail_url
+  }
+  if (product.images && product.images.length > 0 && product.images[0].url) {
+    if (typeof product.images[0].url === "string" && !product.images[0].url.startsWith("http")) {
+      return cloudinaryService.generateOptimizedUrl(product.images[0].url)
+    }
+    return product.images[0].url
+  }
+  return "/placeholder.svg?height=300&width=300"
+}
+
+const ProductCard = memo(({ product, isMobile }: { product: Product; isMobile: boolean }) => {
   const [imageLoaded, setImageLoaded] = useState(false)
   const [imageError, setImageError] = useState(false)
   const [showPlaceholder, setShowPlaceholder] = useState(true)
 
   const discountPercentage = product.sale_price
     ? Math.round(((product.price - product.sale_price) / product.price) * 100)
-    : product.compare_at_price && product.price
-      ? Math.round(((product.compare_at_price - product.price) / product.compare_at_price) * 100)
-      : 0
+    : 0
 
   const handleImageLoad = () => {
     setImageLoaded(true)
@@ -82,11 +102,9 @@ const ProductCard = ({ product, isMobile }: { product: Product; isMobile: boolea
     setShowPlaceholder(true)
   }, [product.id])
 
-  const imageUrl = product.image_urls?.[0] || product.image_url || product.thumbnail_url || "/placeholder.svg"
+  const imageUrl = getProductImageUrl(product)
   const rating = product.rating || 3 + Math.random() * 2
   const reviewCount = product.review_count || Math.floor(Math.random() * 5000) + 100
-  const displayPrice = product.sale_price || product.price || 0
-  const originalPrice = product.sale_price ? product.price : product.compare_at_price
 
   return (
     <Link href={`/product/${product.slug || product.id}`} prefetch={false}>
@@ -111,7 +129,6 @@ const ProductCard = ({ product, isMobile }: { product: Product; isMobile: boolea
                 </motion.div>
               )}
             </AnimatePresence>
-
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: imageLoaded ? 1 : 0 }}
@@ -129,115 +146,106 @@ const ProductCard = ({ product, isMobile }: { product: Product; isMobile: boolea
                 onError={handleImageError}
               />
             </motion.div>
-
             {/* Discount Badge - Dark Cherry Red */}
-            {discountPercentage > 0 && (
+            {product.sale_price && discountPercentage > 0 && (
               <div className="absolute top-1 left-1 bg-[#8B1538] text-white text-[10px] sm:text-xs font-medium px-1.5 py-0.5 rounded-sm z-20">
                 -{discountPercentage}%
               </div>
             )}
           </div>
-
-          {/* Product Info */}
+          {/* Product Info - Compact */}
           <div className={isMobile ? "p-2" : "p-3"}>
+            {/* Product Name - 2 lines max */}
             <h3
               className={`text-gray-800 line-clamp-2 leading-tight mb-1.5 ${isMobile ? "text-xs min-h-[32px]" : "text-sm min-h-[40px]"}`}
             >
               {product.name}
             </h3>
-
             {/* Price - Dark Cherry Red */}
             <div className="mb-1.5">
               <span className={`font-semibold text-[#8B1538] ${isMobile ? "text-sm" : "text-base"}`}>
-                KSh {displayPrice.toLocaleString()}
+                KSh {(product.sale_price || product.price).toLocaleString()}
               </span>
-              {originalPrice && originalPrice > displayPrice && (
+              {product.sale_price && (
                 <span className={`text-gray-400 line-through ml-1.5 ${isMobile ? "text-[10px]" : "text-xs"}`}>
-                  KSh {originalPrice.toLocaleString()}
+                  KSh {product.price.toLocaleString()}
                 </span>
               )}
             </div>
-
+            {/* Star Rating */}
             <StarRating rating={rating} reviewCount={reviewCount} />
           </div>
         </div>
       </motion.div>
     </Link>
   )
-}
+})
+
+ProductCard.displayName = "ProductCard"
 
 const TrendingSkeleton = ({ isMobile }: { isMobile: boolean }) => (
   <section className="w-full mb-4 sm:mb-8">
     <div className="w-full">
       <div className="bg-[#8B1538] text-white flex items-center justify-between px-2 sm:px-4 py-1.5 sm:py-2">
         <div className="flex items-center gap-1 sm:gap-2">
-          <div className={`bg-white/20 rounded animate-pulse ${isMobile ? "h-4 w-16" : "h-5 w-20"}`}></div>
+          <TrendingUp className={`text-yellow-300 ${isMobile ? "h-4 w-4" : "h-5 w-5"}`} />
+          <span className={`font-bold ${isMobile ? "text-sm" : "text-base"}`}>Trending Now</span>
         </div>
-        <div className={`bg-white/20 rounded animate-pulse ${isMobile ? "h-4 w-12" : "h-5 w-16"}`}></div>
+        <div className="flex items-center gap-2">
+          <span className={`font-medium ${isMobile ? "text-xs" : "text-sm"}`}>See All</span>
+        </div>
       </div>
-
       <div className={isMobile ? "p-1" : "p-2"}>
-        <div className="flex gap-[1px] bg-gray-100">
-          {[...Array(isMobile ? 4 : 6)].map((_, index) => (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-              className={`bg-white flex-shrink-0 ${isMobile ? "p-2 w-[calc(25%-1px)]" : "p-4 w-[200px]"}`}
-            >
+        <div className="flex gap-[1px] bg-gray-100 overflow-hidden">
+          {[...Array(isMobile ? 4 : 6)].map((_: unknown, index: number) => (
+            <div key={index} className={`bg-white flex-shrink-0 ${isMobile ? "p-2 w-[calc(25%-1px)]" : "p-3 flex-1"}`}>
               <div
-                className={`w-full mb-2 bg-[#f5f5f7] flex items-center justify-center relative overflow-hidden ${isMobile ? "aspect-square" : "aspect-[4/3]"}`}
+                className={`w-full mb-2 bg-white relative overflow-hidden flex items-center justify-center ${isMobile ? "aspect-square" : "aspect-square"}`}
               >
-                <motion.div
-                  animate={{
-                    backgroundPosition: ["0% 0%", "100% 100%"],
-                    opacity: [0.5, 0.8, 0.5],
-                  }}
-                  transition={{
-                    duration: 2,
-                    repeat: Number.POSITIVE_INFINITY,
-                    ease: "linear",
-                  }}
-                  className="absolute inset-0 bg-gradient-to-r from-[#f5f5f7] via-[#e0e0e3] to-[#f5f5f7] bg-[length:400%_400%]"
+                <Image
+                  src="/images/screenshot-20from-202025-02-18-2013-30-22.png"
+                  alt="Loading"
+                  width={isMobile ? 48 : 64}
+                  height={isMobile ? 48 : 64}
+                  className="object-contain opacity-60"
                 />
-                <motion.div
-                  animate={{
-                    scale: [1, 1.05, 1],
-                    opacity: [0.6, 1, 0.6],
-                  }}
-                  transition={{
-                    duration: 2,
-                    repeat: Number.POSITIVE_INFINITY,
-                    ease: "easeInOut",
-                  }}
-                  className="relative z-10"
-                >
-                  <div className={`relative ${isMobile ? "h-6 w-6" : "h-8 w-8"}`}>
-                    <Image
-                      src="/images/screenshot-20from-202025-02-18-2013-30-22.png"
-                      alt="Loading"
-                      fill
-                      className="object-contain opacity-60"
-                    />
-                  </div>
-                </motion.div>
               </div>
-              <Skeleton className={`w-1/3 mb-2 bg-[#f5f5f7] rounded-full ${isMobile ? "h-3" : "h-4"}`} />
-              <Skeleton className={`w-2/3 bg-[#f5f5f7] rounded-full ${isMobile ? "h-3" : "h-4"}`} />
-              <div className="flex gap-1.5 pt-1">
-                <Skeleton className={`bg-[#f5f5f7] rounded-full ${isMobile ? "h-3 w-3" : "h-4 w-4"}`} />
+              <div className="space-y-2">
+                <div className="h-3 bg-gray-100 rounded w-3/4 relative overflow-hidden">
+                  <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100" />
+                </div>
+                <div className="h-3 bg-gray-100 rounded w-1/2 relative overflow-hidden">
+                  <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100" />
+                </div>
+                <div className="h-4 bg-gray-100 rounded w-2/3 relative overflow-hidden">
+                  <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100" />
+                </div>
               </div>
-            </motion.div>
+            </div>
           ))}
         </div>
       </div>
     </div>
+    <style jsx>{`
+      @keyframes shimmer {
+        100% {
+          transform: translateX(100%);
+        }
+      }
+    `}</style>
   </section>
 )
 
 export function TrendingNow() {
-  const { trending, isLoading, mutate } = useTrending()
+  // Ensure hook return is typed so map callbacks get Product instead of implicit any.
+  const { trending: trendingRaw, isLoading, hasCachedData, mutate } = useSWRTrending() as {
+    trending?: Product[]
+    isLoading: boolean
+    hasCachedData: boolean
+    mutate: (...args: any[]) => any
+  }
+  const trending = trendingRaw ?? []
+
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isHovering, setIsHovering] = useState(false)
   const [hoverSide, setHoverSide] = useState<"left" | "right" | null>(null)
@@ -282,6 +290,12 @@ export function TrendingNow() {
     setHoverSide(null)
   }, [])
 
+  const handleDragStart = useCallback(() => {
+    if (isMobile) return
+    setIsDragging(true)
+    setHoverSide(null)
+  }, [isMobile])
+
   const handleDragEnd = useCallback(
     (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
       if (isMobile) return
@@ -301,12 +315,33 @@ export function TrendingNow() {
     [currentIndex, maxIndex, goToPrevious, goToNext, isMobile],
   )
 
+  useEffect(() => {
+    const currentCarousel = carouselRef.current
+    if (!currentCarousel || isMobile) return
+    const handleWheelEvent = (e: WheelEvent) => {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY) || e.shiftKey) {
+        e.preventDefault()
+        const threshold = 10
+        const delta = e.deltaX || e.deltaY
+        if (Math.abs(delta) > threshold) {
+          if (delta > 0 && currentIndex < maxIndex) {
+            goToNext()
+          } else if (delta < 0 && currentIndex > 0) {
+            goToPrevious()
+          }
+        }
+      }
+    }
+    currentCarousel.addEventListener("wheel", handleWheelEvent, { passive: false })
+    return () => currentCarousel.removeEventListener("wheel", handleWheelEvent)
+  }, [currentIndex, maxIndex, goToPrevious, goToNext, isMobile])
+
   const handleViewAll = (e: React.MouseEvent) => {
     e.preventDefault()
     router.push("/trending")
   }
 
-  if (isLoading) {
+  if (isLoading && !hasCachedData) {
     return <TrendingSkeleton isMobile={isMobile} />
   }
 
@@ -317,7 +352,7 @@ export function TrendingNow() {
   return (
     <section className="w-full mb-4 sm:mb-8">
       <div className="w-full">
-        {/* Header - Dark Cherry Red matching reference */}
+        {/* Header - Dark Cherry Red matching Flash Sales */}
         <div className="bg-[#8B1538] text-white flex items-center justify-between px-2 sm:px-4 py-1.5 sm:py-2">
           <div className="flex items-center gap-1 sm:gap-2">
             <TrendingUp className={`text-yellow-300 ${isMobile ? "h-4 w-4" : "h-5 w-5"}`} />
@@ -337,88 +372,110 @@ export function TrendingNow() {
           </button>
         </div>
 
-        {/* Carousel Container */}
+        {/* Carousel Container - Matching Flash Sales */}
         <div className={isMobile ? "p-1" : "p-2"}>
           <div
             ref={carouselRef}
-            className={`relative bg-gray-100 ${isMobile ? "overflow-x-auto overflow-y-hidden scrollbar-hide" : "overflow-hidden"}`}
-            style={{ maxWidth: "100%", width: "100%" }}
+            className={`relative bg-gray-100 ${isMobile ? "overflow-hidden" : "overflow-hidden"}`}
+            style={{
+              maxWidth: isMobile ? "100%" : undefined,
+              width: isMobile ? "100%" : undefined,
+            }}
             onMouseMove={handleMouseMove}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
           >
+            {/* Carousel Track */}
             {isMobile ? (
               <div
-                className="flex gap-2 w-max px-2"
+                className="flex gap-1 w-full overflow-x-auto scrollbar-hide px-2"
                 style={{
                   scrollSnapType: "x mandatory",
                   WebkitOverflowScrolling: "touch",
                   paddingBottom: "8px",
                 }}
               >
-                {trending.map((product, index) => (
+                {trending.map((product: Product) => (
                   <div
                     key={product.id}
+                    className="flex-shrink-0 pointer-events-auto"
                     style={{
                       width: mobileItemWidth,
-                      flexShrink: 0,
+                      minWidth: isSmallMobile ? "100px" : "110px",
+                      maxWidth: "130px",
                       scrollSnapAlign: "start",
                     }}
                   >
-                    <ProductCard product={product} isMobile={isMobile} />
+                    <ProductCard product={product} isMobile={true} />
                   </div>
                 ))}
               </div>
             ) : (
+              // Desktop: Motion animation matching Flash Sales
               <motion.div
                 className="flex gap-[1px]"
-                animate={{ x: `-${currentIndex * (100 / itemsPerView)}%` }}
-                transition={{ type: "spring", stiffness: 300, damping: 30 }}
                 drag="x"
                 dragConstraints={{ left: 0, right: 0 }}
                 dragElastic={0.1}
-                onDragStart={() => setIsDragging(true)}
+                onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
+                animate={{
+                  x: `-${currentIndex * (isTablet ? 20 : 16.666)}%`,
+                }}
+                transition={{
+                  type: "spring",
+                  stiffness: 300,
+                  damping: 30,
+                  mass: 0.8,
+                }}
+                style={{
+                  cursor: isDragging ? "grabbing" : "grab",
+                }}
               >
-                {trending.map((product) => (
-                  <div key={product.id} className="flex-shrink-0" style={{ width: `${100 / itemsPerView}%` }}>
-                    <ProductCard product={product} isMobile={isMobile} />
-                  </div>
+                {trending.map((product: Product, index: number) => (
+                  <motion.div
+                    key={product.id}
+                    className="flex-shrink-0 pointer-events-auto"
+                    style={{ width: `${isTablet ? 20 : 16.666}%` }}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: index * 0.05 }}
+                  >
+                    <ProductCard product={product} isMobile={false} />
+                  </motion.div>
                 ))}
               </motion.div>
             )}
 
-            {/* Navigation Arrows - Desktop only */}
-            {!isMobile && trending.length > itemsPerView && (
-              <>
-                <AnimatePresence>
-                  {isHovering && hoverSide === "left" && currentIndex > 0 && (
-                    <motion.button
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.8 }}
-                      onClick={goToPrevious}
-                      className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/95 backdrop-blur-sm rounded-full p-2 shadow-lg hover:bg-white hover:scale-110 transition-all z-20"
-                    >
-                      <ChevronLeft className="w-5 h-5 text-gray-700" />
-                    </motion.button>
-                  )}
-                </AnimatePresence>
-                <AnimatePresence>
-                  {isHovering && hoverSide === "right" && currentIndex < maxIndex && (
-                    <motion.button
-                      initial={{ opacity: 0, scale: 0.8 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.8 }}
-                      onClick={goToNext}
-                      className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/95 backdrop-blur-sm rounded-full p-2 shadow-lg hover:bg-white hover:scale-110 transition-all z-20"
-                    >
-                      <ChevronRight className="w-5 h-5 text-gray-700" />
-                    </motion.button>
-                  )}
-                </AnimatePresence>
-              </>
-            )}
+            {/* Navigation Arrows - Desktop only matching Flash Sales */}
+            <AnimatePresence>
+              {!isMobile && isHovering && !isDragging && hoverSide === "left" && currentIndex > 0 && (
+                <motion.button
+                  initial={{ opacity: 0, x: -20, scale: 0.8 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={{ opacity: 0, x: -20, scale: 0.8 }}
+                  transition={{ duration: 0.2 }}
+                  onClick={goToPrevious}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/95 backdrop-blur-sm rounded-full p-2 shadow-lg hover:bg-white hover:scale-110 transition-all z-20"
+                >
+                  <ChevronLeft className="w-5 h-5 text-gray-700" />
+                </motion.button>
+              )}
+            </AnimatePresence>
+            <AnimatePresence>
+              {!isMobile && isHovering && !isDragging && hoverSide === "right" && currentIndex < maxIndex && (
+                <motion.button
+                  initial={{ opacity: 0, x: 20, scale: 0.8 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={{ opacity: 0, x: 20, scale: 0.8 }}
+                  transition={{ duration: 0.2 }}
+                  onClick={goToNext}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/95 backdrop-blur-sm rounded-full p-2 shadow-lg hover:bg-white hover:scale-110 transition-all z-20"
+                >
+                  <ChevronRight className="w-5 h-5 text-gray-700" />
+                </motion.button>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </div>

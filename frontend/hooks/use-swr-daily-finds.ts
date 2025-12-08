@@ -4,7 +4,7 @@ import { productService } from "@/services/product"
 import { cloudinaryService } from "@/services/cloudinary-service"
 
 // In-memory cache for instant display
-let trendingCache: Product[] | null = null
+let dailyFindsCache: Product[] | null = null
 let lastFetchTime = 0
 const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 const STALE_TIME = 30 * 1000 // 30 seconds
@@ -23,34 +23,31 @@ const processProducts = (products: Product[]): Product[] => {
 }
 
 // Fetcher function with instant cache return
-const trendingFetcher = async (): Promise<Product[]> => {
+const dailyFindsFetcher = async (): Promise<Product[]> => {
   try {
-    const products = await productService.getProducts({
-      limit: 12,
-      trending: true,
-    })
+    const products = await productService.getDailyFindProducts(12)
 
     if (products && products.length > 0) {
       const processed = processProducts(products).slice(0, 12)
-      trendingCache = processed
+      dailyFindsCache = processed
       lastFetchTime = Date.now()
       return processed
     }
 
-    // Fallback to popular products
-    const fallbackProducts = await productService.getProducts({
+    // Fallback to recent products
+    const regularProducts = await productService.getProducts({
       limit: 12,
-      sort_by: "view_count",
+      sort_by: "created_at",
       sort_order: "desc",
     })
-    const processed = processProducts(fallbackProducts)
-    trendingCache = processed
+    const processed = processProducts(regularProducts)
+    dailyFindsCache = processed
     lastFetchTime = Date.now()
     return processed
   } catch (error) {
-    console.error("Error fetching trending:", error)
-    if (trendingCache) {
-      return trendingCache
+    console.error("Error fetching daily finds:", error)
+    if (dailyFindsCache) {
+      return dailyFindsCache
     }
     throw error
   }
@@ -69,46 +66,44 @@ const defaultConfig: SWRConfiguration = {
   shouldRetryOnError: true,
 }
 
-export function useTrending(config?: SWRConfiguration) {
-  const isCacheFresh = trendingCache && Date.now() - lastFetchTime < CACHE_DURATION
+export function useDailyFinds(config?: SWRConfiguration) {
+  const isCacheFresh = dailyFindsCache && Date.now() - lastFetchTime < CACHE_DURATION
 
-  const { data, error, isLoading, isValidating, mutate } = useSWR<Product[]>("trending", trendingFetcher, {
+  const { data, error, isLoading, isValidating, mutate } = useSWR<Product[]>("daily-finds", dailyFindsFetcher, {
     ...defaultConfig,
-    fallbackData: isCacheFresh ? trendingCache : undefined,
+    fallbackData: isCacheFresh ? dailyFindsCache : undefined,
     ...config,
   })
 
   return {
-    trending: data || trendingCache || [],
-    isLoading: isLoading && !trendingCache,
+    dailyFinds: data || dailyFindsCache || [],
+    isLoading: isLoading && !dailyFindsCache,
     isValidating,
     isError: error,
     mutate,
-    hasCachedData: !!trendingCache || !!data,
+    hasCachedData: !!dailyFindsCache || !!data,
   }
 }
 
-export async function prefetchTrending(): Promise<void> {
-  if (trendingCache && Date.now() - lastFetchTime < CACHE_DURATION) {
+export async function prefetchDailyFinds(): Promise<void> {
+  if (dailyFindsCache && Date.now() - lastFetchTime < CACHE_DURATION) {
     return
   }
 
   try {
-    const data = await trendingFetcher()
-    await globalMutate("trending", data, false)
+    const data = await dailyFindsFetcher()
+    await globalMutate("daily-finds", data, false)
   } catch (error) {
-    console.warn("Failed to prefetch trending:", error)
+    console.warn("Failed to prefetch daily finds:", error)
   }
 }
 
-export async function invalidateTrending(): Promise<void> {
-  trendingCache = null
+export async function invalidateDailyFinds(): Promise<void> {
+  dailyFindsCache = null
   lastFetchTime = 0
-  await globalMutate("trending")
+  await globalMutate("daily-finds")
 }
 
-export function getCachedTrending(): Product[] | null {
-  return trendingCache
+export function getCachedDailyFinds(): Product[] | null {
+  return dailyFindsCache
 }
-
-export default useTrending

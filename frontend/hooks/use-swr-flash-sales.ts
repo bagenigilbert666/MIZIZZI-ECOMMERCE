@@ -6,7 +6,8 @@ import { cloudinaryService } from "@/services/cloudinary-service"
 // In-memory cache for instant display
 let flashSalesCache: Product[] | null = null
 let lastFetchTime = 0
-const CACHE_DURATION = 2 * 60 * 1000 // 2 minutes
+const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+const STALE_TIME = 30 * 1000 // 30 seconds
 
 // Process product images
 const processProducts = (products: Product[]): Product[] => {
@@ -53,7 +54,6 @@ const flashSalesFetcher = async (): Promise<Product[]> => {
   }
 }
 
-// Default SWR configuration for flash sales
 const defaultConfig: SWRConfiguration = {
   revalidateOnFocus: false,
   revalidateOnReconnect: true,
@@ -65,13 +65,17 @@ const defaultConfig: SWRConfiguration = {
   revalidateIfStale: true,
   // Keep previous data while fetching new
   keepPreviousData: true,
+  refreshInterval: 0,
+  shouldRetryOnError: true,
 }
 
 export function useFlashSales(config?: SWRConfiguration) {
+  const isCacheFresh = flashSalesCache && Date.now() - lastFetchTime < CACHE_DURATION
+
   const { data, error, isLoading, isValidating, mutate } = useSWR<Product[]>("flash-sales", flashSalesFetcher, {
     ...defaultConfig,
     // Return cached data immediately if available and fresh
-    fallbackData: flashSalesCache && Date.now() - lastFetchTime < CACHE_DURATION ? flashSalesCache : undefined,
+    fallbackData: isCacheFresh ? flashSalesCache : undefined,
     ...config,
   })
 
@@ -82,7 +86,7 @@ export function useFlashSales(config?: SWRConfiguration) {
     isError: error,
     mutate,
     // Helper to check if we have cached data
-    hasCachedData: !!flashSalesCache,
+    hasCachedData: !!flashSalesCache || !!data,
   }
 }
 

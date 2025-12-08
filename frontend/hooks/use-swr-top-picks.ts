@@ -6,7 +6,8 @@ import { cloudinaryService } from "@/services/cloudinary-service"
 // In-memory cache for instant display
 let topPicksCache: Product[] | null = null
 let lastFetchTime = 0
-const CACHE_DURATION = 2 * 60 * 1000 // 2 minutes
+const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+const STALE_TIME = 30 * 1000 // 30 seconds
 
 // Process product images
 const processProducts = (products: Product[]): Product[] => {
@@ -24,7 +25,10 @@ const processProducts = (products: Product[]): Product[] => {
 // Fetcher function with instant cache return
 const topPicksFetcher = async (): Promise<Product[]> => {
   try {
-    const products = await productService.getTopPicks(12)
+    const products = await productService.getProducts({
+      limit: 12,
+      top_pick: true,
+    })
 
     if (products && products.length > 0) {
       const processed = processProducts(products).slice(0, 12)
@@ -33,13 +37,13 @@ const topPicksFetcher = async (): Promise<Product[]> => {
       return processed
     }
 
-    // Fallback to regular products if no top picks
-    const regularProducts = await productService.getProducts({
+    // Fallback to highly rated products
+    const fallbackProducts = await productService.getProducts({
       limit: 12,
       sort_by: "rating",
       sort_order: "desc",
     })
-    const processed = processProducts(regularProducts)
+    const processed = processProducts(fallbackProducts)
     topPicksCache = processed
     lastFetchTime = Date.now()
     return processed
@@ -52,7 +56,6 @@ const topPicksFetcher = async (): Promise<Product[]> => {
   }
 }
 
-// Default SWR configuration
 const defaultConfig: SWRConfiguration = {
   revalidateOnFocus: false,
   revalidateOnReconnect: true,
@@ -62,12 +65,16 @@ const defaultConfig: SWRConfiguration = {
   errorRetryInterval: 5000,
   revalidateIfStale: true,
   keepPreviousData: true,
+  refreshInterval: 0,
+  shouldRetryOnError: true,
 }
 
 export function useTopPicks(config?: SWRConfiguration) {
+  const isCacheFresh = topPicksCache && Date.now() - lastFetchTime < CACHE_DURATION
+
   const { data, error, isLoading, isValidating, mutate } = useSWR<Product[]>("top-picks", topPicksFetcher, {
     ...defaultConfig,
-    fallbackData: topPicksCache && Date.now() - lastFetchTime < CACHE_DURATION ? topPicksCache : undefined,
+    fallbackData: isCacheFresh ? topPicksCache : undefined,
     ...config,
   })
 
@@ -77,7 +84,7 @@ export function useTopPicks(config?: SWRConfiguration) {
     isValidating,
     isError: error,
     mutate,
-    hasCachedData: !!topPicksCache,
+    hasCachedData: !!topPicksCache || !!data,
   }
 }
 

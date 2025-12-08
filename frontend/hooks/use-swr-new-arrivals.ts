@@ -6,7 +6,8 @@ import { cloudinaryService } from "@/services/cloudinary-service"
 // In-memory cache for instant display
 let newArrivalsCache: Product[] | null = null
 let lastFetchTime = 0
-const CACHE_DURATION = 2 * 60 * 1000 // 2 minutes
+const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+const STALE_TIME = 30 * 1000 // 30 seconds - show stale data immediately
 
 // Process product images
 const processProducts = (products: Product[]): Product[] => {
@@ -52,7 +53,6 @@ const newArrivalsFetcher = async (): Promise<Product[]> => {
   }
 }
 
-// Default SWR configuration
 const defaultConfig: SWRConfiguration = {
   revalidateOnFocus: false,
   revalidateOnReconnect: true,
@@ -62,12 +62,19 @@ const defaultConfig: SWRConfiguration = {
   errorRetryInterval: 5000,
   revalidateIfStale: true,
   keepPreviousData: true,
+  // Suspense-like behavior: show data immediately, revalidate in background
+  refreshInterval: 0,
+  shouldRetryOnError: true,
 }
 
 export function useNewArrivals(config?: SWRConfiguration) {
+  const isCacheFresh = newArrivalsCache && Date.now() - lastFetchTime < CACHE_DURATION
+  const isCacheUsable = newArrivalsCache && Date.now() - lastFetchTime < CACHE_DURATION + STALE_TIME
+
   const { data, error, isLoading, isValidating, mutate } = useSWR<Product[]>("new-arrivals", newArrivalsFetcher, {
     ...defaultConfig,
-    fallbackData: newArrivalsCache && Date.now() - lastFetchTime < CACHE_DURATION ? newArrivalsCache : undefined,
+    // Return cached data immediately if available
+    fallbackData: isCacheFresh ? newArrivalsCache : undefined,
     ...config,
   })
 
@@ -77,7 +84,7 @@ export function useNewArrivals(config?: SWRConfiguration) {
     isValidating,
     isError: error,
     mutate,
-    hasCachedData: !!newArrivalsCache,
+    hasCachedData: !!newArrivalsCache || !!data,
   }
 }
 

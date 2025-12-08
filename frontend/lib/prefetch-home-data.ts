@@ -1,12 +1,13 @@
 // Prefetch critical home page data for instant loading
 import { prefetchFlashSales } from "@/hooks/use-swr-flash-sales"
 import { prefetchLuxuryDeals } from "@/hooks/use-swr-luxury-deals"
+import { prefetchNewArrivals } from "@/hooks/use-swr-new-arrivals"
+import { prefetchDailyFinds } from "@/hooks/use-swr-daily-finds"
 import { prefetchTopPicks } from "@/hooks/use-swr-top-picks"
 import { prefetchTrending } from "@/hooks/use-swr-trending"
-import { prefetchNewArrivals } from "@/hooks/use-swr-new-arrivals"
-import { prefetchProductsGrid } from "@/hooks/use-swr-products-grid"
 
 let prefetchPromise: Promise<void> | null = null
+let secondaryPrefetchPromise: Promise<void> | null = null
 
 // Call this once on app initialization to prefetch critical data
 export async function prefetchHomeData(): Promise<void> {
@@ -17,15 +18,24 @@ export async function prefetchHomeData(): Promise<void> {
 
   prefetchPromise = (async () => {
     try {
-      await Promise.all([
-        prefetchFlashSales(),
-        prefetchLuxuryDeals(),
+      // Priority 1: Prefetch above-the-fold content first (Flash Sales, Luxury Deals)
+      await Promise.all([prefetchFlashSales(), prefetchLuxuryDeals()])
+
+      // Priority 2: Prefetch remaining sections in background (non-blocking)
+      secondaryPrefetchPromise = Promise.all([
         prefetchTopPicks(),
-        prefetchTrending(),
         prefetchNewArrivals(),
-        prefetchProductsGrid(),
+        prefetchTrending(),
+        prefetchDailyFinds(),
       ])
-      console.log("[v0] Home data prefetched successfully")
+        .then(() => {
+          console.log("[v0] Secondary home data prefetched successfully")
+        })
+        .catch((error) => {
+          console.warn("[v0] Failed to prefetch secondary home data:", error)
+        })
+
+      console.log("[v0] Primary home data prefetched successfully")
     } catch (error) {
       console.warn("[v0] Failed to prefetch home data:", error)
     }
@@ -42,4 +52,5 @@ export function isPrefetchInitiated(): boolean {
 // Reset prefetch state (useful for testing)
 export function resetPrefetch(): void {
   prefetchPromise = null
+  secondaryPrefetchPromise = null
 }

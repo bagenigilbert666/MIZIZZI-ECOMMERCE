@@ -33,48 +33,83 @@ class Logger {
   }
 
   private formatMessage(message: string, context?: Record<string, unknown>): string {
-    let formatted = `[${new Date().toISOString()}] ${message}`
-    if (context) {
-      try {
-        const sanitizedContext = this.sanitizeContext(context)
-        formatted += ` ${JSON.stringify(sanitizedContext)}`
-      } catch (e) {
-        formatted += ` [Context serialization error: ${(e as Error).message}]`
-      }
-    }
-    return formatted
+    // Keep the formatted message small and avoid stringifying the whole context.
+    // Context will be passed as a separate (sanitized) console argument.
+    return `[${new Date().toISOString()}] ${message}`
   }
 
-  private sanitizeContext(context: Record<string, unknown>): Record<string, unknown> {
-    const sanitized: Record<string, unknown> = {}
-    for (const key in context) {
-      if (Object.prototype.hasOwnProperty.call(context, key)) {
-        const value = context[key]
-        // Basic sanitization for sensitive data
-        if (typeof key === "string" && (key.includes("password") || key.includes("token") || key.includes("secret"))) {
-          sanitized[key] = "[REDACTED]"
-        } else if (typeof value === "string" && value.length > 200) {
-          // Truncate long strings
-          sanitized[key] = value.substring(0, 200) + "...[TRUNCATED]"
-        } else if (typeof value === "object" && value !== null) {
-          // Recursively sanitize nested objects, but prevent deep recursion
-          sanitized[key] = JSON.parse(
-            JSON.stringify(value, (k, v) => {
-              if (typeof k === "string" && (k.includes("password") || k.includes("token") || k.includes("secret"))) {
-                return "[REDACTED]"
-              }
-              if (typeof v === "string" && v.length > 200) {
-                return v.substring(0, 200) + "...[TRUNCATED]"
-              }
-              return v
-            }),
-          )
-        } else {
-          sanitized[key] = value
-        }
+  // Add a safe serializer that prevents circular ref errors, redacts sensitive keys,
+  // truncates long strings and reduces large config/header objects to safe shapes.
+  private safeSerialize(value: unknown): unknown {
+    const seen = new WeakSet<object>()
+    const truncate = (s: string) => (s.length > 200 ? s.substring(0, 200) + '...[TRUNCATED]' : s)
+
+    const recurse = (v: any, key?: string): any => {
+      if (v === null || typeof v === 'undefined') return v
+      if (typeof v === 'function') return '[Function]'
+      if (typeof v !== 'object') {
+        if (typeof v === 'string') return truncate(v)
+        return v
       }
+
+      if (seen.has(v)) return '[Circular]'
+      seen.add(v)
+
+      if (Array.isArray(v)) {
+        return v.map((item) => recurse(item))
+      }
+
+      const out: Record<string, any> = {}
+      for (const k in v) {
+        if (!Object.prototype.hasOwnProperty.call(v, k)) continue
+        const val = v[k]
+        const lower = k.toLowerCase()
+
+        // Redact very sensitive fields outright
+        if (lower.includes('password') || lower.includes('token') || lower.includes('secret') || lower === 'authorization') {
+          out[k] = '[REDACTED]'
+          continue
+        }
+
+        // If headers, redact common sensitive header values
+        if (k === 'headers' && val && typeof val === 'object') {
+          const headersOut: Record<string, any> = {}
+          for (const hk in val) {
+            if (!Object.prototype.hasOwnProperty.call(val, hk)) continue
+            const hl = hk.toLowerCase()
+            if (hl === 'authorization' || hl.includes('token') || hl.includes('cookie') || hl.includes('x-xsrf-token')) {
+              headersOut[hk] = '[REDACTED]'
+            } else {
+              headersOut[hk] = recurse(val[hk], hk)
+            }
+          }
+          out[k] = headersOut
+          continue
+        }
+
+        // For axios-like config objects, only keep a minimal safe subset
+        if (k === 'config' && val && typeof val === 'object') {
+          out[k] = {
+            url: val.url,
+            method: val.method,
+            baseURL: val.baseURL,
+            timeout: val.timeout,
+            headers: recurse(val.headers || {}),
+          }
+          continue
+        }
+
+        out[k] = recurse(val, k)
+      }
+      return out
     }
-    return sanitized
+
+    return recurse(value)
+  }
+
+  // Replace sanitizeContext to use the safe serializer above
+  private sanitizeContext(context: Record<string, unknown>): Record<string, unknown> {
+    return (this.safeSerialize(context) as Record<string, unknown>) || {}
   }
 
   private output(level: LogLevel, message: string, context?: Record<string, unknown>, durationMs?: number): void {
@@ -84,51 +119,53 @@ class Logger {
 
     // If context contains an error object, extract more details for debugging
     let enhancedContext = context
-    if (context && context.error instanceof Error) {
-      const errorObj = context.error
+    if (context && (context as any).error instanceof Error) {
+      const errorObj = (context as any).error as Error
       enhancedContext = {
         ...context,
         errorMessage: errorObj.message,
         errorStack: errorObj.stack,
         errorName: errorObj.name,
         errorCode: (errorObj as any).code,
-        errorRaw: errorObj,
+        // Attach a safely serialized/minimal error representation instead of the raw error
+        errorRaw: this.safeSerialize(errorObj),
       }
       delete (enhancedContext as any).error
-    } else if (context && typeof context.error === "string") {
+    } else if (context && typeof (context as any).error === "string") {
       // Convert error string to Error object for better logging
-      const errorObj = new Error(context.error)
+      const errorObj = new Error((context as any).error)
       enhancedContext = {
         ...context,
         errorMessage: errorObj.message,
         errorStack: errorObj.stack,
         errorName: errorObj.name,
-        errorRaw: errorObj,
+        errorRaw: this.safeSerialize(errorObj),
       }
       delete (enhancedContext as any).error
     }
 
     // If context contains a Response-like object with status/data, extract details for error logging
     if (
-      context &&
-      typeof context === "object" &&
-      "status" in context &&
-      "data" in context &&
-      typeof (context as any).status === "number"
+      enhancedContext &&
+      typeof enhancedContext === "object" &&
+      "status" in enhancedContext &&
+      "data" in enhancedContext &&
+      typeof (enhancedContext as any).status === "number"
     ) {
       enhancedContext = {
         ...enhancedContext,
-        errorStatus: (context as any).status,
-        errorData: (context as any).data,
+        errorStatus: (enhancedContext as any).status,
+        errorData: (enhancedContext as any).data,
       }
     }
 
     const formattedMessage = this.formatMessage(message, enhancedContext)
+    const sanitizedForConsole = enhancedContext ? this.sanitizeContext(enhancedContext) : undefined
     const logEntry: LogEntry = {
       level,
       timestamp: new Date().toISOString(),
       message,
-      context: enhancedContext ? this.sanitizeContext(enhancedContext) : undefined,
+      context: sanitizedForConsole,
       durationMs,
     }
 
@@ -137,17 +174,18 @@ class Logger {
 
     switch (level) {
       case "debug":
-        console.debug(formattedMessage)
+        console.debug(formattedMessage, sanitizedForConsole)
         break
       case "info":
       case "log":
-        console.log(formattedMessage)
+        console.log(formattedMessage, sanitizedForConsole)
         break
       case "warn":
-        console.warn(formattedMessage)
+        console.warn(formattedMessage, sanitizedForConsole)
         break
       case "error":
-        console.error(formattedMessage)
+        // Use a separate context parameter to avoid forcing a huge serialized string
+        console.error(formattedMessage, sanitizedForConsole)
         break
     }
   }
@@ -170,25 +208,26 @@ class Logger {
 
   public error(message: string, context?: Record<string, unknown>): void {
     // If context contains an error, log stack trace and more details for network/backend issues
-    if (context && context.error instanceof Error) {
-      const errorObj = context.error
+    if (context && (context as any).error instanceof Error) {
+      const errorObj = (context as any).error
       this.output("error", message, {
         ...context,
         errorMessage: errorObj.message,
         errorStack: errorObj.stack,
         errorName: errorObj.name,
         errorCode: (errorObj as any).code,
-        errorRaw: errorObj,
+        // ensure errorRaw is safely serialized
+        errorRaw: this.safeSerialize(errorObj),
       })
-    } else if (context && typeof context.error === "string") {
+    } else if (context && typeof (context as any).error === "string") {
       // Convert error string to Error object for better logging
-      const errorObj = new Error(context.error)
+      const errorObj = new Error((context as any).error)
       this.output("error", message, {
         ...context,
         errorMessage: errorObj.message,
         errorStack: errorObj.stack,
         errorName: errorObj.name,
-        errorRaw: errorObj,
+        errorRaw: this.safeSerialize(errorObj),
       })
     } else {
       this.output("error", message, context)
