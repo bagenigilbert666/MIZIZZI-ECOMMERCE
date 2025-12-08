@@ -60,21 +60,22 @@ const ProductCard = memo(
       ? Math.round(((product.price - product.sale_price) / product.price) * 100)
       : 0
 
-    const handleImageLoad = () => {
+    const handleImageLoad = useCallback(() => {
       setImageLoaded(true)
       setTimeout(() => setShowPlaceholder(false), 300)
-    }
+    }, [])
 
-    const handleImageError = () => {
+    const handleImageError = useCallback(() => {
       setImageError(true)
       setImageLoaded(false)
-    }
+    }, [])
 
+    const productId = product.id
     useEffect(() => {
       setImageLoaded(false)
       setImageError(false)
       setShowPlaceholder(true)
-    }, [product.id])
+    }, [productId])
 
     const imageUrl =
       (product.image_urls && product.image_urls[0]) || product.thumbnail_url || "/diverse-fashion-display.png"
@@ -150,7 +151,6 @@ const ProductCard = memo(
             </div>
 
             <div className="p-1.5 sm:p-2 md:p-3">
-              {/* Product Name - Smaller text for 3-col mobile */}
               <h3 className="text-gray-800 text-[10px] sm:text-xs md:text-sm line-clamp-2 leading-tight mb-1 sm:mb-1.5 min-h-[24px] sm:min-h-[32px] md:min-h-[40px]">
                 {product.name}
               </h3>
@@ -166,7 +166,6 @@ const ProductCard = memo(
                 )}
               </div>
 
-              {/* Star Rating */}
               <StarRating rating={rating} reviewCount={reviewCount} />
             </div>
           </div>
@@ -179,53 +178,64 @@ const ProductCard = memo(
 ProductCard.displayName = "ProductCard"
 
 const ProductGridSkeleton = ({ count = 12 }: { count?: number }) => (
-  <div className="grid grid-cols-3 gap-[1px] bg-gray-100 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-    {[...Array(count)].map((_, i) => (
-      <motion.div
-        key={i}
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: i * 0.02, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-        className="bg-white p-1.5 sm:p-2 md:p-3"
-      >
-        <div className="aspect-square w-full bg-[#f5f5f7] flex items-center justify-center relative overflow-hidden mb-1.5 sm:mb-2">
+  <section className="w-full">
+    <div className="w-full">
+      <div className="grid grid-cols-3 gap-[1px] bg-gray-100 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+        {[...Array(count)].map((_, i) => (
           <motion.div
-            animate={{
-              backgroundPosition: ["0% 0%", "100% 100%"],
-              opacity: [0.5, 0.8, 0.5],
-            }}
-            transition={{
-              duration: 2,
-              repeat: Number.POSITIVE_INFINITY,
-              ease: "linear",
-            }}
-            className="absolute inset-0 bg-gradient-to-r from-[#f5f5f7] via-[#e0e0e3] to-[#f5f5f7] bg-[length:400%_400%]"
-          />
-          <motion.div
-            animate={{
-              scale: [1, 1.05, 1],
-              opacity: [0.6, 1, 0.6],
-            }}
-            transition={{
-              duration: 2,
-              repeat: Number.POSITIVE_INFINITY,
-              ease: "easeInOut",
-            }}
-            className="text-center z-10"
+            key={i}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.02, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            className="bg-white p-1.5 sm:p-2 md:p-3"
           >
-            <Package className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-gray-300 mx-auto" />
+            <div className="aspect-square w-full bg-[#f5f5f7] flex items-center justify-center relative overflow-hidden mb-1.5 sm:mb-2">
+              <motion.div
+                animate={{
+                  backgroundPosition: ["0% 0%", "100% 100%"],
+                  opacity: [0.5, 0.8, 0.5],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Number.POSITIVE_INFINITY,
+                  ease: "linear",
+                }}
+                className="absolute inset-0 bg-gradient-to-r from-[#f5f5f7] via-[#e0e0e3] to-[#f5f5f7] bg-[length:400%_400%]"
+              />
+              <motion.div
+                animate={{
+                  scale: [1, 1.05, 1],
+                  opacity: [0.6, 1, 0.6],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Number.POSITIVE_INFINITY,
+                  ease: "easeInOut",
+                }}
+                className="text-center z-10"
+              >
+                <Package className="h-4 w-4 sm:h-5 sm:w-5 md:h-6 md:w-6 text-gray-300 mx-auto" />
+              </motion.div>
+            </div>
+            <Skeleton className="h-2.5 sm:h-3 md:h-4 w-3/4 bg-[#f5f5f7] rounded-full mb-1.5 sm:mb-2" />
+            <Skeleton className="h-2.5 sm:h-3 md:h-4 w-1/2 bg-[#f5f5f7] rounded-full mb-1.5 sm:mb-2" />
+            <div className="flex gap-0.5 sm:gap-1">
+              {[...Array(5)].map((_, j) => (
+                <Skeleton key={j} className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-3.5 md:w-3.5 bg-[#f5f5f7] rounded-full" />
+              ))}
+            </div>
           </motion.div>
-        </div>
-        <Skeleton className="h-2.5 sm:h-3 md:h-4 w-3/4 bg-[#f5f5f7] rounded-full mb-1.5 sm:mb-2" />
-        <Skeleton className="h-2.5 sm:h-3 md:h-4 w-1/2 bg-[#f5f5f7] rounded-full mb-1.5 sm:mb-2" />
-        <div className="flex gap-0.5 sm:gap-1">
-          {[...Array(5)].map((_, j) => (
-            <Skeleton key={j} className="h-2.5 w-2.5 sm:h-3 sm:w-3 md:h-3.5 md:w-3.5 bg-[#f5f5f7] rounded-full" />
-          ))}
-        </div>
-      </motion.div>
-    ))}
-  </div>
+        ))}
+      </div>
+    </div>
+    <style jsx>{`
+      @keyframes shimmer {
+        100% {
+          transform: translateX(100%);
+        }
+      }
+    `}</style>
+  </section>
 )
 
 interface ProductGridProps {
@@ -243,7 +253,6 @@ export function ProductGrid({ limit = 12, category }: ProductGridProps) {
   const [newlyLoadedStartIndex, setNewlyLoadedStartIndex] = useState<number | null>(null)
 
   const productsLengthRef = useRef(0)
-
   const initialLoadDone = useRef(false)
 
   const fetchProducts = useCallback(
@@ -256,15 +265,11 @@ export function ProductGrid({ limit = 12, category }: ProductGridProps) {
         }
         setError(null)
 
-        console.log("[v0] Fetching products - page:", pageNum, "append:", append)
-
         const data = await productService.getProducts({
           limit,
           category_slug: category,
           page: pageNum,
         })
-
-        console.log("[v0] Received products:", data?.length || 0)
 
         if (append) {
           setProducts((prev) => {
@@ -291,7 +296,6 @@ export function ProductGrid({ limit = 12, category }: ProductGridProps) {
   )
 
   const handleShowMore = async () => {
-    console.log("[v0] Show More clicked - current page:", page)
     const nextPage = page + 1
     setPage(nextPage)
     await fetchProducts(nextPage, true)
@@ -302,7 +306,7 @@ export function ProductGrid({ limit = 12, category }: ProductGridProps) {
       initialLoadDone.current = true
       fetchProducts()
     }
-  }, []) // Empty dependency - only run on mount
+  }, [])
 
   useEffect(() => {
     if (initialLoadDone.current) {
@@ -312,9 +316,7 @@ export function ProductGrid({ limit = 12, category }: ProductGridProps) {
   }, [category, limit])
 
   useEffect(() => {
-    const handleProductImagesUpdated = (event: CustomEvent) => {
-      const { productId } = event.detail
-
+    const handleProductImagesUpdated = () => {
       setProducts([])
       setLoading(true)
       setPage(1)
@@ -327,7 +329,6 @@ export function ProductGrid({ limit = 12, category }: ProductGridProps) {
     }
 
     window.addEventListener("productImagesUpdated", handleProductImagesUpdated as EventListener)
-
     return () => {
       window.removeEventListener("productImagesUpdated", handleProductImagesUpdated as EventListener)
     }
@@ -393,7 +394,6 @@ export function ProductGrid({ limit = 12, category }: ProductGridProps) {
                   exit={{ opacity: 0 }}
                   className="flex items-center justify-center"
                 >
-                  {/* Apple-style colored star spinner */}
                   <div className="relative w-5 h-5">
                     {[...Array(12)].map((_, i) => (
                       <motion.span

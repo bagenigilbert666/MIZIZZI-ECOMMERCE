@@ -7,6 +7,7 @@ import { NetworkStatus } from "@/components/shared/network-status"
 import { CategoryGrid } from "@/components/features/category-grid-enhanced"
 import { Carousel } from "@/components/features/carousel"
 import { prefetchHomeData } from "@/lib/prefetch-home-data"
+import { ShoppingBag } from "lucide-react"
 
 const FlashSalesSkeleton = () => (
   <div className="w-full">
@@ -167,17 +168,15 @@ export default function Home() {
             <DailyFinds />
           </section>
 
-          <section className="rounded-lg bg-white p-2 sm:p-4 shadow-sm overflow-hidden">
-            <motion.div
-              className="mb-4 flex items-center justify-between"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ duration: 0.3 }}
-            >
-              <h2 className="text-base sm:text-xl font-bold text-gray-900">All Products</h2>
+          <section className="rounded-lg bg-white shadow-sm overflow-hidden">
+            <div className="bg-[#8B1538] text-white flex items-center justify-between px-2 sm:px-4 py-1.5 sm:py-2">
+              <div className="flex items-center gap-1 sm:gap-2">
+                <ShoppingBag className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-300" />
+                <h2 className="font-bold text-sm sm:text-base md:text-lg whitespace-nowrap">All Products</h2>
+              </div>
               <Link
                 href="/products"
-                className="group flex items-center gap-1 text-xs sm:text-sm font-medium text-cherry-700 hover:text-cherry-900 transition-colors"
+                className="group flex items-center gap-1 text-xs sm:text-sm font-medium text-white hover:text-yellow-300 transition-colors"
               >
                 View All
                 <motion.span
@@ -188,8 +187,10 @@ export default function Home() {
                   →
                 </motion.span>
               </Link>
-            </motion.div>
-            <ProductGrid limit={12} />
+            </div>
+            <div className="p-1 sm:p-2">
+              <ProductGrid limit={12} />
+            </div>
           </section>
 
           <section className="rounded-lg bg-white shadow-sm overflow-hidden">

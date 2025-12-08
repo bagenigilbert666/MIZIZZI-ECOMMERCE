@@ -5,11 +5,10 @@ import { prefetchNewArrivals } from "@/hooks/use-swr-new-arrivals"
 import { prefetchDailyFinds } from "@/hooks/use-swr-daily-finds"
 import { prefetchTopPicks } from "@/hooks/use-swr-top-picks"
 import { prefetchTrending } from "@/hooks/use-swr-trending"
+import { prefetchProductGrid } from "@/hooks/use-swr-product-grid"
 
 let prefetchPromise: Promise<void> | null = null
-let secondaryPrefetchPromise: Promise<void> | null = null
 
-// Call this once on app initialization to prefetch critical data
 export async function prefetchHomeData(): Promise<void> {
   // Prevent multiple concurrent prefetch calls
   if (prefetchPromise) {
@@ -18,24 +17,20 @@ export async function prefetchHomeData(): Promise<void> {
 
   prefetchPromise = (async () => {
     try {
-      // Priority 1: Prefetch above-the-fold content first (Flash Sales, Luxury Deals)
-      await Promise.all([prefetchFlashSales(), prefetchLuxuryDeals()])
-
-      // Priority 2: Prefetch remaining sections in background (non-blocking)
-      secondaryPrefetchPromise = Promise.all([
+      // Run ALL prefetches in parallel for fastest loading
+      // This ensures Top Picks, Trending, New Arrivals, and Daily Finds
+      // load just as fast as Flash Sales and Luxury Deals
+      await Promise.all([
+        prefetchFlashSales(),
+        prefetchLuxuryDeals(),
         prefetchTopPicks(),
         prefetchNewArrivals(),
         prefetchTrending(),
         prefetchDailyFinds(),
+        prefetchProductGrid(12), // Prefetch product grid with default limit
       ])
-        .then(() => {
-          console.log("[v0] Secondary home data prefetched successfully")
-        })
-        .catch((error) => {
-          console.warn("[v0] Failed to prefetch secondary home data:", error)
-        })
 
-      console.log("[v0] Primary home data prefetched successfully")
+      console.log("[v0] All home data prefetched successfully")
     } catch (error) {
       console.warn("[v0] Failed to prefetch home data:", error)
     }
@@ -52,5 +47,4 @@ export function isPrefetchInitiated(): boolean {
 // Reset prefetch state (useful for testing)
 export function resetPrefetch(): void {
   prefetchPromise = null
-  secondaryPrefetchPromise = null
 }
