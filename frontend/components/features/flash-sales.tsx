@@ -73,7 +73,7 @@ function getProductImageUrl(product: Product): string {
     }
     return product.images[0].url
   }
-  return "/placeholder.svg?height=300&width=300"
+  return ""
 }
 
 const ProductCard = memo(({ product, isMobile }: { product: Product; isMobile: boolean }) => {
@@ -105,6 +105,8 @@ const ProductCard = memo(({ product, isMobile }: { product: Product; isMobile: b
   const rating = product.rating || 3 + Math.random() * 2
   const reviewCount = product.review_count || Math.floor(Math.random() * 5000) + 100
 
+  const hasValidImage = imageUrl && imageUrl.length > 0
+
   return (
     <Link href={`/product/${product.slug || product.id}`} prefetch={false}>
       <motion.div
@@ -118,7 +120,7 @@ const ProductCard = memo(({ product, isMobile }: { product: Product; isMobile: b
           {/* Image Container - Square aspect ratio */}
           <div className="relative aspect-square overflow-hidden bg-[#f8f8f8]">
             <AnimatePresence>
-              {(showPlaceholder || imageError) && (
+              {(showPlaceholder || imageError || !hasValidImage) && (
                 <motion.div
                   initial={{ opacity: 1 }}
                   exit={{ opacity: 0, transition: { duration: 0.3 } }}
@@ -128,23 +130,25 @@ const ProductCard = memo(({ product, isMobile }: { product: Product; isMobile: b
                 </motion.div>
               )}
             </AnimatePresence>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: imageLoaded ? 1 : 0 }}
-              transition={{ duration: 0.3 }}
-              className="absolute inset-0"
-            >
-              <Image
-                src={imageUrl || "/placeholder.svg"}
-                alt={product.name}
-                fill
-                sizes={isMobile ? "25vw" : "16vw"}
-                className="object-cover transition-transform duration-300 group-hover:scale-105"
-                loading="lazy"
-                onLoad={handleImageLoad}
-                onError={handleImageError}
-              />
-            </motion.div>
+            {hasValidImage && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: imageLoaded ? 1 : 0 }}
+                transition={{ duration: 0.3 }}
+                className="absolute inset-0"
+              >
+                <Image
+                  src={imageUrl || "/placeholder.svg"}
+                  alt={product.name}
+                  fill
+                  sizes={isMobile ? "25vw" : "16vw"}
+                  className="object-cover transition-transform duration-300 group-hover:scale-105"
+                  loading="lazy"
+                  onLoad={handleImageLoad}
+                  onError={handleImageError}
+                />
+              </motion.div>
+            )}
             {/* Discount Badge - Dark Cherry Red */}
             {product.sale_price && discountPercentage > 0 && (
               <div className="absolute top-1 left-1 bg-[#8B1538] text-white text-[10px] sm:text-xs font-medium px-1.5 py-0.5 rounded-sm z-20">

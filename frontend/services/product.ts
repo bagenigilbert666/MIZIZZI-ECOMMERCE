@@ -683,7 +683,38 @@ export const productService = {
    * @returns Promise resolving to an array of products
    */
   async getFlashSaleProducts(): Promise<Product[]> {
-    return this.getProducts({ flash_sale: true })
+    try {
+      // Try several possible endpoint variations (singular/plural/alternate forms)
+      const candidatePaths = [
+        "/api/products/featured/flash-sale",
+        "/api/products/featured/flash-sales",
+        "/api/products/featured/flash_sale",
+        "/api/products/featured/flashsales",
+      ]
+
+      for (const path of candidatePaths) {
+        try {
+          const url = `${API_BASE_URL}${path}`
+          const response = await api.get(url)
+          const items =
+            Array.isArray(response.data) ? response.data : response.data.items || response.data.products || []
+          return Array.isArray(items) ? items : []
+        } catch (e: any) {
+          // If the endpoint is not found, try the next candidate; otherwise rethrow
+          if (e?.response?.status === 404) {
+            continue
+          }
+          throw e
+        }
+      }
+
+      // If none of the endpoints exist, fall back to the filtered products endpoint
+      console.warn("[v0] Flash sales endpoint(s) not found, falling back to filter")
+      return this.getProducts({ flash_sale: true })
+    } catch (e: any) {
+      console.error("Error fetching flash sale products:", e)
+      return []
+    }
   },
 
   /**
@@ -691,7 +722,18 @@ export const productService = {
    * @returns Promise resolving to an array of products
    */
   async getLuxuryDealProducts(): Promise<Product[]> {
-    return this.getProducts({ luxury_deal: true })
+    try {
+      const url = `${API_BASE_URL}/api/products/featured/luxury-deals`
+      const response = await api.get(url)
+      const items = Array.isArray(response.data) ? response.data : response.data.items || response.data.products || []
+      return Array.isArray(items) ? items : []
+    } catch (e: any) {
+      if (e.response?.status === 404) {
+        return this.getProducts({ luxury_deal: true })
+      }
+      console.error("Error fetching luxury deal products:", e)
+      return []
+    }
   },
 
   /**
@@ -700,7 +742,19 @@ export const productService = {
    * @returns Promise resolving to an array of products
    */
   async getDailyFindProducts(limit = 12): Promise<Product[]> {
-    return this.getProducts({ daily_find: true, limit })
+    try {
+      const url = `${API_BASE_URL}/api/products/featured/daily-finds`
+      const response = await api.get(url)
+      const items = Array.isArray(response.data) ? response.data : response.data.items || response.data.products || []
+      const products = Array.isArray(items) ? items : []
+      return products.slice(0, limit)
+    } catch (e: any) {
+      if (e.response?.status === 404) {
+        return this.getProducts({ daily_find: true, limit })
+      }
+      console.error("Error fetching daily find products:", e)
+      return []
+    }
   },
 
   /**
@@ -708,7 +762,19 @@ export const productService = {
    * @returns Promise resolving to an array of products
    */
   async getTopPicks(limit = 12): Promise<Product[]> {
-    return this.getProducts({ top_pick: true, limit })
+    try {
+      const url = `${API_BASE_URL}/api/products/featured/top-picks`
+      const response = await api.get(url)
+      const items = Array.isArray(response.data) ? response.data : response.data.items || response.data.products || []
+      const products = Array.isArray(items) ? items : []
+      return products.slice(0, limit)
+    } catch (e: any) {
+      if (e.response?.status === 404) {
+        return this.getProducts({ top_pick: true, limit })
+      }
+      console.error("Error fetching top picks:", e)
+      return []
+    }
   },
 
   /**
@@ -717,7 +783,19 @@ export const productService = {
    * @returns Promise resolving to an array of products
    */
   async getTrendingProducts(limit = 12): Promise<Product[]> {
-    return this.getProducts({ trending: true, limit })
+    try {
+      const url = `${API_BASE_URL}/api/products/featured/trending`
+      const response = await api.get(url)
+      const items = Array.isArray(response.data) ? response.data : response.data.items || response.data.products || []
+      const products = Array.isArray(items) ? items : []
+      return products.slice(0, limit)
+    } catch (e: any) {
+      if (e.response?.status === 404) {
+        return this.getProducts({ trending: true, limit })
+      }
+      console.error("Error fetching trending products:", e)
+      return []
+    }
   },
 
   /**
@@ -726,10 +804,20 @@ export const productService = {
    * @returns Promise resolving to an array of products
    */
   async getNewArrivalProducts(limit = 12): Promise<Product[]> {
-    // Fetch more items initially to handle cases where backend filtering might be partial
-    // or when we need to filter client-side from a larger pool
-    const products = await this.getProducts({ new_arrival: true, limit: 50 })
-    return products.slice(0, limit)
+    try {
+      const url = `${API_BASE_URL}/api/products/featured/new_arrivals`
+      const response = await api.get(url)
+      const items = Array.isArray(response.data) ? response.data : response.data.items || response.data.products || []
+      const products = Array.isArray(items) ? items : []
+      return products.slice(0, limit)
+    } catch (e: any) {
+      if (e.response?.status === 404) {
+        const products = await this.getProducts({ new_arrival: true, limit: 50 })
+        return products.slice(0, limit)
+      }
+      console.error("Error fetching new arrivals:", e)
+      return []
+    }
   },
 
   /**
@@ -1003,9 +1091,9 @@ export const productService = {
   },
 
   /**
-   * Prefetch products by category
+   * Get product by category
    * @param categoryId The category ID
-   * @returns Promise resolving to a boolean
+   * @returns Promise resolving to an array of products
    */
   async prefetchProductsByCategory(categoryId: string): Promise<boolean> {
     return prefetchData("/api/products", { category_id: categoryId, limit: 12 })
