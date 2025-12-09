@@ -262,3 +262,4 @@ wrapt
 wsproto
 WTForms
 yarl
+orjson
