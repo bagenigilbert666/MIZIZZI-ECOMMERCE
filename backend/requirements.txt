@@ -263,3 +263,5 @@ wsproto
 WTForms
 yarl
 orjson
+Flask-Compress
+upstash-redis

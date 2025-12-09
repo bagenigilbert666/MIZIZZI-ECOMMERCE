@@ -1,6 +1,6 @@
 """
-Redis Cache Utility for Mizizzi E-commerce platform.
-OPTIMIZED: High-performance caching with pre-serialized JSON storage.
+Upstash Redis Cache Utility for Mizizzi E-commerce platform.
+OPTIMIZED: High-performance caching with Upstash Redis (serverless, HTTP-based).
 """
 import os
 import logging
@@ -34,13 +34,12 @@ except ImportError:
     FAST_JSON = False
     logger.info("orjson not available, using standard json")
 
-# Try to import redis
 try:
-    import redis
-    REDIS_AVAILABLE = True
+    from upstash_redis import Redis as UpstashRedis
+    UPSTASH_AVAILABLE = True
 except ImportError:
-    REDIS_AVAILABLE = False
-    logger.warning("Redis package not installed. Using in-memory fallback cache.")
+    UPSTASH_AVAILABLE = False
+    logger.warning("upstash-redis package not installed. Using in-memory fallback cache.")
 
 # In-memory fallback cache
 _memory_cache = {}
@@ -49,18 +48,25 @@ _memory_cache_timestamps = {}
 
 class RedisCache:
     """
-    High-performance Redis cache wrapper with fallback to in-memory cache.
-    OPTIMIZED: Stores pre-serialized JSON strings for instant cache hits.
+    High-performance Upstash Redis cache wrapper with fallback to in-memory cache.
+    OPTIMIZED: Uses Upstash REST API for serverless-friendly caching.
     """
     
-    def __init__(self, redis_url: Optional[str] = None):
+    def __init__(self):
         """
-        Initialize Redis connection.
+        Initialize Upstash Redis connection using environment variables.
+        Required env vars: UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN
+        (or KV_REST_API_URL and KV_REST_API_TOKEN from Vercel integration)
+        """
+        self.upstash_url = (
+            os.environ.get('UPSTASH_REDIS_REST_URL') or 
+            os.environ.get('KV_REST_API_URL')
+        )
+        self.upstash_token = (
+            os.environ.get('UPSTASH_REDIS_REST_TOKEN') or 
+            os.environ.get('KV_REST_API_TOKEN')
+        )
         
-        Args:
-            redis_url: Redis connection URL (defaults to REDIS_URL env var)
-        """
-        self.redis_url = redis_url or os.environ.get('REDIS_URL')
         self._client = None
         self._connected = False
         self._stats = {
@@ -70,29 +76,33 @@ class RedisCache:
             'errors': 0
         }
         
-        if REDIS_AVAILABLE and self.redis_url:
+        if not self.upstash_url or not self.upstash_token:
+            logger.warning(
+                "Upstash Redis credentials not found in environment variables. "
+                "Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN in your .env file. "
+                "Using in-memory cache as fallback."
+            )
+            return
+        
+        if UPSTASH_AVAILABLE:
             try:
-                self._client = redis.from_url(
-                    self.redis_url,
-                    decode_responses=True,
-                    socket_timeout=5,
-                    socket_connect_timeout=5,
-                    retry_on_timeout=True,
-                    health_check_interval=30
+                self._client = UpstashRedis(
+                    url=self.upstash_url,
+                    token=self.upstash_token
                 )
-                # Test connection
+                # Test connection with a ping
                 self._client.ping()
                 self._connected = True
-                logger.info("Redis cache connected successfully")
+                logger.info(f"Upstash Redis cache connected successfully to {self.upstash_url}")
             except Exception as e:
-                logger.warning(f"Redis connection failed, using memory cache: {e}")
+                logger.warning(f"Upstash Redis connection failed, using memory cache: {e}")
                 self._connected = False
         else:
-            logger.info("Redis not configured, using in-memory cache")
+            logger.info("upstash-redis not installed, using in-memory cache")
     
     @property
     def is_connected(self) -> bool:
-        """Check if Redis is connected."""
+        """Check if Upstash Redis is connected."""
         return self._connected and self._client is not None
     
     @property
@@ -104,21 +114,14 @@ class RedisCache:
             **self._stats,
             'total_requests': total,
             'hit_rate_percent': round(hit_rate, 2),
-            'fast_json': FAST_JSON
+            'fast_json': FAST_JSON,
+            'cache_type': 'upstash' if self.is_connected else 'memory'
         }
 
     def _generate_key(self, prefix: str, params: dict) -> str:
         """
         Generate a cache key from prefix and parameters.
-        
-        Args:
-            prefix: Cache key prefix
-            params: Query parameters to include in key
-            
-        Returns:
-            A unique cache key string
         """
-        # Sort params for consistent key generation
         sorted_params = sorted(params.items())
         param_str = fast_json_dumps(sorted_params)
         param_hash = hashlib.md5(param_str.encode()).hexdigest()[:12]
@@ -165,7 +168,7 @@ class RedisCache:
         """
         try:
             if self.is_connected:
-                self._client.setex(key, ttl, value)
+                self._client.set(key, value, ex=ttl)
                 logger.debug(f"CACHE SET (raw): {key} (TTL: {ttl}s)")
                 self._stats['sets'] += 1
                 return True
@@ -182,13 +185,7 @@ class RedisCache:
     
     def get(self, key: str) -> Optional[Any]:
         """
-        Get value from cache.
-        
-        Args:
-            key: Cache key
-            
-        Returns:
-            Cached value or None if not found
+        Get value from cache and deserialize.
         """
         try:
             if self.is_connected:
@@ -196,7 +193,7 @@ class RedisCache:
                 if value:
                     logger.debug(f"CACHE HIT: {key}")
                     self._stats['hits'] += 1
-                    return fast_json_loads(value)
+                    return fast_json_loads(value) if isinstance(value, str) else value
                 logger.debug(f"CACHE MISS: {key}")
                 self._stats['misses'] += 1
                 return None
@@ -221,21 +218,13 @@ class RedisCache:
     
     def set(self, key: str, value: Any, ttl: int = 30) -> bool:
         """
-        Set value in cache.
-        
-        Args:
-            key: Cache key
-            value: Value to cache
-            ttl: Time to live in seconds (default 30)
-            
-        Returns:
-            True if successful, False otherwise
+        Serialize value and set in cache.
         """
         try:
             json_value = fast_json_dumps(value)
             
             if self.is_connected:
-                self._client.setex(key, ttl, json_value)
+                self._client.set(key, json_value, ex=ttl)
                 logger.debug(f"CACHE SET: {key} (TTL: {ttl}s)")
                 self._stats['sets'] += 1
                 return True
@@ -253,12 +242,6 @@ class RedisCache:
     def delete(self, key: str) -> bool:
         """
         Delete a key from cache.
-        
-        Args:
-            key: Cache key to delete
-            
-        Returns:
-            True if successful, False otherwise
         """
         try:
             if self.is_connected:
@@ -289,9 +272,11 @@ class RedisCache:
             if self.is_connected:
                 keys = self._client.keys(pattern)
                 if keys:
-                    deleted = self._client.delete(*keys)
-                    logger.info(f"CACHE PATTERN DELETE: {pattern} ({deleted} keys)")
-                    return deleted
+                    # Delete keys one by one (Upstash REST API)
+                    for key in keys:
+                        self._client.delete(key)
+                    logger.info(f"CACHE PATTERN DELETE: {pattern} ({len(keys)} keys)")
+                    return len(keys)
                 return 0
             else:
                 prefix = pattern.replace('*', '')
@@ -312,21 +297,19 @@ class RedisCache:
     def invalidate_featured(self) -> int:
         """Invalidate all featured product cache entries."""
         count = self.delete_pattern("mizizzi:featured:*")
-        count += self.delete_pattern("mizizzi:fast:*")  # Also clear fast endpoints
+        count += self.delete_pattern("mizizzi:fast:*")
         return count
     
     def flush_all(self) -> bool:
         """
-        Flush all cache entries. Use with caution!
-        
-        Returns:
-            True if successful, False otherwise
+        Flush all mizizzi cache entries. Use with caution!
         """
         try:
             if self.is_connected:
                 keys = self._client.keys("mizizzi:*")
                 if keys:
-                    self._client.delete(*keys)
+                    for key in keys:
+                        self._client.delete(key)
                 logger.info("CACHE FLUSH: All mizizzi keys cleared")
                 return True
             else:
@@ -351,11 +334,6 @@ def cached_response(prefix: str, ttl: int = 30, key_params: Optional[list] = Non
         prefix: Cache key prefix (e.g., "products", "featured")
         ttl: Cache time to live in seconds (default 30)
         key_params: List of request args to include in cache key
-        
-    Usage:
-        @cached_response("products", ttl=30, key_params=["page", "per_page", "category_id"])
-        def get_products():
-            ...
     """
     def decorator(func: Callable):
         @wraps(func)
@@ -415,11 +393,6 @@ def fast_cached_response(prefix: str, ttl: int = 30, key_params: Optional[list] 
     """
     ULTRA-FAST decorator that caches pre-serialized JSON strings.
     Bypasses Flask's jsonify() on cache hits for maximum speed.
-    
-    Args:
-        prefix: Cache key prefix
-        ttl: Cache time to live in seconds (default 30)
-        key_params: List of request args to include in cache key
     """
     def decorator(func: Callable):
         @wraps(func)
@@ -441,7 +414,6 @@ def fast_cached_response(prefix: str, ttl: int = 30, key_params: Optional[list] 
                 cached_json = product_cache.get_raw(cache_key)
                 if cached_json is not None:
                     current_app.logger.info(f"[FAST CACHE HIT] {prefix} - {cache_key}")
-                    # Return raw JSON string directly - no serialization needed!
                     response = Response(
                         cached_json,
                         status=200,
@@ -464,11 +436,9 @@ def fast_cached_response(prefix: str, ttl: int = 30, key_params: Optional[list] 
                     data, status_code = result, 200
                 
                 if status_code == 200:
-                    # Serialize once and cache the string
                     json_str = fast_json_dumps(data)
                     product_cache.set_raw(cache_key, json_str, ttl)
                     
-                    # Return response
                     response = Response(
                         json_str,
                         status=200,
@@ -478,7 +448,6 @@ def fast_cached_response(prefix: str, ttl: int = 30, key_params: Optional[list] 
                     response.headers['X-Cache-Key'] = cache_key
                     return response
                 else:
-                    # Error response
                     return Response(
                         fast_json_dumps(data),
                         status=status_code,
@@ -505,14 +474,6 @@ def fast_cached_response(prefix: str, ttl: int = 30, key_params: Optional[list] 
 def invalidate_on_change(prefixes: list):
     """
     Decorator to invalidate cache after successful mutations (POST, PUT, DELETE).
-    
-    Args:
-        prefixes: List of cache prefixes to invalidate
-        
-    Usage:
-        @invalidate_on_change(["products", "featured"])
-        def update_product():
-            ...
     """
     def decorator(func: Callable):
         @wraps(func)
