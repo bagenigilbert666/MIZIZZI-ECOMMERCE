@@ -265,4 +265,3 @@ yarl
 orjson
 Flask-Compress
 upstash-redis
-redis_cache
