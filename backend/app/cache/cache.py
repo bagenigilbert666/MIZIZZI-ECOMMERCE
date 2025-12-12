@@ -461,7 +461,6 @@ def cached_response(namespace: str, ttl: int = 30, key_params: Optional[list] = 
                 # Execute function
                 result = func(*args, **kwargs)
                 
-                # Handle tuple returns (data, status_code)
                 if isinstance(result, tuple):
                     data, status_code = result[0], result[1] if len(result) > 1 else 200
                     if status_code == 200:
@@ -470,11 +469,23 @@ def cached_response(namespace: str, ttl: int = 30, key_params: Optional[list] = 
                         else:
                             json_data = data
                         cache_manager.set(cache_key, json_data, ttl)
+                        # Add X-Cache: MISS header to response
+                        if hasattr(data, 'headers'):
+                            data.headers['X-Cache'] = 'MISS'
+                            data.headers['X-Cache-Key'] = cache_key
+                        else:
+                            response = jsonify(json_data)
+                            response.headers['X-Cache'] = 'MISS'
+                            response.headers['X-Cache-Key'] = cache_key
+                            return response, status_code
                     return result
                 else:
                     if hasattr(result, 'get_json'):
                         json_data = result.get_json()
                         cache_manager.set(cache_key, json_data, ttl)
+                        # Add X-Cache: MISS header to response
+                        result.headers['X-Cache'] = 'MISS'
+                        result.headers['X-Cache-Key'] = cache_key
                     return result
                     
             except Exception as e:

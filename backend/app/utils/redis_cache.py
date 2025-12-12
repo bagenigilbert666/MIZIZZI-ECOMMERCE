@@ -243,11 +243,20 @@ except ImportError as e:
                     if cached:
                         response = jsonify(cached)
                         response.headers['X-Cache'] = 'HIT'
+                        response.headers['X-Cache-Key'] = cache_key
                         return response, 200
                     result = func(*args, **kwargs)
                     if isinstance(result, tuple) and result[1] == 200:
                         data = result[0].get_json() if hasattr(result[0], 'get_json') else result[0]
                         product_cache.set(cache_key, data, ttl)
+                        if hasattr(result[0], 'headers'):
+                            result[0].headers['X-Cache'] = 'MISS'
+                            result[0].headers['X-Cache-Key'] = cache_key
+                        else:
+                            response = jsonify(data)
+                            response.headers['X-Cache'] = 'MISS'
+                            response.headers['X-Cache-Key'] = cache_key
+                            return response, 200
                     return result
                 except Exception as e:
                     current_app.logger.error(f"Cache error: {e}")
