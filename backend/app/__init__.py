@@ -113,8 +113,7 @@ except ImportError:
                 if database_url.startswith('postgres://'):
                     database_url = database_url.replace('postgres://', 'postgresql://', 1)
                 return database_url
-            # FIX APPLIED HERE: Returned string instead of tuple
-            return 'postgresql://neondb_owner:npg_0gMwASZYo9pJ@ep-shiny-term-adlossxs-pooler.c-2.us-east-1.aws.neon.tech/mizizzi_project?sslmode=require&channel_binding=require'
+            return 'DATABASE_URL', 'postgresql://neondb_owner:npg_0gMwASZYo9pJ@ep-shiny-term-adlossxs-pooler.c-2.us-east-1.aws.neon.tech/mizizzi_project?sslmode=require&channel_binding=require'
         
         # Minimal config classes
         class Config:
@@ -242,7 +241,7 @@ def create_app(config_name=None, enable_socketio=True):
         supports_credentials=True,
         allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Cache-Control", "cache-control", "Pragma", "Expires", "X-MFA-Token", "Accept", "Origin"],
         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-        expose_headers=["Content-Range", "X-Content-Range"],
+        expose_headers=["Content-Range", "X-Content-Range", "X-Cache", "X-Cache-Key", "X-Fast-Cache"],
         send_wildcard=False,
         vary_header=True
     )

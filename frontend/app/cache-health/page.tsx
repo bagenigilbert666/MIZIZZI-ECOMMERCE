@@ -21,6 +21,7 @@ import {
   TrendingUp,
   AlertTriangle,
   ArrowLeft,
+  LayoutGrid,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -52,6 +53,16 @@ interface PingResult {
   error?: string
 }
 
+interface RouteTestResult {
+  route: string
+  endpoint: string
+  status: "success" | "error" | "pending"
+  latency?: number
+  cached?: boolean
+  cacheHit?: boolean
+  error?: string
+}
+
 export default function CacheHealthPage() {
   const [cacheStats, setCacheStats] = useState<CacheStats | null>(null)
   const [healthChecks, setHealthChecks] = useState<HealthCheck[]>([])
@@ -59,6 +70,8 @@ export default function CacheHealthPage() {
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [pingResults, setPingResults] = useState<PingResult[]>([])
+  const [routeTests, setRouteTests] = useState<RouteTestResult[]>([])
+  const [testingRoutes, setTestingRoutes] = useState(false)
 
   const runHealthChecks = useCallback(async () => {
     setLoading(true)
@@ -109,7 +122,6 @@ export default function CacheHealthPage() {
         let perfMessage: string
 
         if (isWarmingUp) {
-          // Cache is warming up - don't judge harshly
           perfStatus = "warming"
           perfMessage = `Warming up: ${hitRate.toFixed(1)}% hit rate (${data.stats.hits}/${totalRequests} requests)`
         } else if (hitRate >= 70) {
@@ -130,7 +142,7 @@ export default function CacheHealthPage() {
         }
         checks.push(perfCheck)
 
-        // Check 4: Fast JSON (orjson) - informational, not critical
+        // Check 4: Fast JSON (orjson)
         const jsonCheck: HealthCheck = {
           name: "Fast JSON (orjson)",
           status: data.stats.fast_json ? "healthy" : "warming",
@@ -187,10 +199,87 @@ export default function CacheHealthPage() {
           error: error instanceof Error ? error.message : "Failed",
         })
       }
-      // Small delay between pings
       await new Promise((r) => setTimeout(r, 200))
     }
     setPingResults(results)
+  }, [])
+
+  const runRouteCacheTests = useCallback(async () => {
+    setTestingRoutes(true)
+
+    const routes = [
+      { name: "Products", endpoint: "/api/products?page=1&per_page=10" },
+      { name: "Featured Products", endpoint: "/api/products/featured?limit=10" },
+      { name: "Categories", endpoint: "/api/categories?per_page=100" },
+      { name: "Categories Tree", endpoint: "/api/categories/tree" },
+      { name: "Featured Categories", endpoint: "/api/categories/featured?limit=6" },
+      { name: "Carousel", endpoint: "/api/carousel/items?position=homepage" },
+      { name: "Footer", endpoint: "/api/footer/settings" },
+      { name: "Topbar", endpoint: "/api/topbar/slides" },
+      { name: "Theme", endpoint: "/api/theme/active" },
+      { name: "Theme CSS", endpoint: "/api/theme/css" },
+    ]
+
+    const results: RouteTestResult[] = routes.map((r) => ({
+      route: r.name,
+      endpoint: r.endpoint,
+      status: "pending" as const,
+    }))
+    setRouteTests([...results])
+
+    // Test each route twice - first to potentially populate cache, second to check cache hit
+    for (let i = 0; i < routes.length; i++) {
+      const route = routes[i]
+
+      try {
+        // First request
+        const startTime1 = performance.now()
+        const response1 = await fetch(`${API_URL}${route.endpoint}`, {
+          headers: { "Content-Type": "application/json" },
+        })
+        const latency1 = Math.round(performance.now() - startTime1)
+        const cacheHeader1 = response1.headers.get("X-Cache")
+
+        // Small delay
+        await new Promise((r) => setTimeout(r, 100))
+
+        // Second request (should be cached)
+        const startTime2 = performance.now()
+        const response2 = await fetch(`${API_URL}${route.endpoint}`, {
+          headers: { "Content-Type": "application/json" },
+        })
+        const latency2 = Math.round(performance.now() - startTime2)
+        const cacheHeader2 = response2.headers.get("X-Cache")
+
+        let data: Record<string, unknown> = {}
+        try {
+          data = await response2.json()
+        } catch {
+          // Response might not be JSON
+        }
+
+        results[i] = {
+          route: route.name,
+          endpoint: route.endpoint,
+          status: response2.ok ? "success" : "error",
+          latency: latency2,
+          cached: data.cached === true || cacheHeader2 === "HIT",
+          cacheHit: cacheHeader2 === "HIT" || latency2 < latency1 * 0.7, // If 2nd request is significantly faster
+          error: response2.ok ? undefined : `HTTP ${response2.status}`,
+        }
+      } catch (error) {
+        results[i] = {
+          route: route.name,
+          endpoint: route.endpoint,
+          status: "error",
+          error: error instanceof Error ? error.message : "Failed",
+        }
+      }
+
+      setRouteTests([...results])
+    }
+
+    setTestingRoutes(false)
   }, [])
 
   useEffect(() => {
@@ -199,7 +288,7 @@ export default function CacheHealthPage() {
 
   useEffect(() => {
     if (autoRefresh) {
-      const interval = setInterval(runHealthChecks, 10000) // Refresh every 10 seconds
+      const interval = setInterval(runHealthChecks, 10000)
       return () => clearInterval(interval)
     }
   }, [autoRefresh, runHealthChecks])
@@ -207,7 +296,6 @@ export default function CacheHealthPage() {
   const getOverallHealth = () => {
     if (healthChecks.length === 0) return "checking"
 
-    // Only API and Redis connection are critical
     const criticalChecks = healthChecks.filter(
       (c) => c.name === "API Server" || c.name === "Upstash Redis" || c.name === "Error Rate",
     )
@@ -215,11 +303,9 @@ export default function CacheHealthPage() {
     const hasUnhealthyCritical = criticalChecks.some((c) => c.status === "unhealthy")
     if (hasUnhealthyCritical) return "unhealthy"
 
-    // Check for degraded (but not warming)
     const hasDegraded = healthChecks.some((c) => c.status === "degraded")
     if (hasDegraded) return "degraded"
 
-    // Check if anything is still warming up
     const hasWarming = healthChecks.some((c) => c.status === "warming")
     if (hasWarming) return "warming"
 
@@ -282,7 +368,7 @@ export default function CacheHealthPage() {
 
   return (
     <div className="min-h-screen bg-background p-4 sm:p-6">
-      <div className="mx-auto max-w-4xl space-y-6">
+      <div className="mx-auto max-w-5xl space-y-6">
         {/* Header */}
         <div className="flex items-start justify-between">
           <div className="space-y-1">
@@ -296,7 +382,9 @@ export default function CacheHealthPage() {
               </Link>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Cache Health Dashboard</h1>
-            <p className="text-muted-foreground">Monitor Upstash Redis cache status and performance</p>
+            <p className="text-muted-foreground">
+              Monitor Upstash Redis cache status and performance across all routes
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <Button
@@ -466,6 +554,102 @@ export default function CacheHealthPage() {
           </Card>
         )}
 
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <LayoutGrid className="h-5 w-5" />
+                  Route Cache Tests
+                </CardTitle>
+                <CardDescription>Test caching on all public API routes</CardDescription>
+              </div>
+              <Button variant="outline" size="sm" onClick={runRouteCacheTests} disabled={testingRoutes}>
+                {testingRoutes ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Zap className="h-4 w-4 mr-1" />}
+                Test All Routes
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            {routeTests.length > 0 ? (
+              <div className="space-y-3">
+                {routeTests.map((test, i) => (
+                  <div
+                    key={i}
+                    className={`flex items-center justify-between p-3 rounded-lg border ${
+                      test.status === "success"
+                        ? "border-green-200 bg-green-50"
+                        : test.status === "error"
+                          ? "border-red-200 bg-red-50"
+                          : "border-muted bg-muted/30"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {test.status === "success" ? (
+                        <CheckCircle2 className="h-5 w-5 text-green-600" />
+                      ) : test.status === "error" ? (
+                        <XCircle className="h-5 w-5 text-red-600" />
+                      ) : (
+                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+                      )}
+                      <div>
+                        <p className="font-medium">{test.route}</p>
+                        <p className="text-xs text-muted-foreground font-mono">{test.endpoint}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {test.latency !== undefined && (
+                        <Badge variant="outline" className="text-xs">
+                          {test.latency}ms
+                        </Badge>
+                      )}
+                      {test.cached !== undefined && (
+                        <Badge variant={test.cached ? "default" : "secondary"} className="text-xs">
+                          {test.cached ? "Cached" : "Not Cached"}
+                        </Badge>
+                      )}
+                      {test.cacheHit !== undefined && test.cacheHit && (
+                        <Badge variant="outline" className="text-xs border-green-500 text-green-600">
+                          HIT
+                        </Badge>
+                      )}
+                      {test.error && <span className="text-xs text-red-600">{test.error}</span>}
+                    </div>
+                  </div>
+                ))}
+
+                {/* Summary */}
+                {!testingRoutes && routeTests.length > 0 && (
+                  <div className="mt-4 p-4 rounded-lg bg-muted/50">
+                    <div className="grid grid-cols-3 gap-4 text-center">
+                      <div>
+                        <p className="text-2xl font-bold text-green-600">
+                          {routeTests.filter((t) => t.status === "success").length}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Passed</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-red-600">
+                          {routeTests.filter((t) => t.status === "error").length}
+                        </p>
+                        <p className="text-xs text-muted-foreground">Failed</p>
+                      </div>
+                      <div>
+                        <p className="text-2xl font-bold text-blue-600">{routeTests.filter((t) => t.cached).length}</p>
+                        <p className="text-xs text-muted-foreground">Using Cache</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-8 text-muted-foreground">
+                Click &quot;Test All Routes&quot; to verify caching on all endpoints
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Latency Test */}
         <Card>
           <CardHeader>
@@ -534,35 +718,28 @@ export default function CacheHealthPage() {
           </CardContent>
         </Card>
 
-        {/* API Endpoint Info */}
+        {/* Connection Info */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Connection Details</CardTitle>
+            <CardTitle>Connection Information</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                <span className="text-sm text-muted-foreground">API Endpoint</span>
-                <code className="text-xs bg-background px-2 py-1 rounded">{API_URL}</code>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">API URL</span>
+                <code className="text-xs bg-muted px-2 py-1 rounded">{API_URL}</code>
               </div>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                <span className="text-sm text-muted-foreground">Cache Status Endpoint</span>
-                <code className="text-xs bg-background px-2 py-1 rounded">/api/products/cache/status</code>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Cache Provider</span>
+                <span>{cacheStats?.type || "Unknown"}</span>
               </div>
-              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/50">
-                <span className="text-sm text-muted-foreground">Featured Cache Status</span>
-                <code className="text-xs bg-background px-2 py-1 rounded">/api/products/featured/cache-status</code>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Last Update</span>
+                <span>{cacheStats?.timestamp || "N/A"}</span>
               </div>
             </div>
           </CardContent>
         </Card>
-
-        {/* Link to detailed testing page */}
-        <div className="text-center">
-          <Link href="/redis-test" className="text-sm text-muted-foreground hover:text-foreground underline">
-            Need detailed endpoint testing? Go to Redis Performance Test Page
-          </Link>
-        </div>
       </div>
     </div>
   )

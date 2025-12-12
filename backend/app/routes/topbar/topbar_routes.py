@@ -23,9 +23,26 @@ try:
         fast_json_dumps
     )
     CACHE_AVAILABLE = True
+    logger.info("✅ Redis cache available for topbar routes")
 except ImportError as e:
     logger.warning(f"Redis cache not available: {e}")
     CACHE_AVAILABLE = False
+    product_cache = None
+    
+    def cached_response(prefix, ttl=30, key_params=None):
+        def decorator(func):
+            return func
+        return decorator
+    
+    def fast_cached_response(prefix, ttl=30, key_params=None):
+        def decorator(func):
+            return func
+        return decorator
+    
+    def invalidate_on_change(prefixes):
+        def decorator(func):
+            return func
+        return decorator
 
 try:
     from ...models.topbar_model import TopBarSlide
@@ -57,7 +74,7 @@ def init_topbar_tables():
 # ============================================================================
 
 @topbar_routes.route('/slides', methods=['GET'])
-@cached_response("topbar_slides", ttl=120, key_params=[]) if CACHE_AVAILABLE else lambda f: f
+@cached_response("topbar_slides", ttl=120, key_params=[])
 def get_topbar_slides():
     """
     Get active topbar slides for display.
@@ -77,7 +94,7 @@ def get_topbar_slides():
             TopBarSlide.sort_order
         ).all()
         
-        logger.info(f"[v0] Retrieved {len(slides)} active topbar slides")
+        logger.info(f"Retrieved {len(slides)} active topbar slides")
         
         slides_data = [slide.to_dict() for slide in slides]
         
@@ -85,6 +102,7 @@ def get_topbar_slides():
             "success": True,
             "slides": slides_data,
             "count": len(slides_data),
+            "cached": CACHE_AVAILABLE,
             "cached_at": datetime.utcnow().isoformat()
         }, 200
         
@@ -98,7 +116,7 @@ def get_topbar_slides():
 
 
 @topbar_routes.route('/slide/<int:slide_id>', methods=['GET'])
-@cached_response("topbar_slide", ttl=120, key_params=[]) if CACHE_AVAILABLE else lambda f: f
+@cached_response("topbar_slide", ttl=120, key_params=[])
 def get_topbar_slide(slide_id):
     """Get a specific topbar slide by ID. OPTIMIZED: Redis cached."""
     try:
@@ -117,7 +135,8 @@ def get_topbar_slide(slide_id):
         
         return {
             "success": True,
-            "slide": slide.to_dict()
+            "slide": slide.to_dict(),
+            "cached": CACHE_AVAILABLE
         }, 200
         
     except Exception as e:
@@ -148,7 +167,7 @@ def get_all_topbar_slides():
         
         slides = TopBarSlide.query.order_by(TopBarSlide.sort_order).all()
         
-        logger.info(f"[v0] Admin retrieved {len(slides)} topbar slides")
+        logger.info(f"Admin retrieved {len(slides)} topbar slides")
         
         slides_data = [slide.to_dict() for slide in slides]
         
@@ -170,7 +189,7 @@ def get_all_topbar_slides():
 @topbar_routes.route('/admin', methods=['POST'])
 @jwt_required()
 @admin_required
-@invalidate_on_change(["topbar_slides", "topbar_slide"]) if CACHE_AVAILABLE else lambda f: f
+@invalidate_on_change(["topbar_slides", "topbar_slide"])
 def create_topbar_slide():
     """Create a new topbar slide. Invalidates topbar cache."""
     try:
@@ -212,7 +231,7 @@ def create_topbar_slide():
         db.session.add(new_slide)
         db.session.commit()
         
-        logger.info(f"[v0] Created topbar slide: {new_slide.id}")
+        logger.info(f"Created topbar slide: {new_slide.id}")
         
         return jsonify({
             "success": True,
@@ -232,7 +251,7 @@ def create_topbar_slide():
 @topbar_routes.route('/admin/<int:slide_id>', methods=['PUT'])
 @jwt_required()
 @admin_required
-@invalidate_on_change(["topbar_slides", "topbar_slide"]) if CACHE_AVAILABLE else lambda f: f
+@invalidate_on_change(["topbar_slides", "topbar_slide"])
 def update_topbar_slide(slide_id):
     """Update a topbar slide. Invalidates topbar cache."""
     try:
@@ -279,7 +298,7 @@ def update_topbar_slide(slide_id):
         
         db.session.commit()
         
-        logger.info(f"[v0] Updated topbar slide: {slide_id}")
+        logger.info(f"Updated topbar slide: {slide_id}")
         
         return jsonify({
             "success": True,
@@ -299,7 +318,7 @@ def update_topbar_slide(slide_id):
 @topbar_routes.route('/admin/<int:slide_id>', methods=['DELETE'])
 @jwt_required()
 @admin_required
-@invalidate_on_change(["topbar_slides", "topbar_slide"]) if CACHE_AVAILABLE else lambda f: f
+@invalidate_on_change(["topbar_slides", "topbar_slide"])
 def delete_topbar_slide(slide_id):
     """Delete a topbar slide. Invalidates topbar cache."""
     try:
@@ -319,7 +338,7 @@ def delete_topbar_slide(slide_id):
         db.session.delete(slide)
         db.session.commit()
         
-        logger.info(f"[v0] Deleted topbar slide: {slide_id}")
+        logger.info(f"Deleted topbar slide: {slide_id}")
         
         return jsonify({
             "success": True,
@@ -338,7 +357,7 @@ def delete_topbar_slide(slide_id):
 @topbar_routes.route('/admin/reorder', methods=['POST'])
 @jwt_required()
 @admin_required
-@invalidate_on_change(["topbar_slides"]) if CACHE_AVAILABLE else lambda f: f
+@invalidate_on_change(["topbar_slides"])
 def reorder_topbar_slides():
     """Reorder topbar slides. Invalidates topbar cache."""
     try:
@@ -358,7 +377,7 @@ def reorder_topbar_slides():
         
         db.session.commit()
         
-        logger.info(f"[v0] Reordered topbar slides")
+        logger.info(f"Reordered topbar slides")
         
         return jsonify({
             "success": True,
@@ -377,7 +396,7 @@ def reorder_topbar_slides():
 @topbar_routes.route('/admin/bulk-update', methods=['POST'])
 @jwt_required()
 @admin_required
-@invalidate_on_change(["topbar_slides", "topbar_slide"]) if CACHE_AVAILABLE else lambda f: f
+@invalidate_on_change(["topbar_slides", "topbar_slide"])
 def bulk_update_topbar_slides():
     """Bulk update topbar slides. Invalidates topbar cache."""
     try:
@@ -421,7 +440,7 @@ def bulk_update_topbar_slides():
         
         db.session.commit()
         
-        logger.info(f"[v0] Bulk updated {len(slide_ids)} topbar slides")
+        logger.info(f"Bulk updated {len(slide_ids)} topbar slides")
         
         return jsonify({
             "success": True,
@@ -472,12 +491,36 @@ def get_topbar_stats():
         }), 500
 
 
+@topbar_routes.route('/cache/status', methods=['GET'])
+def topbar_cache_status():
+    """Get cache status for topbar routes."""
+    cache_info = {
+        "connected": False,
+        "type": "none",
+        "stats": {}
+    }
+    
+    if CACHE_AVAILABLE and product_cache:
+        cache_info = {
+            "connected": product_cache.is_connected,
+            "type": "upstash" if product_cache.is_connected else "memory",
+            "stats": product_cache.stats
+        }
+    
+    return jsonify({
+        "service": "topbar",
+        "cache": cache_info,
+        "database_available": TOPBAR_AVAILABLE,
+        "timestamp": datetime.utcnow().isoformat()
+    }), 200
+
+
 @topbar_routes.route('/health', methods=['GET'])
 def topbar_health():
     """Health check for topbar system."""
     cache_status = {
-        "connected": product_cache.is_connected if CACHE_AVAILABLE else False,
-        "type": "upstash" if (CACHE_AVAILABLE and product_cache.is_connected) else "none"
+        "connected": product_cache.is_connected if CACHE_AVAILABLE and product_cache else False,
+        "type": "upstash" if (CACHE_AVAILABLE and product_cache and product_cache.is_connected) else "none"
     }
     
     return jsonify({
@@ -488,6 +531,7 @@ def topbar_health():
         "endpoints": [
             "GET /api/topbar/slides",
             "GET /api/topbar/slide/<id>",
+            "GET /api/topbar/cache/status",
             "GET /api/topbar/admin/all",
             "POST /api/topbar/admin",
             "PUT /api/topbar/admin/<id>",

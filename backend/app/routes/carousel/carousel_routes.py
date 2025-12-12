@@ -8,6 +8,7 @@ from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime, timezone
 import logging
+from functools import wraps
 
 logger = logging.getLogger(__name__)
 
@@ -22,9 +23,26 @@ try:
         fast_json_dumps
     )
     CACHE_AVAILABLE = True
+    logger.info("✅ Redis cache available for carousel routes")
 except ImportError as e:
     logger.warning(f"Redis cache not available: {e}")
     CACHE_AVAILABLE = False
+    product_cache = None
+    
+    def cached_response(prefix, ttl=30, key_params=None):
+        def decorator(func):
+            return func
+        return decorator
+    
+    def fast_cached_response(prefix, ttl=30, key_params=None):
+        def decorator(func):
+            return func
+        return decorator
+    
+    def invalidate_on_change(prefixes):
+        def decorator(func):
+            return func
+        return decorator
 
 try:
     from ...models.carousel_model import CarouselBanner
@@ -56,7 +74,7 @@ def init_carousel_tables():
 # ============================================================================
 
 @carousel_routes.route('/items', methods=['GET'])
-@cached_response("carousel_items", ttl=60, key_params=["position"]) if CACHE_AVAILABLE else lambda f: f
+@cached_response("carousel_items", ttl=60, key_params=["position"])
 def get_carousel_items():
     """
     Get active carousel items for a specific position.
@@ -81,7 +99,7 @@ def get_carousel_items():
             is_active=True
         ).order_by(CarouselBanner.sort_order).all()
         
-        logger.info(f"[v0] Retrieved {len(items)} active carousel items for position: {position}")
+        logger.info(f"Retrieved {len(items)} active carousel items for position: {position}")
         
         carousel_data = [{
             "id": item.id,
@@ -101,6 +119,7 @@ def get_carousel_items():
             "position": position,
             "items": carousel_data,
             "count": len(carousel_data),
+            "cached": CACHE_AVAILABLE,
             "cached_at": datetime.utcnow().isoformat()
         }, 200
         
@@ -114,7 +133,7 @@ def get_carousel_items():
 
 
 @carousel_routes.route('/item/<int:item_id>', methods=['GET'])
-@cached_response("carousel_item", ttl=60, key_params=[]) if CACHE_AVAILABLE else lambda f: f
+@cached_response("carousel_item", ttl=60, key_params=[])
 def get_carousel_item(item_id):
     """Get a specific carousel item by ID. OPTIMIZED: Redis cached."""
     try:
@@ -133,7 +152,8 @@ def get_carousel_item(item_id):
         
         return {
             "success": True,
-            "item": item.to_dict()
+            "item": item.to_dict(),
+            "cached": CACHE_AVAILABLE
         }, 200
         
     except Exception as e:
@@ -167,7 +187,7 @@ def get_all_carousel_items():
             CarouselBanner.sort_order
         ).all()
         
-        logger.info(f"[v0] Admin retrieved {len(items)} carousel items for position: {position}")
+        logger.info(f"Admin retrieved {len(items)} carousel items for position: {position}")
         
         banners = [item.to_dict() for item in items]
         
@@ -189,7 +209,7 @@ def get_all_carousel_items():
 
 @carousel_routes.route('/admin', methods=['POST'])
 @jwt_required()
-@invalidate_on_change(["carousel_items", "carousel_item"]) if CACHE_AVAILABLE else lambda f: f
+@invalidate_on_change(["carousel_items", "carousel_item"])
 def create_carousel_item():
     """Create a new carousel item. Invalidates carousel cache."""
     try:
@@ -233,7 +253,7 @@ def create_carousel_item():
         db.session.add(new_item)
         db.session.commit()
         
-        logger.info(f"[v0] Created carousel item: {new_item.id}")
+        logger.info(f"Created carousel item: {new_item.id}")
         
         return jsonify({
             "success": True,
@@ -252,7 +272,7 @@ def create_carousel_item():
 
 @carousel_routes.route('/admin/<int:item_id>', methods=['PUT'])
 @jwt_required()
-@invalidate_on_change(["carousel_items", "carousel_item"]) if CACHE_AVAILABLE else lambda f: f
+@invalidate_on_change(["carousel_items", "carousel_item"])
 def update_carousel_item(item_id):
     """Update a carousel item. Invalidates carousel cache."""
     try:
@@ -297,7 +317,7 @@ def update_carousel_item(item_id):
         
         db.session.commit()
         
-        logger.info(f"[v0] Updated carousel item: {item_id}")
+        logger.info(f"Updated carousel item: {item_id}")
         
         return jsonify({
             "success": True,
@@ -316,7 +336,7 @@ def update_carousel_item(item_id):
 
 @carousel_routes.route('/admin/<int:item_id>', methods=['DELETE'])
 @jwt_required()
-@invalidate_on_change(["carousel_items", "carousel_item"]) if CACHE_AVAILABLE else lambda f: f
+@invalidate_on_change(["carousel_items", "carousel_item"])
 def delete_carousel_item(item_id):
     """Delete a carousel item. Invalidates carousel cache."""
     try:
@@ -336,7 +356,7 @@ def delete_carousel_item(item_id):
         db.session.delete(item)
         db.session.commit()
         
-        logger.info(f"[v0] Deleted carousel item: {item_id}")
+        logger.info(f"Deleted carousel item: {item_id}")
         
         return jsonify({
             "success": True,
@@ -354,7 +374,7 @@ def delete_carousel_item(item_id):
 
 @carousel_routes.route('/admin/reorder', methods=['POST'])
 @jwt_required()
-@invalidate_on_change(["carousel_items"]) if CACHE_AVAILABLE else lambda f: f
+@invalidate_on_change(["carousel_items"])
 def reorder_carousel_items():
     """Reorder carousel items. Invalidates carousel cache."""
     try:
@@ -374,7 +394,7 @@ def reorder_carousel_items():
         
         db.session.commit()
         
-        logger.info(f"[v0] Reordered carousel items")
+        logger.info(f"Reordered carousel items")
         
         return jsonify({
             "success": True,
@@ -392,7 +412,7 @@ def reorder_carousel_items():
 
 @carousel_routes.route('/admin/bulk-update', methods=['POST'])
 @jwt_required()
-@invalidate_on_change(["carousel_items", "carousel_item"]) if CACHE_AVAILABLE else lambda f: f
+@invalidate_on_change(["carousel_items", "carousel_item"])
 def bulk_update_carousel_items():
     """Bulk update carousel items. Invalidates carousel cache."""
     try:
@@ -415,7 +435,7 @@ def bulk_update_carousel_items():
         
         db.session.commit()
         
-        logger.info(f"[v0] Bulk updated {len(item_ids)} carousel items")
+        logger.info(f"Bulk updated {len(item_ids)} carousel items")
         
         return jsonify({
             "success": True,
@@ -471,12 +491,36 @@ def get_carousel_stats():
         }), 500
 
 
+@carousel_routes.route('/cache/status', methods=['GET'])
+def carousel_cache_status():
+    """Get cache status for carousel routes."""
+    cache_info = {
+        "connected": False,
+        "type": "none",
+        "stats": {}
+    }
+    
+    if CACHE_AVAILABLE and product_cache:
+        cache_info = {
+            "connected": product_cache.is_connected,
+            "type": "upstash" if product_cache.is_connected else "memory",
+            "stats": product_cache.stats
+        }
+    
+    return jsonify({
+        "service": "carousel",
+        "cache": cache_info,
+        "database_available": CAROUSEL_AVAILABLE,
+        "timestamp": datetime.utcnow().isoformat()
+    }), 200
+
+
 @carousel_routes.route('/health', methods=['GET'])
 def carousel_health():
     """Health check for carousel system."""
     cache_status = {
-        "connected": product_cache.is_connected if CACHE_AVAILABLE else False,
-        "type": "upstash" if (CACHE_AVAILABLE and product_cache.is_connected) else "none"
+        "connected": product_cache.is_connected if CACHE_AVAILABLE and product_cache else False,
+        "type": "upstash" if (CACHE_AVAILABLE and product_cache and product_cache.is_connected) else "none"
     }
     
     return jsonify({
@@ -487,6 +531,7 @@ def carousel_health():
         "endpoints": [
             "GET /api/carousel/items",
             "GET /api/carousel/item/<id>",
+            "GET /api/carousel/cache/status",
             "GET /api/carousel/admin/all",
             "POST /api/carousel/admin",
             "PUT /api/carousel/admin/<id>",

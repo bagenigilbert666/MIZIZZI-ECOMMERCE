@@ -24,9 +24,26 @@ try:
         fast_json_dumps
     )
     CACHE_AVAILABLE = True
+    logger.info("✅ Redis cache available for footer routes")
 except ImportError as e:
     logger.warning(f"Redis cache not available: {e}")
     CACHE_AVAILABLE = False
+    product_cache = None
+    
+    def cached_response(prefix, ttl=30, key_params=None):
+        def decorator(func):
+            return func
+        return decorator
+    
+    def fast_cached_response(prefix, ttl=30, key_params=None):
+        def decorator(func):
+            return func
+        return decorator
+    
+    def invalidate_on_change(prefixes):
+        def decorator(func):
+            return func
+        return decorator
 
 # Import FooterSettings model
 try:
@@ -42,7 +59,7 @@ except ImportError as e:
 # ============================================================================
 
 @footer_routes.route('/settings', methods=['GET'])
-@cached_response("footer_settings", ttl=300, key_params=[]) if CACHE_AVAILABLE else lambda f: f
+@cached_response("footer_settings", ttl=300, key_params=[])
 def get_footer_settings_public():
     """
     Get current footer settings - Public endpoint
@@ -63,6 +80,7 @@ def get_footer_settings_public():
         return {
             'success': True,
             'data': data,
+            'cached': CACHE_AVAILABLE,
             'cached_at': datetime.utcnow().isoformat()
         }, 200
     except Exception as e:
@@ -106,7 +124,7 @@ def get_footer_settings_admin():
 
 @footer_routes.route('/admin/settings', methods=['PUT'])
 @jwt_required()
-@invalidate_on_change(["footer_settings"]) if CACHE_AVAILABLE else lambda f: f
+@invalidate_on_change(["footer_settings"])
 def update_footer_settings():
     """Update footer settings - Admin only. Invalidates footer cache."""
     try:
@@ -206,7 +224,7 @@ def update_footer_settings():
 
 @footer_routes.route('/admin/settings/reset', methods=['POST'])
 @jwt_required()
-@invalidate_on_change(["footer_settings"]) if CACHE_AVAILABLE else lambda f: f
+@invalidate_on_change(["footer_settings"])
 def reset_footer_settings():
     """Reset footer settings to defaults - Admin only. Invalidates footer cache."""
     try:
@@ -274,19 +292,27 @@ def reset_footer_settings():
 
 @footer_routes.route('/cache/status', methods=['GET'])
 def footer_cache_status():
-    """Get cache status for footer."""
-    if CACHE_AVAILABLE:
-        return jsonify({
-            'connected': product_cache.is_connected,
-            'type': 'upstash' if product_cache.is_connected else 'memory',
-            'stats': product_cache.stats,
-            'timestamp': datetime.utcnow().isoformat()
-        }), 200
+    """Get cache status for footer routes."""
+    cache_info = {
+        "connected": False,
+        "type": "none",
+        "stats": {}
+    }
+    
+    if CACHE_AVAILABLE and product_cache:
+        cache_info = {
+            "connected": product_cache.is_connected,
+            "type": "upstash" if product_cache.is_connected else "memory",
+            "stats": product_cache.stats
+        }
+    
     return jsonify({
-        'connected': False,
-        'type': 'none',
-        'message': 'Cache not available'
+        "service": "footer",
+        "cache": cache_info,
+        "database_available": FOOTER_AVAILABLE,
+        "timestamp": datetime.utcnow().isoformat()
     }), 200
+
 
 def init_footer_tables(app):
     """Initialize footer tables in the database"""
