@@ -1,7 +1,7 @@
 """
 User-facing products routes for Mizizzi E-commerce platform.
 Handles public product viewing, searching, and browsing functionality.
-OPTIMIZED with Upstash Redis caching and lightweight JSON responses.
+OPTIMIZED with Upstash Redis caching - Direct cache pattern (like footer).
 """
 from flask import Blueprint, request, jsonify, current_app, Response
 from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
@@ -11,54 +11,66 @@ from sqlalchemy.orm import load_only, joinedload
 from datetime import datetime
 import re
 import time
-import logging
+import hashlib
 
 from app.configuration.extensions import db, limiter
 from app.models.models import (
     Product, ProductVariant, ProductImage, Category, Brand,
     User, UserRole
 )
-
-logger = logging.getLogger(__name__)
-
-try:
-    from app.utils.redis_cache import (
-        product_cache,
-        cached_response,
-        fast_cached_response,
-        invalidate_on_change,
-        fast_json_dumps
-    )
-    CACHE_AVAILABLE = True
-    logger.info("✅ Redis cache available for products routes")
-except ImportError as e:
-    logger.warning(f"Redis cache not available: {e}")
-    CACHE_AVAILABLE = False
-    product_cache = None
-    
-    # Fallback no-op decorators
-    def cached_response(prefix, ttl=30, key_params=None):
-        def decorator(func):
-            return func
-        return decorator
-    
-    def fast_cached_response(prefix, ttl=30, key_params=None):
-        def decorator(func):
-            return func
-        return decorator
-    
-    def invalidate_on_change(prefixes):
-        def decorator(func):
-            return func
-        return decorator
-    
-    def fast_json_dumps(data):
-        import json
-        return json.dumps(data)
-
+from app.utils.redis_cache import product_cache, fast_json_dumps
 
 # Create blueprint for user-facing product routes
 products_routes = Blueprint('products_routes', __name__, url_prefix='/api/products')
+
+# ----------------------
+# Cache Helper Functions (Direct pattern like footer)
+# ----------------------
+
+def generate_cache_key(prefix: str, params: dict = None) -> str:
+    """Generate a cache key from prefix and parameters."""
+    if params:
+        # Filter out None values and sort for consistency
+        filtered_params = {k: v for k, v in sorted(params.items()) if v is not None}
+        if filtered_params:
+            param_str = fast_json_dumps(filtered_params)
+            param_hash = hashlib.md5(param_str.encode()).hexdigest()[:12]
+            return f"mizizzi:{prefix}:{param_hash}"
+    return f"mizizzi:{prefix}"
+
+
+def get_cached_response(cache_key: str):
+    """Try to get cached response. Returns (data, is_cached) tuple."""
+    try:
+        cached = product_cache.get(cache_key)
+        if cached is not None:
+            current_app.logger.info(f'[Cache] HIT: {cache_key}')
+            return cached, True
+        current_app.logger.info(f'[Cache] MISS: {cache_key}')
+        return None, False
+    except Exception as e:
+        current_app.logger.error(f'[Cache] Error getting {cache_key}: {e}')
+        return None, False
+
+
+def set_cached_response(cache_key: str, data: dict, ttl: int = 30):
+    """Cache the response data."""
+    try:
+        product_cache.set(cache_key, data, ttl)
+        current_app.logger.info(f'[Cache] SET: {cache_key} (TTL: {ttl}s)')
+    except Exception as e:
+        current_app.logger.error(f'[Cache] Error setting {cache_key}: {e}')
+
+
+def make_response_with_cache_headers(data: dict, cache_key: str, is_cached: bool):
+    """Create JSON response with cache headers."""
+    response = jsonify(data)
+    response.headers['X-Cache'] = 'HIT' if is_cached else 'MISS'
+    response.headers['X-Cache-Key'] = cache_key
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+    return response
 
 # ----------------------
 # Lightweight Serializers (Optimized for speed)
@@ -288,8 +300,8 @@ def health_check():
     return jsonify({
         'status': 'ok',
         'service': 'products_routes',
-        'cache_connected': product_cache.is_connected if CACHE_AVAILABLE else False,
-        'cache_type': 'upstash' if CACHE_AVAILABLE and product_cache.is_connected else 'memory',
+        'cache_connected': product_cache.is_connected,
+        'cache_type': 'upstash' if product_cache.is_connected else 'memory',
         'timestamp': datetime.utcnow().isoformat()
     }), 200
 
@@ -302,9 +314,9 @@ def health_check():
 def cache_status():
     """Get cache status and info."""
     return jsonify({
-        'connected': product_cache.is_connected if CACHE_AVAILABLE else False,
-        'type': 'upstash' if CACHE_AVAILABLE and product_cache.is_connected else 'memory',
-        'stats': product_cache.stats if CACHE_AVAILABLE else {},
+        'connected': product_cache.is_connected,
+        'type': 'upstash' if product_cache.is_connected else 'memory',
+        'stats': product_cache.stats,
         'timestamp': datetime.utcnow().isoformat()
     }), 200
 
@@ -314,9 +326,6 @@ def invalidate_cache():
     """Invalidate all product caches (admin only)."""
     if not is_admin_user():
         return jsonify({'error': 'Admin access required'}), 403
-    
-    if not CACHE_AVAILABLE:
-        return jsonify({'error': 'Cache not available'}), 500
 
     total_cleared = product_cache.invalidate_all_products()
 
@@ -328,20 +337,15 @@ def invalidate_cache():
 
 
 # ----------------------
-# Public Products List (OPTIMIZED with Redis)
+# Public Products List (OPTIMIZED with Direct Redis Cache)
 # ----------------------
 
 @products_routes.route('/', methods=['GET'])
 @limiter.limit("600 per minute")
-@cached_response("products", ttl=30, key_params=[
-    "page", "per_page", "category_id", "brand_id", "min_price", "max_price",
-    "is_featured", "is_new", "is_sale", "is_flash_sale", "is_luxury_deal",
-    "is_new_arrival", "search", "sort_by", "sort_order"
-])
 def get_products():
     """
     Get products with filtering, sorting, and pagination.
-    OPTIMIZED: Uses Redis caching and lightweight serialization.
+    OPTIMIZED: Uses direct Redis caching pattern (like footer).
     """
     try:
         # Get query parameters
@@ -361,6 +365,29 @@ def get_products():
         sort_by = request.args.get('sort_by', 'created_at')
         sort_order = request.args.get('sort_order', 'desc')
         include_inactive = request.args.get('include_inactive', False, type=bool)
+
+        cache_params = {
+            'page': page,
+            'per_page': per_page,
+            'category_id': category_id,
+            'brand_id': brand_id,
+            'min_price': min_price,
+            'max_price': max_price,
+            'is_featured': is_featured,
+            'is_new': is_new,
+            'is_sale': is_sale,
+            'is_flash_sale': is_flash_sale,
+            'is_luxury_deal': is_luxury_deal,
+            'is_new_arrival': is_new_arrival,
+            'search': search if search else None,
+            'sort_by': sort_by,
+            'sort_order': sort_order,
+        }
+        cache_key = generate_cache_key('products', cache_params)
+
+        cached_data, is_cached = get_cached_response(cache_key)
+        if is_cached and cached_data:
+            return make_response_with_cache_headers(cached_data, cache_key, True), 200
 
         # Convert string booleans
         def str_to_bool(val):
@@ -466,7 +493,7 @@ def get_products():
             if serialized:
                 products.append(serialized)
 
-        return jsonify({
+        response_data = {
             'items': products,
             'pagination': {
                 'page': pagination.page,
@@ -476,7 +503,11 @@ def get_products():
                 'has_next': pagination.has_next,
                 'has_prev': pagination.has_prev
             }
-        }), 200
+        }
+
+        set_cached_response(cache_key, response_data, ttl=30)
+
+        return make_response_with_cache_headers(response_data, cache_key, False), 200
 
     except SQLAlchemyError as e:
         current_app.logger.error(f"Database error getting products: {str(e)}")
@@ -487,19 +518,24 @@ def get_products():
 
 
 # ----------------------
-# Flash Sale Products (OPTIMIZED)
+# Flash Sale Products (OPTIMIZED with Direct Redis Cache)
 # ----------------------
 
 @products_routes.route('/flash-sale', methods=['GET'])
 @limiter.limit("600 per minute")
-@cached_response("flash_sale", ttl=30, key_params=["limit", "page"])
 def get_flash_sale_products():
     """
     Get flash sale products.
-    OPTIMIZED: Redis cached, lightweight response.
+    OPTIMIZED: Direct Redis cache pattern (like footer).
     """
     try:
         limit = min(request.args.get('limit', 20, type=int), 50)
+        page = request.args.get('page', 1, type=int)
+
+        cache_key = generate_cache_key('flash_sale', {'limit': limit, 'page': page})
+        cached_data, is_cached = get_cached_response(cache_key)
+        if is_cached and cached_data:
+            return make_response_with_cache_headers(cached_data, cache_key, True), 200
 
         # Optimized query with indexed column is_flash_sale
         products = Product.query.options(
@@ -517,11 +553,15 @@ def get_flash_sale_products():
             Product.discount_percentage.desc()
         ).limit(limit).all()
 
-        return jsonify({
+        response_data = {
             'items': [serialize_product_lightweight(p) for p in products if p],
             'total': len(products),
             'cached_at': datetime.utcnow().isoformat()
-        }), 200
+        }
+
+        set_cached_response(cache_key, response_data, ttl=30)
+
+        return make_response_with_cache_headers(response_data, cache_key, False), 200
 
     except Exception as e:
         current_app.logger.error(f"Error getting flash sale products: {str(e)}")
@@ -529,19 +569,24 @@ def get_flash_sale_products():
 
 
 # ----------------------
-# Luxury Deals Products (OPTIMIZED)
+# Luxury Deals Products (OPTIMIZED with Direct Redis Cache)
 # ----------------------
 
 @products_routes.route('/luxury-deals', methods=['GET'])
 @limiter.limit("600 per minute")
-@cached_response("luxury_deals", ttl=30, key_params=["limit", "page"])
 def get_luxury_deals_products():
     """
     Get luxury deals products.
-    OPTIMIZED: Redis cached, lightweight response.
+    OPTIMIZED: Direct Redis cache pattern (like footer).
     """
     try:
         limit = min(request.args.get('limit', 20, type=int), 50)
+        page = request.args.get('page', 1, type=int)
+
+        cache_key = generate_cache_key('luxury_deals', {'limit': limit, 'page': page})
+        cached_data, is_cached = get_cached_response(cache_key)
+        if is_cached and cached_data:
+            return make_response_with_cache_headers(cached_data, cache_key, True), 200
 
         # Optimized query with indexed column is_luxury_deal
         products = Product.query.options(
@@ -549,26 +594,29 @@ def get_luxury_deals_products():
                 Product.id, Product.name, Product.slug, Product.price,
                 Product.sale_price, Product.thumbnail_url, Product.image_urls,
                 Product.discount_percentage, Product.stock,
-                Product.is_luxury_deal, Product.created_at
+                Product.is_luxury_deal
             )
         ).filter(
             Product.is_active == True,
             Product.is_visible == True,
             Product.is_luxury_deal == True
         ).order_by(
-            Product.created_at.desc()
+            Product.price.desc()
         ).limit(limit).all()
 
-        return jsonify({
+        response_data = {
             'items': [serialize_product_lightweight(p) for p in products if p],
             'total': len(products),
             'cached_at': datetime.utcnow().isoformat()
-        }), 200
+        }
+
+        set_cached_response(cache_key, response_data, ttl=30)
+
+        return make_response_with_cache_headers(response_data, cache_key, False), 200
 
     except Exception as e:
         current_app.logger.error(f"Error getting luxury deals products: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
-
 
 # ----------------------
 # Get Product by ID (with caching for single product)
@@ -580,7 +628,7 @@ def get_product_by_id(product_id):
     try:
         # Check cache first
         cache_key = f"mizizzi:product:{product_id}"
-        cached = product_cache.get(cache_key) if CACHE_AVAILABLE else None
+        cached = product_cache.get(cache_key)
         if cached:
             current_app.logger.info(f"[CACHE HIT] product:{product_id}")
             return jsonify(cached), 200
@@ -598,8 +646,7 @@ def get_product_by_id(product_id):
         serialized = serialize_product(product, include_variants=True, include_images=True)
 
         # Cache for 60 seconds (single products can be cached longer)
-        if CACHE_AVAILABLE:
-            product_cache.set(cache_key, serialized, ttl=60)
+        product_cache.set(cache_key, serialized, ttl=60)
 
         return jsonify(serialized), 200
 
@@ -618,7 +665,7 @@ def get_product_by_slug(slug):
     try:
         # Check cache first
         cache_key = f"mizizzi:product:slug:{slug}"
-        cached = product_cache.get(cache_key) if CACHE_AVAILABLE else None
+        cached = product_cache.get(cache_key)
         if cached:
             current_app.logger.info(f"[CACHE HIT] product:slug:{slug}")
             return jsonify(cached), 200
@@ -636,8 +683,7 @@ def get_product_by_slug(slug):
         serialized = serialize_product(product, include_variants=True, include_images=True)
 
         # Cache for 60 seconds
-        if CACHE_AVAILABLE:
-            product_cache.set(cache_key, serialized, ttl=60)
+        product_cache.set(cache_key, serialized, ttl=60)
 
         return jsonify(serialized), 200
 
@@ -1204,7 +1250,7 @@ def get_products_fast():
         cache_key = f"mizizzi:products:fast:{page}:{per_page}:{category_id}:{brand_id}:{is_featured}:{is_sale}:{sort_by}:{sort_order}"
 
         # Try cache first
-        cached = product_cache.get_raw(cache_key) if CACHE_AVAILABLE else None
+        cached = product_cache.get_raw(cache_key)
         if cached:
             cache_time = (time.perf_counter() - start) * 1000
             response = Response(cached, status=200, mimetype='application/json')
@@ -1277,8 +1323,7 @@ def get_products_fast():
 
         # Cache the pre-serialized JSON
         json_str = fast_json_dumps(data)
-        if CACHE_AVAILABLE:
-            product_cache.set_raw(cache_key, json_str, ttl=30)
+        product_cache.set_raw(cache_key, json_str, ttl=30)
 
         total_time = (time.perf_counter() - start) * 1000
         response = Response(json_str, status=200, mimetype='application/json')
