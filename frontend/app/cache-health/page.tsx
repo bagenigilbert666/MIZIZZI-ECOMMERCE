@@ -1,10 +1,10 @@
 "use client"
 
+import type React from "react"
+
 import { useState, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
 import { API_URL } from "@/config"
 import {
   RefreshCw,
@@ -14,14 +14,19 @@ import {
   Activity,
   Database,
   Zap,
-  Clock,
   Server,
   Wifi,
   WifiOff,
   TrendingUp,
   AlertTriangle,
   ArrowLeft,
-  LayoutGrid,
+  Flame,
+  BarChart3,
+  Layers,
+  Gauge,
+  ChevronRight,
+  Play,
+  Settings2,
 } from "lucide-react"
 import Link from "next/link"
 
@@ -36,6 +41,20 @@ interface CacheStats {
     total_requests: number
     fast_json?: boolean
   }
+  config?: {
+    products_list_ttl: number
+    single_product_ttl: number
+    featured_ttl: number
+    search_ttl: number
+    all_products_ttl: number
+  }
+  warming?: {
+    last_warmed: string | null
+    is_warming: boolean
+    products_cached: number
+    categories_cached: string[]
+    errors: string[]
+  }
   timestamp: string
   type: string
 }
@@ -45,21 +64,12 @@ interface HealthCheck {
   status: "healthy" | "degraded" | "unhealthy" | "checking" | "warming"
   message: string
   latency?: number
+  icon?: React.ReactNode
 }
 
 interface PingResult {
   success: boolean
   latency: number
-  error?: string
-}
-
-interface RouteTestResult {
-  route: string
-  endpoint: string
-  status: "success" | "error" | "pending"
-  latency?: number
-  cached?: boolean
-  cacheHit?: boolean
   error?: string
 }
 
@@ -70,21 +80,11 @@ export default function CacheHealthPage() {
   const [autoRefresh, setAutoRefresh] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [pingResults, setPingResults] = useState<PingResult[]>([])
-  const [routeTests, setRouteTests] = useState<RouteTestResult[]>([])
-  const [testingRoutes, setTestingRoutes] = useState(false)
+  const [isWarmingCache, setIsWarmingCache] = useState(false)
 
   const runHealthChecks = useCallback(async () => {
     setLoading(true)
     const checks: HealthCheck[] = []
-
-    // Check 1: API Connection
-    const apiCheck: HealthCheck = {
-      name: "API Server",
-      status: "checking",
-      message: "Checking connection...",
-    }
-    checks.push(apiCheck)
-    setHealthChecks([...checks])
 
     try {
       const startTime = performance.now()
@@ -97,86 +97,89 @@ export default function CacheHealthPage() {
       if (response.ok) {
         const data = await response.json()
         setCacheStats(data)
-        checks[0] = {
+
+        // Check 1: API Connection
+        checks.push({
           name: "API Server",
           status: "healthy",
-          message: `Connected to ${API_URL}`,
+          message: `Connected to backend`,
           latency,
-        }
+          icon: <Server className="h-4 w-4" />,
+        })
 
         // Check 2: Redis Connection
-        const redisCheck: HealthCheck = {
+        checks.push({
           name: "Upstash Redis",
           status: data.connected ? "healthy" : "unhealthy",
-          message: data.connected ? `Connected (${data.type})` : "Redis not connected - using fallback",
+          message: data.connected ? `Connected (${data.type})` : "Redis not connected",
           latency,
-        }
-        checks.push(redisCheck)
+          icon: <Database className="h-4 w-4" />,
+        })
 
-        // Check 3: Cache Performance - smarter logic for warming caches
+        // Check 3: Cache Performance
         const hitRate = data.stats.hit_rate_percent
         const totalRequests = data.stats.total_requests
-        const isWarmingUp = totalRequests < 50 // Cache is still warming up
+        const isWarmingUp = totalRequests < 50
 
         let perfStatus: HealthCheck["status"]
         let perfMessage: string
 
         if (isWarmingUp) {
           perfStatus = "warming"
-          perfMessage = `Warming up: ${hitRate.toFixed(1)}% hit rate (${data.stats.hits}/${totalRequests} requests)`
+          perfMessage = `${hitRate.toFixed(1)}% hit rate (warming up)`
         } else if (hitRate >= 70) {
           perfStatus = "healthy"
-          perfMessage = `Excellent: ${hitRate.toFixed(1)}% hit rate`
+          perfMessage = `${hitRate.toFixed(1)}% hit rate`
         } else if (hitRate >= 40) {
           perfStatus = "degraded"
-          perfMessage = `Moderate: ${hitRate.toFixed(1)}% hit rate - consider longer TTL`
+          perfMessage = `${hitRate.toFixed(1)}% hit rate`
         } else {
           perfStatus = "unhealthy"
-          perfMessage = `Low: ${hitRate.toFixed(1)}% hit rate - review caching strategy`
+          perfMessage = `${hitRate.toFixed(1)}% hit rate`
         }
 
-        const perfCheck: HealthCheck = {
-          name: "Cache Performance",
+        checks.push({
+          name: "Hit Rate",
           status: perfStatus,
           message: perfMessage,
-        }
-        checks.push(perfCheck)
+          icon: <Gauge className="h-4 w-4" />,
+        })
 
-        // Check 4: Fast JSON (orjson)
-        const jsonCheck: HealthCheck = {
-          name: "Fast JSON (orjson)",
-          status: data.stats.fast_json ? "healthy" : "warming",
-          message: data.stats.fast_json
-            ? "orjson enabled - 10x faster serialization"
-            : "Using standard JSON (optional optimization)",
+        // Check 4: Cache Warming Status
+        if (data.warming) {
+          checks.push({
+            name: "Cache Warmth",
+            status: data.warming.products_cached > 0 ? "healthy" : "degraded",
+            message:
+              data.warming.products_cached > 0 ? `${data.warming.products_cached} products cached` : "Cache not warmed",
+            icon: <Flame className="h-4 w-4" />,
+          })
         }
-        checks.push(jsonCheck)
 
         // Check 5: Error Rate
         const errorRate = data.stats.total_requests > 0 ? (data.stats.errors / data.stats.total_requests) * 100 : 0
-        const errorCheck: HealthCheck = {
+        checks.push({
           name: "Error Rate",
           status: errorRate === 0 ? "healthy" : errorRate < 5 ? "degraded" : "unhealthy",
-          message:
-            errorRate === 0
-              ? "No errors detected"
-              : `${errorRate.toFixed(2)}% error rate (${data.stats.errors} errors)`,
-        }
-        checks.push(errorCheck)
+          message: errorRate === 0 ? "No errors" : `${errorRate.toFixed(2)}% errors`,
+          icon: <AlertTriangle className="h-4 w-4" />,
+        })
       } else {
-        checks[0] = {
+        checks.push({
           name: "API Server",
           status: "unhealthy",
-          message: `HTTP ${response.status} - ${response.statusText}`,
+          message: `HTTP ${response.status}`,
           latency,
-        }
+          icon: <Server className="h-4 w-4" />,
+        })
       }
     } catch (error) {
-      checks[0] = {
+      checks.push({
         name: "API Server",
         status: "unhealthy",
         message: error instanceof Error ? error.message : "Connection failed",
-      }
+        icon: <Server className="h-4 w-4" />,
+      })
     }
 
     setHealthChecks(checks)
@@ -204,83 +207,35 @@ export default function CacheHealthPage() {
     setPingResults(results)
   }, [])
 
-  const runRouteCacheTests = useCallback(async () => {
-    setTestingRoutes(true)
+  const warmCache = useCallback(async () => {
+    setIsWarmingCache(true)
+    try {
+      const response = await fetch(`${API_URL}/api/products/cache/warm`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      })
+      if (response.ok) {
+        // Poll for completion
+        const pollInterval = setInterval(async () => {
+          await runHealthChecks()
+          if (cacheStats?.warming && !cacheStats.warming.is_warming) {
+            clearInterval(pollInterval)
+            setIsWarmingCache(false)
+          }
+        }, 2000)
 
-    const routes = [
-      { name: "Products", endpoint: "/api/products?page=1&per_page=10" },
-      { name: "Featured Products", endpoint: "/api/products/featured?limit=10" },
-      { name: "Categories", endpoint: "/api/categories?per_page=100" },
-      { name: "Categories Tree", endpoint: "/api/categories/tree" },
-      { name: "Featured Categories", endpoint: "/api/categories/featured?limit=6" },
-      { name: "Carousel", endpoint: "/api/carousel/items?position=homepage" },
-      { name: "Footer", endpoint: "/api/footer/settings" },
-      { name: "Topbar", endpoint: "/api/topbar/slides" },
-      { name: "Theme", endpoint: "/api/theme/active" },
-      { name: "Theme CSS", endpoint: "/api/theme/css" },
-    ]
-
-    const results: RouteTestResult[] = routes.map((r) => ({
-      route: r.name,
-      endpoint: r.endpoint,
-      status: "pending" as const,
-    }))
-    setRouteTests([...results])
-
-    // Test each route twice - first to potentially populate cache, second to check cache hit
-    for (let i = 0; i < routes.length; i++) {
-      const route = routes[i]
-
-      try {
-        // First request
-        const startTime1 = performance.now()
-        const response1 = await fetch(`${API_URL}${route.endpoint}`, {
-          headers: { "Content-Type": "application/json" },
-        })
-        const latency1 = Math.round(performance.now() - startTime1)
-        const cacheHeader1 = response1.headers.get("X-Cache")
-
-        // Small delay
-        await new Promise((r) => setTimeout(r, 100))
-
-        // Second request (should be cached)
-        const startTime2 = performance.now()
-        const response2 = await fetch(`${API_URL}${route.endpoint}`, {
-          headers: { "Content-Type": "application/json" },
-        })
-        const latency2 = Math.round(performance.now() - startTime2)
-        const cacheHeader2 = response2.headers.get("X-Cache")
-
-        let data: Record<string, unknown> = {}
-        try {
-          data = await response2.json()
-        } catch {
-          // Response might not be JSON
-        }
-
-        results[i] = {
-          route: route.name,
-          endpoint: route.endpoint,
-          status: response2.ok ? "success" : "error",
-          latency: latency2,
-          cached: data.cached === true || cacheHeader2 === "HIT",
-          cacheHit: cacheHeader2 === "HIT" || latency2 < latency1 * 0.7, // If 2nd request is significantly faster
-          error: response2.ok ? undefined : `HTTP ${response2.status}`,
-        }
-      } catch (error) {
-        results[i] = {
-          route: route.name,
-          endpoint: route.endpoint,
-          status: "error",
-          error: error instanceof Error ? error.message : "Failed",
-        }
+        // Stop polling after 30 seconds regardless
+        setTimeout(() => {
+          clearInterval(pollInterval)
+          setIsWarmingCache(false)
+          runHealthChecks()
+        }, 30000)
       }
-
-      setRouteTests([...results])
+    } catch (error) {
+      console.error("Failed to warm cache:", error)
+      setIsWarmingCache(false)
     }
-
-    setTestingRoutes(false)
-  }, [])
+  }, [runHealthChecks, cacheStats?.warming])
 
   useEffect(() => {
     runHealthChecks()
@@ -288,72 +243,52 @@ export default function CacheHealthPage() {
 
   useEffect(() => {
     if (autoRefresh) {
-      const interval = setInterval(runHealthChecks, 10000)
+      const interval = setInterval(runHealthChecks, 5000)
       return () => clearInterval(interval)
     }
   }, [autoRefresh, runHealthChecks])
 
   const getOverallHealth = () => {
     if (healthChecks.length === 0) return "checking"
-
     const criticalChecks = healthChecks.filter(
       (c) => c.name === "API Server" || c.name === "Upstash Redis" || c.name === "Error Rate",
     )
-
     const hasUnhealthyCritical = criticalChecks.some((c) => c.status === "unhealthy")
     if (hasUnhealthyCritical) return "unhealthy"
-
     const hasDegraded = healthChecks.some((c) => c.status === "degraded")
     if (hasDegraded) return "degraded"
-
     const hasWarming = healthChecks.some((c) => c.status === "warming")
     if (hasWarming) return "warming"
-
     return "healthy"
   }
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case "healthy":
-        return "text-green-600"
+        return "text-emerald-500"
       case "degraded":
-        return "text-yellow-600"
+        return "text-amber-500"
       case "unhealthy":
-        return "text-red-600"
+        return "text-red-500"
       case "warming":
-        return "text-blue-600"
+        return "text-blue-500"
       default:
-        return "text-muted-foreground"
+        return "text-neutral-400"
     }
   }
 
-  const getStatusBg = (status: string) => {
+  const getStatusBgLight = (status: string) => {
     switch (status) {
       case "healthy":
-        return "bg-green-100 border-green-200"
+        return "bg-emerald-500/10"
       case "degraded":
-        return "bg-yellow-100 border-yellow-200"
+        return "bg-amber-500/10"
       case "unhealthy":
-        return "bg-red-100 border-red-200"
+        return "bg-red-500/10"
       case "warming":
-        return "bg-blue-100 border-blue-200"
+        return "bg-blue-500/10"
       default:
-        return "bg-muted border-border"
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "healthy":
-        return <CheckCircle2 className="h-5 w-5 text-green-600" />
-      case "degraded":
-        return <AlertTriangle className="h-5 w-5 text-yellow-600" />
-      case "unhealthy":
-        return <XCircle className="h-5 w-5 text-red-600" />
-      case "warming":
-        return <TrendingUp className="h-5 w-5 text-blue-600" />
-      default:
-        return <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+        return "bg-neutral-500/10"
     }
   }
 
@@ -362,385 +297,412 @@ export default function CacheHealthPage() {
     pingResults.length > 0
       ? Math.round(
           pingResults.filter((r) => r.success).reduce((a, b) => a + b.latency, 0) /
-            pingResults.filter((r) => r.success).length,
+            Math.max(pingResults.filter((r) => r.success).length, 1),
         )
       : null
 
   return (
-    <div className="min-h-screen bg-background p-4 sm:p-6">
-      <div className="mx-auto max-w-5xl space-y-6">
-        {/* Header */}
-        <div className="flex items-start justify-between">
-          <div className="space-y-1">
-            <div className="flex items-center gap-3">
-              <Link
-                href="/"
-                className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back
-              </Link>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Cache Health Dashboard</h1>
-            <p className="text-muted-foreground">
-              Monitor Upstash Redis cache status and performance across all routes
-            </p>
+    <div className="min-h-screen bg-neutral-50">
+      {/* Apple-style Header */}
+      <header className="sticky top-0 z-50 border-b border-neutral-200/80 bg-white/80 backdrop-blur-xl">
+        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
+          <div className="flex items-center gap-4">
+            <Link
+              href="/"
+              className="flex items-center gap-2 text-sm text-neutral-500 transition-colors hover:text-neutral-900"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              <span>Back</span>
+            </Link>
+            <div className="h-4 w-px bg-neutral-200" />
+            <h1 className="text-sm font-semibold text-neutral-900">Cache Health</h1>
           </div>
           <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
+            <button
               onClick={() => setAutoRefresh(!autoRefresh)}
-              className={autoRefresh ? "border-green-500 text-green-600" : ""}
+              className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
+                autoRefresh
+                  ? "bg-emerald-500/10 text-emerald-600"
+                  : "bg-neutral-100 text-neutral-600 hover:bg-neutral-200"
+              }`}
             >
-              <Activity className={`h-4 w-4 mr-1 ${autoRefresh ? "animate-pulse" : ""}`} />
-              {autoRefresh ? "Auto" : "Manual"}
-            </Button>
-            <Button onClick={runHealthChecks} disabled={loading} size="sm">
-              {loading ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <RefreshCw className="h-4 w-4 mr-1" />}
-              Refresh
+              <Activity className={`h-3.5 w-3.5 ${autoRefresh ? "animate-pulse" : ""}`} />
+              {autoRefresh ? "Live" : "Manual"}
+            </button>
+            <Button
+              onClick={runHealthChecks}
+              disabled={loading}
+              size="sm"
+              variant="outline"
+              className="h-8 rounded-full border-neutral-200 text-xs bg-transparent"
+            >
+              {loading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="h-3.5 w-3.5" />}
             </Button>
           </div>
         </div>
+      </header>
 
-        {/* Overall Status Banner */}
-        <Card className={`border-2 ${getStatusBg(overallHealth)}`}>
-          <CardContent className="py-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div
-                  className={`h-16 w-16 rounded-full flex items-center justify-center ${
-                    overallHealth === "healthy"
-                      ? "bg-green-500"
-                      : overallHealth === "degraded"
-                        ? "bg-yellow-500"
-                        : overallHealth === "unhealthy"
-                          ? "bg-red-500"
-                          : overallHealth === "warming"
-                            ? "bg-blue-500"
-                            : "bg-muted"
-                  }`}
-                >
-                  {overallHealth === "healthy" ? (
-                    <Wifi className="h-8 w-8 text-white" />
-                  ) : overallHealth === "degraded" ? (
-                    <AlertTriangle className="h-8 w-8 text-white" />
-                  ) : overallHealth === "unhealthy" ? (
-                    <WifiOff className="h-8 w-8 text-white" />
-                  ) : overallHealth === "warming" ? (
-                    <TrendingUp className="h-8 w-8 text-white" />
-                  ) : (
-                    <Loader2 className="h-8 w-8 text-white animate-spin" />
-                  )}
-                </div>
-                <div>
-                  <h2 className={`text-2xl font-bold capitalize ${getStatusColor(overallHealth)}`}>
-                    {overallHealth === "checking"
-                      ? "Checking..."
+      <main className="mx-auto max-w-6xl px-4 py-8">
+        {/* Status Hero */}
+        <div className="mb-8">
+          <div className={`inline-flex items-center gap-3 rounded-2xl ${getStatusBgLight(overallHealth)} px-5 py-4`}>
+            <div
+              className={`flex h-12 w-12 items-center justify-center rounded-full ${
+                overallHealth === "healthy"
+                  ? "bg-emerald-500"
+                  : overallHealth === "degraded"
+                    ? "bg-amber-500"
+                    : overallHealth === "unhealthy"
+                      ? "bg-red-500"
                       : overallHealth === "warming"
-                        ? "System Warming Up"
-                        : overallHealth === "healthy"
-                          ? "System Healthy"
-                          : overallHealth === "degraded"
-                            ? "System Degraded"
-                            : "System Unhealthy"}
-                  </h2>
-                  <p className="text-muted-foreground">
-                    {lastUpdated ? `Last checked: ${lastUpdated.toLocaleTimeString()}` : "Checking system health..."}
-                  </p>
-                  {overallHealth === "warming" && (
-                    <p className="text-sm text-blue-600 mt-1">
-                      Cache is building up - hit rate will improve with more requests
-                    </p>
-                  )}
-                </div>
-              </div>
-              {cacheStats && (
-                <div className="text-right hidden sm:block">
-                  <p className="text-sm text-muted-foreground">Cache Type</p>
-                  <Badge variant={cacheStats.type === "upstash" ? "default" : "secondary"}>{cacheStats.type}</Badge>
-                </div>
+                        ? "bg-blue-500"
+                        : "bg-neutral-400"
+              }`}
+            >
+              {overallHealth === "healthy" ? (
+                <Wifi className="h-6 w-6 text-white" />
+              ) : overallHealth === "degraded" ? (
+                <AlertTriangle className="h-6 w-6 text-white" />
+              ) : overallHealth === "unhealthy" ? (
+                <WifiOff className="h-6 w-6 text-white" />
+              ) : overallHealth === "warming" ? (
+                <TrendingUp className="h-6 w-6 text-white" />
+              ) : (
+                <Loader2 className="h-6 w-6 animate-spin text-white" />
               )}
             </div>
-          </CardContent>
-        </Card>
-
-        {/* Health Checks Grid */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {healthChecks.map((check, index) => (
-            <Card key={index} className={`border ${getStatusBg(check.status)}`}>
-              <CardContent className="pt-4">
-                <div className="flex items-start justify-between">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      {getStatusIcon(check.status)}
-                      <span className="font-semibold">{check.name}</span>
-                    </div>
-                    <p className="text-sm text-muted-foreground">{check.message}</p>
-                  </div>
-                  {check.latency !== undefined && (
-                    <Badge variant="outline" className="text-xs">
-                      {check.latency}ms
-                    </Badge>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+            <div>
+              <h2 className={`text-lg font-semibold ${getStatusColor(overallHealth)}`}>
+                {overallHealth === "checking"
+                  ? "Checking System"
+                  : overallHealth === "warming"
+                    ? "System Warming Up"
+                    : overallHealth === "healthy"
+                      ? "All Systems Operational"
+                      : overallHealth === "degraded"
+                        ? "Degraded Performance"
+                        : "System Issues Detected"}
+              </h2>
+              <p className="text-sm text-neutral-500">
+                {lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString()}` : "Checking..."}
+              </p>
+            </div>
+          </div>
         </div>
 
-        {/* Cache Statistics */}
-        {cacheStats && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Database className="h-5 w-5" />
-                Cache Statistics
-              </CardTitle>
-              <CardDescription>Real-time cache performance metrics</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-muted-foreground">Hit Rate</span>
-                    <span className="font-mono font-bold">{cacheStats.stats.hit_rate_percent.toFixed(1)}%</span>
-                  </div>
-                  <Progress value={cacheStats.stats.hit_rate_percent} className="h-2" />
-                </div>
-
-                <div className="rounded-lg border p-4 text-center">
-                  <Zap className="h-6 w-6 mx-auto text-green-500 mb-2" />
-                  <p className="text-2xl font-bold">{cacheStats.stats.hits}</p>
-                  <p className="text-xs text-muted-foreground">Cache Hits</p>
-                </div>
-
-                <div className="rounded-lg border p-4 text-center">
-                  <Clock className="h-6 w-6 mx-auto text-yellow-500 mb-2" />
-                  <p className="text-2xl font-bold">{cacheStats.stats.misses}</p>
-                  <p className="text-xs text-muted-foreground">Cache Misses</p>
-                </div>
-
-                <div className="rounded-lg border p-4 text-center">
-                  <Server className="h-6 w-6 mx-auto text-blue-500 mb-2" />
-                  <p className="text-2xl font-bold">{cacheStats.stats.sets}</p>
-                  <p className="text-xs text-muted-foreground">Cache Sets</p>
-                </div>
+        {/* Quick Stats Grid */}
+        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Hit Rate Card */}
+          <div className="group rounded-2xl bg-white p-5 shadow-sm ring-1 ring-neutral-200/50 transition-all hover:shadow-md">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10">
+                <Gauge className="h-5 w-5 text-emerald-600" />
               </div>
-
-              <div className="mt-6 grid gap-4 sm:grid-cols-3">
-                <div className="rounded-lg border p-4">
-                  <p className="text-sm text-muted-foreground">Total Requests</p>
-                  <p className="text-xl font-bold">{cacheStats.stats.total_requests}</p>
-                </div>
-                <div className="rounded-lg border p-4">
-                  <p className="text-sm text-muted-foreground">Errors</p>
-                  <p className={`text-xl font-bold ${cacheStats.stats.errors > 0 ? "text-red-600" : ""}`}>
-                    {cacheStats.stats.errors}
-                  </p>
-                </div>
-                <div
-                  className={`rounded-lg border p-4 ${cacheStats.stats.fast_json ? "border-green-200 bg-green-50" : "border-yellow-200 bg-yellow-50"}`}
-                >
-                  <p className="text-sm text-muted-foreground">JSON Serializer</p>
-                  <p
-                    className={`text-xl font-bold ${cacheStats.stats.fast_json ? "text-green-600" : "text-yellow-600"}`}
-                  >
-                    {cacheStats.stats.fast_json ? "orjson" : "standard"}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
-
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <LayoutGrid className="h-5 w-5" />
-                  Route Cache Tests
-                </CardTitle>
-                <CardDescription>Test caching on all public API routes</CardDescription>
-              </div>
-              <Button variant="outline" size="sm" onClick={runRouteCacheTests} disabled={testingRoutes}>
-                {testingRoutes ? <Loader2 className="h-4 w-4 animate-spin mr-1" /> : <Zap className="h-4 w-4 mr-1" />}
-                Test All Routes
-              </Button>
+              <ChevronRight className="h-4 w-4 text-neutral-300 transition-transform group-hover:translate-x-0.5" />
             </div>
-          </CardHeader>
-          <CardContent>
-            {routeTests.length > 0 ? (
-              <div className="space-y-3">
-                {routeTests.map((test, i) => (
-                  <div
-                    key={i}
-                    className={`flex items-center justify-between p-3 rounded-lg border ${
-                      test.status === "success"
-                        ? "border-green-200 bg-green-50"
-                        : test.status === "error"
-                          ? "border-red-200 bg-red-50"
-                          : "border-muted bg-muted/30"
-                    }`}
-                  >
+            <p className="text-2xl font-semibold text-neutral-900 tabular-nums">
+              {cacheStats?.stats.hit_rate_percent?.toFixed(1) ?? "—"}%
+            </p>
+            <p className="text-sm text-neutral-500">Cache Hit Rate</p>
+          </div>
+
+          {/* Total Requests Card */}
+          <div className="group rounded-2xl bg-white p-5 shadow-sm ring-1 ring-neutral-200/50 transition-all hover:shadow-md">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-500/10">
+                <BarChart3 className="h-5 w-5 text-blue-600" />
+              </div>
+              <ChevronRight className="h-4 w-4 text-neutral-300 transition-transform group-hover:translate-x-0.5" />
+            </div>
+            <p className="text-2xl font-semibold text-neutral-900 tabular-nums">
+              {cacheStats?.stats.total_requests?.toLocaleString() ?? "—"}
+            </p>
+            <p className="text-sm text-neutral-500">Total Requests</p>
+          </div>
+
+          {/* Cache Hits Card */}
+          <div className="group rounded-2xl bg-white p-5 shadow-sm ring-1 ring-neutral-200/50 transition-all hover:shadow-md">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10">
+                <Zap className="h-5 w-5 text-violet-600" />
+              </div>
+              <ChevronRight className="h-4 w-4 text-neutral-300 transition-transform group-hover:translate-x-0.5" />
+            </div>
+            <p className="text-2xl font-semibold text-neutral-900 tabular-nums">
+              {cacheStats?.stats.hits?.toLocaleString() ?? "—"}
+            </p>
+            <p className="text-sm text-neutral-500">Cache Hits</p>
+          </div>
+
+          {/* Products Cached Card */}
+          <div className="group rounded-2xl bg-white p-5 shadow-sm ring-1 ring-neutral-200/50 transition-all hover:shadow-md">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10">
+                <Layers className="h-5 w-5 text-amber-600" />
+              </div>
+              <ChevronRight className="h-4 w-4 text-neutral-300 transition-transform group-hover:translate-x-0.5" />
+            </div>
+            <p className="text-2xl font-semibold text-neutral-900 tabular-nums">
+              {cacheStats?.warming?.products_cached?.toLocaleString() ?? "—"}
+            </p>
+            <p className="text-sm text-neutral-500">Products Cached</p>
+          </div>
+        </div>
+
+        {/* Main Content Grid */}
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* Health Checks Panel */}
+          <div className="lg:col-span-2">
+            <div className="rounded-2xl bg-white shadow-sm ring-1 ring-neutral-200/50">
+              <div className="border-b border-neutral-100 px-5 py-4">
+                <h3 className="font-semibold text-neutral-900">System Health</h3>
+                <p className="text-sm text-neutral-500">Real-time service status</p>
+              </div>
+              <div className="divide-y divide-neutral-100">
+                {healthChecks.map((check, index) => (
+                  <div key={index} className="flex items-center justify-between px-5 py-4">
                     <div className="flex items-center gap-3">
-                      {test.status === "success" ? (
-                        <CheckCircle2 className="h-5 w-5 text-green-600" />
-                      ) : test.status === "error" ? (
-                        <XCircle className="h-5 w-5 text-red-600" />
-                      ) : (
-                        <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                      )}
+                      <div
+                        className={`flex h-9 w-9 items-center justify-center rounded-lg ${getStatusBgLight(check.status)}`}
+                      >
+                        <span className={getStatusColor(check.status)}>{check.icon}</span>
+                      </div>
                       <div>
-                        <p className="font-medium">{test.route}</p>
-                        <p className="text-xs text-muted-foreground font-mono">{test.endpoint}</p>
+                        <p className="font-medium text-neutral-900">{check.name}</p>
+                        <p className="text-sm text-neutral-500">{check.message}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      {test.latency !== undefined && (
-                        <Badge variant="outline" className="text-xs">
-                          {test.latency}ms
-                        </Badge>
+                    <div className="flex items-center gap-3">
+                      {check.latency !== undefined && (
+                        <span className="text-xs text-neutral-400 tabular-nums">{check.latency}ms</span>
                       )}
-                      {test.cached !== undefined && (
-                        <Badge variant={test.cached ? "default" : "secondary"} className="text-xs">
-                          {test.cached ? "Cached" : "Not Cached"}
-                        </Badge>
+                      {check.status === "healthy" ? (
+                        <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                      ) : check.status === "degraded" ? (
+                        <AlertTriangle className="h-5 w-5 text-amber-500" />
+                      ) : check.status === "unhealthy" ? (
+                        <XCircle className="h-5 w-5 text-red-500" />
+                      ) : check.status === "warming" ? (
+                        <TrendingUp className="h-5 w-5 text-blue-500" />
+                      ) : (
+                        <Loader2 className="h-5 w-5 animate-spin text-neutral-400" />
                       )}
-                      {test.cacheHit !== undefined && test.cacheHit && (
-                        <Badge variant="outline" className="text-xs border-green-500 text-green-600">
-                          HIT
-                        </Badge>
-                      )}
-                      {test.error && <span className="text-xs text-red-600">{test.error}</span>}
                     </div>
                   </div>
                 ))}
-
-                {/* Summary */}
-                {!testingRoutes && routeTests.length > 0 && (
-                  <div className="mt-4 p-4 rounded-lg bg-muted/50">
-                    <div className="grid grid-cols-3 gap-4 text-center">
-                      <div>
-                        <p className="text-2xl font-bold text-green-600">
-                          {routeTests.filter((t) => t.status === "success").length}
-                        </p>
-                        <p className="text-xs text-muted-foreground">Passed</p>
-                      </div>
-                      <div>
-                        <p className="text-2xl font-bold text-red-600">
-                          {routeTests.filter((t) => t.status === "error").length}
-                        </p>
-                        <p className="text-xs text-muted-foreground">Failed</p>
-                      </div>
-                      <div>
-                        <p className="text-2xl font-bold text-blue-600">{routeTests.filter((t) => t.cached).length}</p>
-                        <p className="text-xs text-muted-foreground">Using Cache</p>
-                      </div>
-                    </div>
+                {healthChecks.length === 0 && (
+                  <div className="flex items-center justify-center py-12 text-neutral-400">
+                    <Loader2 className="h-5 w-5 animate-spin" />
                   </div>
                 )}
               </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                Click &quot;Test All Routes&quot; to verify caching on all endpoints
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Latency Test */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle className="flex items-center gap-2">
-                  <TrendingUp className="h-5 w-5" />
-                  Latency Test
-                </CardTitle>
-                <CardDescription>Test round-trip response times (5 pings)</CardDescription>
-              </div>
-              <Button variant="outline" size="sm" onClick={runLatencyTest}>
-                Run Test
-              </Button>
             </div>
-          </CardHeader>
-          <CardContent>
-            {pingResults.length > 0 ? (
-              <div className="space-y-4">
-                <div className="flex gap-2">
-                  {pingResults.map((result, i) => (
-                    <div
-                      key={i}
-                      className={`flex-1 rounded-lg border p-3 text-center ${
-                        result.success
-                          ? result.latency < 200
-                            ? "border-green-200 bg-green-50"
-                            : result.latency < 500
-                              ? "border-yellow-200 bg-yellow-50"
-                              : "border-red-200 bg-red-50"
-                          : "border-red-200 bg-red-50"
-                      }`}
-                    >
-                      {result.success ? (
-                        <>
-                          <p className="text-lg font-mono font-bold">{result.latency}ms</p>
-                          <p className="text-xs text-muted-foreground">Ping {i + 1}</p>
-                        </>
-                      ) : (
-                        <>
-                          <XCircle className="h-5 w-5 mx-auto text-red-500" />
-                          <p className="text-xs text-red-600">Failed</p>
-                        </>
-                      )}
-                    </div>
-                  ))}
+          </div>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Cache Actions */}
+            <div className="rounded-2xl bg-white shadow-sm ring-1 ring-neutral-200/50">
+              <div className="border-b border-neutral-100 px-5 py-4">
+                <h3 className="font-semibold text-neutral-900">Quick Actions</h3>
+              </div>
+              <div className="p-4 space-y-3">
+                <Button
+                  onClick={warmCache}
+                  disabled={isWarmingCache || cacheStats?.warming?.is_warming}
+                  className="w-full justify-start gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-red-500 text-white hover:from-orange-600 hover:to-red-600"
+                >
+                  {isWarmingCache || cacheStats?.warming?.is_warming ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Flame className="h-4 w-4" />
+                  )}
+                  {isWarmingCache || cacheStats?.warming?.is_warming ? "Warming Cache..." : "Warm Cache"}
+                </Button>
+                <Button
+                  onClick={runLatencyTest}
+                  variant="outline"
+                  className="w-full justify-start gap-2 rounded-xl bg-transparent"
+                >
+                  <Play className="h-4 w-4" />
+                  Run Latency Test
+                </Button>
+                <Link href="/redis-test" className="block">
+                  <Button variant="outline" className="w-full justify-start gap-2 rounded-xl bg-transparent">
+                    <Settings2 className="h-4 w-4" />
+                    Advanced Testing
+                  </Button>
+                </Link>
+              </div>
+            </div>
+
+            {/* Latency Results */}
+            {pingResults.length > 0 && (
+              <div className="rounded-2xl bg-white shadow-sm ring-1 ring-neutral-200/50">
+                <div className="border-b border-neutral-100 px-5 py-4">
+                  <h3 className="font-semibold text-neutral-900">Latency Test</h3>
+                  <p className="text-sm text-neutral-500">5 consecutive pings</p>
                 </div>
-                {avgLatency !== null && (
-                  <div className="text-center p-4 rounded-lg bg-muted/50">
-                    <p className="text-sm text-muted-foreground">Average Latency</p>
-                    <p
-                      className={`text-3xl font-mono font-bold ${
-                        avgLatency < 200 ? "text-green-600" : avgLatency < 500 ? "text-yellow-600" : "text-red-600"
-                      }`}
-                    >
-                      {avgLatency}ms
-                    </p>
+                <div className="p-4">
+                  <div className="mb-4 flex gap-2">
+                    {pingResults.map((result, i) => (
+                      <div
+                        key={i}
+                        className={`flex-1 rounded-lg py-2 text-center ${
+                          result.success
+                            ? result.latency < 200
+                              ? "bg-emerald-500/10 text-emerald-600"
+                              : result.latency < 500
+                                ? "bg-amber-500/10 text-amber-600"
+                                : "bg-red-500/10 text-red-600"
+                            : "bg-red-500/10 text-red-600"
+                        }`}
+                      >
+                        {result.success ? (
+                          <span className="text-sm font-semibold tabular-nums">{result.latency}</span>
+                        ) : (
+                          <XCircle className="mx-auto h-4 w-4" />
+                        )}
+                      </div>
+                    ))}
                   </div>
-                )}
-              </div>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                Click &quot;Run Test&quot; to measure latency
+                  {avgLatency !== null && (
+                    <div className="rounded-xl bg-neutral-50 p-4 text-center">
+                      <p className="text-xs text-neutral-500 uppercase tracking-wider">Average</p>
+                      <p
+                        className={`text-2xl font-semibold tabular-nums ${
+                          avgLatency < 200 ? "text-emerald-600" : avgLatency < 500 ? "text-amber-600" : "text-red-600"
+                        }`}
+                      >
+                        {avgLatency}ms
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
-          </CardContent>
-        </Card>
 
-        {/* Connection Info */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Connection Information</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">API URL</span>
-                <code className="text-xs bg-muted px-2 py-1 rounded">{API_URL}</code>
+            {/* Connection Info */}
+            <div className="rounded-2xl bg-white shadow-sm ring-1 ring-neutral-200/50">
+              <div className="border-b border-neutral-100 px-5 py-4">
+                <h3 className="font-semibold text-neutral-900">Connection</h3>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Cache Provider</span>
-                <span>{cacheStats?.type || "Unknown"}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Last Update</span>
-                <span>{cacheStats?.timestamp || "N/A"}</span>
+              <div className="p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-neutral-500">Cache Type</span>
+                  <Badge variant={cacheStats?.type === "upstash" ? "default" : "secondary"} className="rounded-full">
+                    {cacheStats?.type ?? "—"}
+                  </Badge>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-neutral-500">Status</span>
+                  <span
+                    className={`text-sm font-medium ${cacheStats?.connected ? "text-emerald-600" : "text-red-600"}`}
+                  >
+                    {cacheStats?.connected ? "Connected" : "Disconnected"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-neutral-500">Serializer</span>
+                  <span className="text-sm font-medium text-neutral-900">
+                    {cacheStats?.stats.fast_json ? "orjson" : "standard"}
+                  </span>
+                </div>
               </div>
             </div>
-          </CardContent>
-        </Card>
-      </div>
+
+            {/* Cache Stats Detail */}
+            <div className="rounded-2xl bg-white shadow-sm ring-1 ring-neutral-200/50">
+              <div className="border-b border-neutral-100 px-5 py-4">
+                <h3 className="font-semibold text-neutral-900">Statistics</h3>
+              </div>
+              <div className="p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-neutral-500">Hits</span>
+                  <span className="text-sm font-medium text-neutral-900 tabular-nums">
+                    {cacheStats?.stats.hits?.toLocaleString() ?? "—"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-neutral-500">Misses</span>
+                  <span className="text-sm font-medium text-neutral-900 tabular-nums">
+                    {cacheStats?.stats.misses?.toLocaleString() ?? "—"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-neutral-500">Sets</span>
+                  <span className="text-sm font-medium text-neutral-900 tabular-nums">
+                    {cacheStats?.stats.sets?.toLocaleString() ?? "—"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-neutral-500">Errors</span>
+                  <span
+                    className={`text-sm font-medium tabular-nums ${
+                      (cacheStats?.stats.errors ?? 0) > 0 ? "text-red-600" : "text-neutral-900"
+                    }`}
+                  >
+                    {cacheStats?.stats.errors ?? "—"}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* TTL Configuration */}
+            {cacheStats?.config && (
+              <div className="rounded-2xl bg-white shadow-sm ring-1 ring-neutral-200/50">
+                <div className="border-b border-neutral-100 px-5 py-4">
+                  <h3 className="font-semibold text-neutral-900">TTL Settings</h3>
+                </div>
+                <div className="p-4 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-neutral-500">Products List</span>
+                    <span className="text-sm font-medium text-neutral-900 tabular-nums">
+                      {cacheStats.config.products_list_ttl}s
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-neutral-500">Single Product</span>
+                    <span className="text-sm font-medium text-neutral-900 tabular-nums">
+                      {cacheStats.config.single_product_ttl}s
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-neutral-500">Featured</span>
+                    <span className="text-sm font-medium text-neutral-900 tabular-nums">
+                      {cacheStats.config.featured_ttl}s
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-neutral-500">All Products</span>
+                    <span className="text-sm font-medium text-neutral-900 tabular-nums">
+                      {cacheStats.config.all_products_ttl}s
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Cached Categories */}
+            {cacheStats?.warming?.categories_cached && cacheStats.warming.categories_cached.length > 0 && (
+              <div className="rounded-2xl bg-white shadow-sm ring-1 ring-neutral-200/50">
+                <div className="border-b border-neutral-100 px-5 py-4">
+                  <h3 className="font-semibold text-neutral-900">Cached Categories</h3>
+                </div>
+                <div className="p-4">
+                  <div className="flex flex-wrap gap-2">
+                    {cacheStats.warming.categories_cached.map((cat, i) => (
+                      <Badge key={i} variant="secondary" className="rounded-full text-xs">
+                        {cat}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </main>
     </div>
   )
 }

@@ -1,7 +1,7 @@
 """
 User-facing products routes for Mizizzi E-commerce platform.
 Handles public product viewing, searching, and browsing functionality.
-OPTIMIZED with Upstash Redis caching - Direct cache pattern (like footer).
+OPTIMIZED with Upstash Redis caching and lightweight JSON responses.
 """
 from flask import Blueprint, request, jsonify, current_app, Response
 from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
@@ -11,66 +11,41 @@ from sqlalchemy.orm import load_only, joinedload
 from datetime import datetime
 import re
 import time
-import hashlib
+import threading
 
 from app.configuration.extensions import db, limiter
 from app.models.models import (
     Product, ProductVariant, ProductImage, Category, Brand,
     User, UserRole
 )
-from app.utils.redis_cache import product_cache, fast_json_dumps
+from app.utils.redis_cache import (
+    product_cache,
+    cached_response,
+    fast_cached_response,
+    invalidate_on_change,
+    fast_json_dumps
+)
 
 # Create blueprint for user-facing product routes
 products_routes = Blueprint('products_routes', __name__, url_prefix='/api/products')
 
-# ----------------------
-# Cache Helper Functions (Direct pattern like footer)
-# ----------------------
+# Cache warming configuration
+CACHE_CONFIG = {
+    'products_list_ttl': 300,      # 5 minutes for product lists
+    'single_product_ttl': 600,     # 10 minutes for single products
+    'featured_ttl': 180,           # 3 minutes for featured sections
+    'search_ttl': 120,             # 2 minutes for search results
+    'all_products_ttl': 600,       # 10 minutes for all products cache
+}
 
-def generate_cache_key(prefix: str, params: dict = None) -> str:
-    """Generate a cache key from prefix and parameters."""
-    if params:
-        # Filter out None values and sort for consistency
-        filtered_params = {k: v for k, v in sorted(params.items()) if v is not None}
-        if filtered_params:
-            param_str = fast_json_dumps(filtered_params)
-            param_hash = hashlib.md5(param_str.encode()).hexdigest()[:12]
-            return f"mizizzi:{prefix}:{param_hash}"
-    return f"mizizzi:{prefix}"
-
-
-def get_cached_response(cache_key: str):
-    """Try to get cached response. Returns (data, is_cached) tuple."""
-    try:
-        cached = product_cache.get(cache_key)
-        if cached is not None:
-            current_app.logger.info(f'[Cache] HIT: {cache_key}')
-            return cached, True
-        current_app.logger.info(f'[Cache] MISS: {cache_key}')
-        return None, False
-    except Exception as e:
-        current_app.logger.error(f'[Cache] Error getting {cache_key}: {e}')
-        return None, False
-
-
-def set_cached_response(cache_key: str, data: dict, ttl: int = 30):
-    """Cache the response data."""
-    try:
-        product_cache.set(cache_key, data, ttl)
-        current_app.logger.info(f'[Cache] SET: {cache_key} (TTL: {ttl}s)')
-    except Exception as e:
-        current_app.logger.error(f'[Cache] Error setting {cache_key}: {e}')
-
-
-def make_response_with_cache_headers(data: dict, cache_key: str, is_cached: bool):
-    """Create JSON response with cache headers."""
-    response = jsonify(data)
-    response.headers['X-Cache'] = 'HIT' if is_cached else 'MISS'
-    response.headers['X-Cache-Key'] = cache_key
-    response.headers['Access-Control-Allow-Origin'] = '*'
-    response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
-    response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
-    return response
+# Cache warming state
+_cache_warming_state = {
+    'last_warmed': None,
+    'is_warming': False,
+    'products_cached': 0,
+    'categories_cached': [],
+    'warm_errors': []
+}
 
 # ----------------------
 # Lightweight Serializers (Optimized for speed)
@@ -307,16 +282,29 @@ def health_check():
 
 
 # ----------------------
-# Cache Management Endpoints
+# Cache Management Endpoints - ENHANCED
 # ----------------------
 
 @products_routes.route('/cache/status', methods=['GET'])
 def cache_status():
-    """Get cache status and info."""
+    """Get comprehensive cache status and info."""
+    stats = product_cache.stats
+    
     return jsonify({
         'connected': product_cache.is_connected,
         'type': 'upstash' if product_cache.is_connected else 'memory',
-        'stats': product_cache.stats,
+        'stats': {
+            **stats,
+            'fast_json': True,  # Always using fast JSON
+        },
+        'config': CACHE_CONFIG,
+        'warming': {
+            'last_warmed': _cache_warming_state['last_warmed'],
+            'is_warming': _cache_warming_state['is_warming'],
+            'products_cached': _cache_warming_state['products_cached'],
+            'categories_cached': _cache_warming_state['categories_cached'],
+            'errors': _cache_warming_state['warm_errors'][-5:] if _cache_warming_state['warm_errors'] else []
+        },
         'timestamp': datetime.utcnow().isoformat()
     }), 200
 
@@ -336,16 +324,230 @@ def invalidate_cache():
     }), 200
 
 
+@products_routes.route('/cache/warm', methods=['POST'])
+def warm_cache():
+    """
+    Warm the cache by pre-loading all products.
+    This dramatically improves cache hit rates.
+    """
+    if not is_admin_user():
+        return jsonify({'error': 'Admin access required'}), 403
+    
+    if _cache_warming_state['is_warming']:
+        return jsonify({
+            'success': False,
+            'message': 'Cache warming already in progress',
+            'state': _cache_warming_state
+        }), 409
+    
+    # Start cache warming in background
+    def warm_cache_background():
+        _warm_all_products_cache()
+    
+    thread = threading.Thread(target=warm_cache_background)
+    thread.daemon = True
+    thread.start()
+    
+    return jsonify({
+        'success': True,
+        'message': 'Cache warming started in background',
+        'state': _cache_warming_state
+    }), 202
+
+
+@products_routes.route('/cache/all', methods=['GET'])
+def get_all_cached_products():
+    """
+    Get all products from cache (or warm cache if empty).
+    Returns pre-cached products for maximum performance.
+    """
+    start = time.perf_counter()
+    cache_key = "mizizzi:all_products"
+    
+    # Try to get from cache
+    cached = product_cache.get_raw(cache_key)
+    if cached:
+        cache_time = (time.perf_counter() - start) * 1000
+        response = Response(cached, status=200, mimetype='application/json')
+        response.headers['X-Cache'] = 'HIT'
+        response.headers['X-Cache-Time-Ms'] = str(round(cache_time, 2))
+        response.headers['X-All-Products-Cache'] = 'true'
+        return response
+    
+    # Cache miss - fetch and cache all products
+    try:
+        products = Product.query.options(
+            load_only(
+                Product.id, Product.name, Product.slug, Product.price,
+                Product.sale_price, Product.stock, Product.thumbnail_url,
+                Product.image_urls, Product.discount_percentage,
+                Product.is_featured, Product.is_new, Product.is_sale,
+                Product.is_flash_sale, Product.is_luxury_deal, Product.is_trending,
+                Product.is_top_pick, Product.is_daily_find, Product.is_new_arrival,
+                Product.is_active, Product.is_visible, Product.category_id,
+                Product.brand_id, Product.created_at, Product.sort_order
+            )
+        ).filter(
+            Product.is_active == True,
+            Product.is_visible == True
+        ).order_by(Product.created_at.desc()).all()
+        
+        serialized = [serialize_product_lightweight(p) for p in products if p]
+        
+        data = {
+            'items': serialized,
+            'total': len(serialized),
+            'cached_at': datetime.utcnow().isoformat()
+        }
+        
+        json_str = fast_json_dumps(data)
+        product_cache.set_raw(cache_key, json_str, ttl=CACHE_CONFIG['all_products_ttl'])
+        
+        total_time = (time.perf_counter() - start) * 1000
+        response = Response(json_str, status=200, mimetype='application/json')
+        response.headers['X-Cache'] = 'MISS'
+        response.headers['X-Response-Time-Ms'] = str(round(total_time, 2))
+        response.headers['X-Products-Cached'] = str(len(serialized))
+        return response
+        
+    except Exception as e:
+        current_app.logger.error(f"Error getting all cached products: {str(e)}")
+        return jsonify({'error': 'Internal server error'}), 500
+
+
+@products_routes.route('/cache/warming-status', methods=['GET'])
+def get_warming_status():
+    """Get the current cache warming status."""
+    return jsonify({
+        'state': _cache_warming_state,
+        'cache_connected': product_cache.is_connected,
+        'cache_stats': product_cache.stats,
+        'timestamp': datetime.utcnow().isoformat()
+    }), 200
+
+
+def _warm_all_products_cache():
+    """Background task to warm the cache with all products."""
+    global _cache_warming_state
+    
+    _cache_warming_state['is_warming'] = True
+    _cache_warming_state['warm_errors'] = []
+    _cache_warming_state['products_cached'] = 0
+    _cache_warming_state['categories_cached'] = []
+    
+    try:
+        from flask import current_app
+        app = current_app._get_current_object()
+        
+        with app.app_context():
+            # 1. Cache all products
+            products = Product.query.options(
+                load_only(
+                    Product.id, Product.name, Product.slug, Product.price,
+                    Product.sale_price, Product.stock, Product.thumbnail_url,
+                    Product.image_urls, Product.discount_percentage,
+                    Product.is_featured, Product.is_new, Product.is_sale,
+                    Product.is_flash_sale, Product.is_luxury_deal, Product.is_trending,
+                    Product.is_top_pick, Product.is_daily_find, Product.is_new_arrival,
+                    Product.is_active, Product.is_visible, Product.category_id,
+                    Product.brand_id, Product.created_at, Product.sort_order
+                )
+            ).filter(
+                Product.is_active == True,
+                Product.is_visible == True
+            ).all()
+            
+            # Cache all products list
+            all_serialized = [serialize_product_lightweight(p) for p in products if p]
+            all_products_data = {
+                'items': all_serialized,
+                'total': len(all_serialized),
+                'cached_at': datetime.utcnow().isoformat()
+            }
+            product_cache.set_raw(
+                "mizizzi:all_products", 
+                fast_json_dumps(all_products_data), 
+                ttl=CACHE_CONFIG['all_products_ttl']
+            )
+            _cache_warming_state['products_cached'] = len(all_serialized)
+            
+            # 2. Cache by category
+            categories = Category.query.all()
+            for category in categories:
+                try:
+                    cat_products = [p for p in products if p.category_id == category.id]
+                    if cat_products:
+                        cat_serialized = [serialize_product_lightweight(p) for p in cat_products if p]
+                        cat_data = {
+                            'items': cat_serialized,
+                            'total': len(cat_serialized),
+                            'category_id': category.id,
+                            'category_name': category.name,
+                            'cached_at': datetime.utcnow().isoformat()
+                        }
+                        product_cache.set_raw(
+                            f"mizizzi:products:category:{category.id}",
+                            fast_json_dumps(cat_data),
+                            ttl=CACHE_CONFIG['products_list_ttl']
+                        )
+                        _cache_warming_state['categories_cached'].append(category.name)
+                except Exception as e:
+                    _cache_warming_state['warm_errors'].append(f"Category {category.id}: {str(e)}")
+            
+            # 3. Cache featured product sections
+            featured_sections = [
+                ('is_featured', 'featured'),
+                ('is_trending', 'trending'),
+                ('is_flash_sale', 'flash_sale'),
+                ('is_luxury_deal', 'luxury_deals'),
+                ('is_top_pick', 'top_picks'),
+                ('is_daily_find', 'daily_finds'),
+                ('is_new_arrival', 'new_arrivals'),
+                ('is_new', 'new_products'),
+                ('is_sale', 'sale_products'),
+            ]
+            
+            for attr, cache_name in featured_sections:
+                try:
+                    section_products = [p for p in products if getattr(p, attr, False)]
+                    if section_products:
+                        section_serialized = [serialize_product_lightweight(p) for p in section_products if p]
+                        section_data = {
+                            'items': section_serialized,
+                            'total': len(section_serialized),
+                            'cached_at': datetime.utcnow().isoformat()
+                        }
+                        product_cache.set_raw(
+                            f"mizizzi:{cache_name}",
+                            fast_json_dumps(section_data),
+                            ttl=CACHE_CONFIG['featured_ttl']
+                        )
+                except Exception as e:
+                    _cache_warming_state['warm_errors'].append(f"Section {cache_name}: {str(e)}")
+            
+            _cache_warming_state['last_warmed'] = datetime.utcnow().isoformat()
+            
+    except Exception as e:
+        _cache_warming_state['warm_errors'].append(f"Global error: {str(e)}")
+    finally:
+        _cache_warming_state['is_warming'] = False
+
+
 # ----------------------
-# Public Products List (OPTIMIZED with Direct Redis Cache)
+# Public Products List (OPTIMIZED with Redis)
 # ----------------------
 
 @products_routes.route('/', methods=['GET'])
 @limiter.limit("600 per minute")
+@cached_response("products", ttl=30, key_params=[
+    "page", "per_page", "category_id", "brand_id", "min_price", "max_price",
+    "is_featured", "is_new", "is_sale", "is_flash_sale", "is_luxury_deal",
+    "is_new_arrival", "search", "sort_by", "sort_order"
+])
 def get_products():
     """
     Get products with filtering, sorting, and pagination.
-    OPTIMIZED: Uses direct Redis caching pattern (like footer).
+    OPTIMIZED: Uses Redis caching and lightweight serialization.
     """
     try:
         # Get query parameters
@@ -365,29 +567,6 @@ def get_products():
         sort_by = request.args.get('sort_by', 'created_at')
         sort_order = request.args.get('sort_order', 'desc')
         include_inactive = request.args.get('include_inactive', False, type=bool)
-
-        cache_params = {
-            'page': page,
-            'per_page': per_page,
-            'category_id': category_id,
-            'brand_id': brand_id,
-            'min_price': min_price,
-            'max_price': max_price,
-            'is_featured': is_featured,
-            'is_new': is_new,
-            'is_sale': is_sale,
-            'is_flash_sale': is_flash_sale,
-            'is_luxury_deal': is_luxury_deal,
-            'is_new_arrival': is_new_arrival,
-            'search': search if search else None,
-            'sort_by': sort_by,
-            'sort_order': sort_order,
-        }
-        cache_key = generate_cache_key('products', cache_params)
-
-        cached_data, is_cached = get_cached_response(cache_key)
-        if is_cached and cached_data:
-            return make_response_with_cache_headers(cached_data, cache_key, True), 200
 
         # Convert string booleans
         def str_to_bool(val):
@@ -493,7 +672,7 @@ def get_products():
             if serialized:
                 products.append(serialized)
 
-        response_data = {
+        return jsonify({
             'items': products,
             'pagination': {
                 'page': pagination.page,
@@ -503,11 +682,7 @@ def get_products():
                 'has_next': pagination.has_next,
                 'has_prev': pagination.has_prev
             }
-        }
-
-        set_cached_response(cache_key, response_data, ttl=30)
-
-        return make_response_with_cache_headers(response_data, cache_key, False), 200
+        }), 200
 
     except SQLAlchemyError as e:
         current_app.logger.error(f"Database error getting products: {str(e)}")
@@ -518,24 +693,19 @@ def get_products():
 
 
 # ----------------------
-# Flash Sale Products (OPTIMIZED with Direct Redis Cache)
+# Flash Sale Products (OPTIMIZED)
 # ----------------------
 
 @products_routes.route('/flash-sale', methods=['GET'])
 @limiter.limit("600 per minute")
+@cached_response("flash_sale", ttl=30, key_params=["limit", "page"])
 def get_flash_sale_products():
     """
     Get flash sale products.
-    OPTIMIZED: Direct Redis cache pattern (like footer).
+    OPTIMIZED: Redis cached, lightweight response.
     """
     try:
         limit = min(request.args.get('limit', 20, type=int), 50)
-        page = request.args.get('page', 1, type=int)
-
-        cache_key = generate_cache_key('flash_sale', {'limit': limit, 'page': page})
-        cached_data, is_cached = get_cached_response(cache_key)
-        if is_cached and cached_data:
-            return make_response_with_cache_headers(cached_data, cache_key, True), 200
 
         # Optimized query with indexed column is_flash_sale
         products = Product.query.options(
@@ -553,15 +723,11 @@ def get_flash_sale_products():
             Product.discount_percentage.desc()
         ).limit(limit).all()
 
-        response_data = {
+        return jsonify({
             'items': [serialize_product_lightweight(p) for p in products if p],
             'total': len(products),
             'cached_at': datetime.utcnow().isoformat()
-        }
-
-        set_cached_response(cache_key, response_data, ttl=30)
-
-        return make_response_with_cache_headers(response_data, cache_key, False), 200
+        }), 200
 
     except Exception as e:
         current_app.logger.error(f"Error getting flash sale products: {str(e)}")
@@ -569,24 +735,19 @@ def get_flash_sale_products():
 
 
 # ----------------------
-# Luxury Deals Products (OPTIMIZED with Direct Redis Cache)
+# Luxury Deals Products (OPTIMIZED)
 # ----------------------
 
 @products_routes.route('/luxury-deals', methods=['GET'])
 @limiter.limit("600 per minute")
+@cached_response("luxury_deals", ttl=30, key_params=["limit", "page"])
 def get_luxury_deals_products():
     """
     Get luxury deals products.
-    OPTIMIZED: Direct Redis cache pattern (like footer).
+    OPTIMIZED: Redis cached, lightweight response.
     """
     try:
         limit = min(request.args.get('limit', 20, type=int), 50)
-        page = request.args.get('page', 1, type=int)
-
-        cache_key = generate_cache_key('luxury_deals', {'limit': limit, 'page': page})
-        cached_data, is_cached = get_cached_response(cache_key)
-        if is_cached and cached_data:
-            return make_response_with_cache_headers(cached_data, cache_key, True), 200
 
         # Optimized query with indexed column is_luxury_deal
         products = Product.query.options(
@@ -594,29 +755,26 @@ def get_luxury_deals_products():
                 Product.id, Product.name, Product.slug, Product.price,
                 Product.sale_price, Product.thumbnail_url, Product.image_urls,
                 Product.discount_percentage, Product.stock,
-                Product.is_luxury_deal
+                Product.is_luxury_deal, Product.created_at
             )
         ).filter(
             Product.is_active == True,
             Product.is_visible == True,
             Product.is_luxury_deal == True
         ).order_by(
-            Product.price.desc()
+            Product.created_at.desc()
         ).limit(limit).all()
 
-        response_data = {
+        return jsonify({
             'items': [serialize_product_lightweight(p) for p in products if p],
             'total': len(products),
             'cached_at': datetime.utcnow().isoformat()
-        }
-
-        set_cached_response(cache_key, response_data, ttl=30)
-
-        return make_response_with_cache_headers(response_data, cache_key, False), 200
+        }), 200
 
     except Exception as e:
         current_app.logger.error(f"Error getting luxury deals products: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
+
 
 # ----------------------
 # Get Product by ID (with caching for single product)
@@ -646,7 +804,7 @@ def get_product_by_id(product_id):
         serialized = serialize_product(product, include_variants=True, include_images=True)
 
         # Cache for 60 seconds (single products can be cached longer)
-        product_cache.set(cache_key, serialized, ttl=60)
+        product_cache.set(cache_key, serialized, ttl=CACHE_CONFIG['single_product_ttl'])
 
         return jsonify(serialized), 200
 
@@ -683,7 +841,7 @@ def get_product_by_slug(slug):
         serialized = serialize_product(product, include_variants=True, include_images=True)
 
         # Cache for 60 seconds
-        product_cache.set(cache_key, serialized, ttl=60)
+        product_cache.set(cache_key, serialized, ttl=CACHE_CONFIG['single_product_ttl'])
 
         return jsonify(serialized), 200
 
@@ -1363,6 +1521,9 @@ def get_products_fast():
 @products_routes.route('/recent-searches', methods=['OPTIONS'])
 @products_routes.route('/cache/status', methods=['OPTIONS'])
 @products_routes.route('/cache/invalidate', methods=['OPTIONS'])
+@products_routes.route('/cache/warm', methods=['OPTIONS'])
+@products_routes.route('/cache/all', methods=['OPTIONS'])
+@products_routes.route('/cache/warming-status', methods=['OPTIONS'])
 @products_routes.route('/fast', methods=['OPTIONS'])
 def handle_options():
     """Handle OPTIONS requests for CORS."""
