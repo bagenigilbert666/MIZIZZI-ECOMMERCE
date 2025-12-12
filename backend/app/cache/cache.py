@@ -618,6 +618,9 @@ def invalidate_on_change(namespaces: list):
             
             # Check if operation was successful
             if isinstance(result, tuple):
+
+
+                
                 status_code = result[1] if len(result) > 1 else 200
             else:
                 status_code = 200

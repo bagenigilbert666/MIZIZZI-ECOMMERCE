@@ -325,7 +325,7 @@ def get_featured_categories():
 
 @categories_routes.route('/<int:category_id>', methods=['GET', 'OPTIONS'])
 @cross_origin()
-@cached_response("category_detail", ttl=60, key_params=[])
+@cached_response("category_detail", ttl=60, key_params=["category_id"])
 def get_category(category_id):
     """Get category by ID with detailed information. OPTIMIZED: Redis cached."""
     if request.method == 'OPTIONS':
@@ -353,7 +353,7 @@ def get_category(category_id):
 
 @categories_routes.route('/slug/<string:slug>', methods=['GET', 'OPTIONS'])
 @cross_origin()
-@cached_response("category_slug", ttl=60, key_params=[])
+@cached_response("category_slug", ttl=60, key_params=["slug"])
 def get_category_by_slug(slug):
     """Get category by slug with detailed information. OPTIMIZED: Redis cached."""
     if request.method == 'OPTIONS':
@@ -382,7 +382,7 @@ def get_category_by_slug(slug):
 @categories_routes.route('/<int:category_id>/products', methods=['GET', 'OPTIONS'])
 @cross_origin()
 @cached_response("category_products", ttl=30, key_params=[
-    "page", "per_page", "include_subcategories", "sort_by"
+	"category_id", "page", "per_page", "include_subcategories", "sort_by"
 ])
 def get_category_products(category_id):
     """Get products in a specific category. OPTIMIZED: Redis cached."""
@@ -451,7 +451,7 @@ def get_category_products(category_id):
 
 @categories_routes.route('/<int:category_id>/breadcrumb', methods=['GET', 'OPTIONS'])
 @cross_origin()
-@cached_response("category_breadcrumb", ttl=300, key_params=[])
+@cached_response("category_breadcrumb", ttl=300, key_params=["category_id"])
 def get_category_breadcrumb_endpoint(category_id):
     """Get category breadcrumb trail. OPTIMIZED: Redis cached."""
     if request.method == 'OPTIONS':
@@ -673,13 +673,34 @@ def health_check():
             "timestamp": datetime.utcnow().isoformat()
         }), 503
 
-@categories_routes.route('/cache/status', methods=['GET'])
+@categories_routes.route('/cache-health', methods=['GET'])
 @cross_origin()
 def categories_cache_status():
-    """Get cache status for categories."""
-    return jsonify({
-        'connected': product_cache.is_connected if product_cache else False,
-        'type': 'upstash' if product_cache else 'memory',
-        'stats': product_cache.stats if product_cache else {},
-        'timestamp': datetime.utcnow().isoformat()
-    }), 200
+    """Get cache status for categories (resilient if cache not present)."""
+    try:
+        connected = False
+        cache_type = 'memory'
+        stats = {}
+
+        if product_cache:
+            # guard access in case product_cache has different attrs
+            connected = getattr(product_cache, 'is_connected', getattr(product_cache, 'connected', True))
+            stats = getattr(product_cache, 'stats', {})
+            # keep the type naming consistent if upstash-like object exists
+            cache_type = 'upstash' if 'upstash' in str(type(product_cache)).lower() or connected else cache_type
+
+        return jsonify({
+            'connected': bool(connected),
+            'type': cache_type,
+            'stats': stats,
+            'timestamp': datetime.utcnow().isoformat()
+        }), 200
+    except Exception as e:
+        logger.warning(f"Cache status check failed: {e}")
+        return jsonify({
+            'connected': False,
+            'type': 'unknown',
+            'stats': {},
+            'error': str(e),
+            'timestamp': datetime.utcnow().isoformat()
+        }), 200
