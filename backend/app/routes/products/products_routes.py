@@ -12,6 +12,7 @@ from datetime import datetime
 import re
 import time
 import threading
+import json
 
 from app.configuration.extensions import db, limiter
 from app.models.models import (
@@ -272,14 +273,20 @@ def is_admin_user():
 @products_routes.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint for products service."""
+    try:
+        cache_connected = getattr(product_cache, 'is_connected', False)
+        cache_type = 'upstash' if cache_connected else 'memory'
+    except Exception:
+        cache_connected = False
+        cache_type = 'memory'
+
     return jsonify({
         'status': 'ok',
         'service': 'products_routes',
-        'cache_connected': product_cache.is_connected,
-        'cache_type': 'upstash' if product_cache.is_connected else 'memory',
+        'cache_connected': bool(cache_connected),
+        'cache_type': cache_type,
         'timestamp': datetime.utcnow().isoformat()
     }), 200
-
 
 # ----------------------
 # Cache Management Endpoints - ENHANCED
@@ -288,14 +295,21 @@ def health_check():
 @products_routes.route('/cache/status', methods=['GET'])
 def cache_status():
     """Get comprehensive cache status and info."""
-    stats = product_cache.stats
-    
+    try:
+        connected = getattr(product_cache, 'is_connected', False)
+        stats = getattr(product_cache, 'stats', {}) or {}
+        cache_type = 'upstash' if connected else 'memory'
+    except Exception:
+        connected = False
+        stats = {}
+        cache_type = 'memory'
+
     return jsonify({
-        'connected': product_cache.is_connected,
-        'type': 'upstash' if product_cache.is_connected else 'memory',
+        'connected': bool(connected),
+        'type': cache_type,
         'stats': {
             **stats,
-            'fast_json': True,  # Always using fast JSON
+            'fast_json': True,
         },
         'config': CACHE_CONFIG,
         'warming': {
@@ -315,12 +329,15 @@ def invalidate_cache():
     if not is_admin_user():
         return jsonify({'error': 'Admin access required'}), 403
 
-    total_cleared = product_cache.invalidate_all_products()
+    try:
+        total_cleared = product_cache.invalidate_all_products() if product_cache and hasattr(product_cache, 'invalidate_all_products') else 0
+    except Exception:
+        total_cleared = 0
 
     return jsonify({
         'success': True,
         'total_cleared': total_cleared,
-        'cache_type': 'upstash' if product_cache.is_connected else 'memory'
+        'cache_type': 'upstash' if getattr(product_cache, 'is_connected', False) else 'memory'
     }), 200
 
 
@@ -365,14 +382,33 @@ def get_all_cached_products():
     cache_key = "mizizzi:all_products"
     
     # Try to get from cache
-    cached = product_cache.get_raw(cache_key)
+    cached = product_cache.get_raw(cache_key) if product_cache and hasattr(product_cache, 'get_raw') else None
     if cached:
-        cache_time = (time.perf_counter() - start) * 1000
-        response = Response(cached, status=200, mimetype='application/json')
-        response.headers['X-Cache'] = 'HIT'
-        response.headers['X-Cache-Time-Ms'] = str(round(cache_time, 2))
-        response.headers['X-All-Products-Cache'] = 'true'
-        return response
+        try:
+            # Ensure cached is a str
+            if isinstance(cached, bytes):
+                cached_str = cached.decode('utf-8')
+            else:
+                cached_str = cached
+            payload = json.loads(cached_str)
+            # Add alias if missing
+            if 'products' not in payload and 'items' in payload:
+                payload['products'] = payload['items']
+            json_out = json.dumps(payload)
+            cache_time = (time.perf_counter() - start) * 1000
+            response = Response(json_out, status=200, mimetype='application/json')
+            response.headers['X-Cache'] = 'HIT'
+            response.headers['X-Cache-Time-Ms'] = str(round(cache_time, 2))
+            response.headers['X-All-Products-Cache'] = 'true'
+            return response
+        except Exception:
+            # Fall back to returning raw cached string as-is
+            cache_time = (time.perf_counter() - start) * 1000
+            response = Response(cached if isinstance(cached, str) else cached.decode('utf-8'), status=200, mimetype='application/json')
+            response.headers['X-Cache'] = 'HIT'
+            response.headers['X-Cache-Time-Ms'] = str(round(cache_time, 2))
+            response.headers['X-All-Products-Cache'] = 'true'
+            return response
     
     # Cache miss - fetch and cache all products
     try:
@@ -396,12 +432,14 @@ def get_all_cached_products():
         
         data = {
             'items': serialized,
+            'products': serialized,
             'total': len(serialized),
             'cached_at': datetime.utcnow().isoformat()
         }
         
         json_str = fast_json_dumps(data)
-        product_cache.set_raw(cache_key, json_str, ttl=CACHE_CONFIG['all_products_ttl'])
+        if product_cache and hasattr(product_cache, 'set_raw'):
+            product_cache.set_raw(cache_key, json_str, ttl=CACHE_CONFIG['all_products_ttl'])
         
         total_time = (time.perf_counter() - start) * 1000
         response = Response(json_str, status=200, mimetype='application/json')
@@ -461,14 +499,16 @@ def _warm_all_products_cache():
             all_serialized = [serialize_product_lightweight(p) for p in products if p]
             all_products_data = {
                 'items': all_serialized,
+                'products': all_serialized,
                 'total': len(all_serialized),
                 'cached_at': datetime.utcnow().isoformat()
             }
-            product_cache.set_raw(
-                "mizizzi:all_products", 
-                fast_json_dumps(all_products_data), 
-                ttl=CACHE_CONFIG['all_products_ttl']
-            )
+            if product_cache and hasattr(product_cache, 'set_raw'):
+                product_cache.set_raw(
+                    "mizizzi:all_products", 
+                    fast_json_dumps(all_products_data), 
+                    ttl=CACHE_CONFIG['all_products_ttl']
+                )
             _cache_warming_state['products_cached'] = len(all_serialized)
             
             # 2. Cache by category
@@ -480,16 +520,18 @@ def _warm_all_products_cache():
                         cat_serialized = [serialize_product_lightweight(p) for p in cat_products if p]
                         cat_data = {
                             'items': cat_serialized,
+                            'products': cat_serialized,
                             'total': len(cat_serialized),
                             'category_id': category.id,
                             'category_name': category.name,
                             'cached_at': datetime.utcnow().isoformat()
                         }
-                        product_cache.set_raw(
-                            f"mizizzi:products:category:{category.id}",
-                            fast_json_dumps(cat_data),
-                            ttl=CACHE_CONFIG['products_list_ttl']
-                        )
+                        if product_cache and hasattr(product_cache, 'set_raw'):
+                            product_cache.set_raw(
+                                f"mizizzi:products:category:{category.id}",
+                                fast_json_dumps(cat_data),
+                                ttl=CACHE_CONFIG['products_list_ttl']
+                            )
                         _cache_warming_state['categories_cached'].append(category.name)
                 except Exception as e:
                     _cache_warming_state['warm_errors'].append(f"Category {category.id}: {str(e)}")
@@ -514,14 +556,16 @@ def _warm_all_products_cache():
                         section_serialized = [serialize_product_lightweight(p) for p in section_products if p]
                         section_data = {
                             'items': section_serialized,
+                            'products': section_serialized,
                             'total': len(section_serialized),
                             'cached_at': datetime.utcnow().isoformat()
                         }
-                        product_cache.set_raw(
-                            f"mizizzi:{cache_name}",
-                            fast_json_dumps(section_data),
-                            ttl=CACHE_CONFIG['featured_ttl']
-                        )
+                        if product_cache and hasattr(product_cache, 'set_raw'):
+                            product_cache.set_raw(
+                                f"mizizzi:{cache_name}",
+                                fast_json_dumps(section_data),
+                                ttl=CACHE_CONFIG['featured_ttl']
+                            )
                 except Exception as e:
                     _cache_warming_state['warm_errors'].append(f"Section {cache_name}: {str(e)}")
             
@@ -674,6 +718,7 @@ def get_products():
 
         return jsonify({
             'items': products,
+            'products': products,
             'pagination': {
                 'page': pagination.page,
                 'per_page': pagination.per_page,
@@ -723,8 +768,10 @@ def get_flash_sale_products():
             Product.discount_percentage.desc()
         ).limit(limit).all()
 
+        items = [serialize_product_lightweight(p) for p in products if p]
         return jsonify({
-            'items': [serialize_product_lightweight(p) for p in products if p],
+            'items': items,
+            'products': items,
             'total': len(products),
             'cached_at': datetime.utcnow().isoformat()
         }), 200
@@ -765,8 +812,10 @@ def get_luxury_deals_products():
             Product.created_at.desc()
         ).limit(limit).all()
 
+        items = [serialize_product_lightweight(p) for p in products if p]
         return jsonify({
-            'items': [serialize_product_lightweight(p) for p in products if p],
+            'items': items,
+            'products': items,
             'total': len(products),
             'cached_at': datetime.utcnow().isoformat()
         }), 200
@@ -981,6 +1030,7 @@ def search_products():
         return jsonify({
             'query': query_text,
             'items': products,
+            'products': products,
             'pagination': {
                 'page': pagination.page,
                 'per_page': pagination.per_page,
@@ -1022,10 +1072,10 @@ def get_featured_products():
             error_out=False
         )
 
-        products = [serialize_product_lightweight(p) for p in pagination.items if p]
-
+        items = [serialize_product_lightweight(p) for p in pagination.items if p]
         return jsonify({
-            'items': products,
+            'items': items,
+            'products': items,
             'pagination': {
                 'page': pagination.page,
                 'per_page': pagination.per_page,
@@ -1035,7 +1085,6 @@ def get_featured_products():
                 'has_prev': pagination.has_prev
             }
         }), 200
-
     except Exception as e:
         current_app.logger.error(f"Error getting featured products: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
@@ -1067,10 +1116,10 @@ def get_new_products():
             error_out=False
         )
 
-        products = [serialize_product_lightweight(p) for p in pagination.items if p]
-
+        items = [serialize_product_lightweight(p) for p in pagination.items if p]
         return jsonify({
-            'items': products,
+            'items': items,
+            'products': items,
             'pagination': {
                 'page': pagination.page,
                 'per_page': pagination.per_page,
@@ -1080,7 +1129,6 @@ def get_new_products():
                 'has_prev': pagination.has_prev
             }
         }), 200
-
     except Exception as e:
         current_app.logger.error(f"Error getting new products: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
@@ -1112,10 +1160,10 @@ def get_sale_products():
             error_out=False
         )
 
-        products = [serialize_product_lightweight(p) for p in pagination.items if p]
-
+        items = [serialize_product_lightweight(p) for p in pagination.items if p]
         return jsonify({
-            'items': products,
+            'items': items,
+            'products': items,
             'pagination': {
                 'page': pagination.page,
                 'per_page': pagination.per_page,
@@ -1125,7 +1173,6 @@ def get_sale_products():
                 'has_prev': pagination.has_prev
             }
         }), 200
-
     except Exception as e:
         current_app.logger.error(f"Error getting sale products: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
@@ -1167,11 +1214,12 @@ def get_trending_products():
                 Product.is_visible == True
             ).order_by(func.random()).limit(limit).all()
 
+        items = [serialize_product_lightweight(p) for p in products if p]
         return jsonify({
-            'items': [serialize_product_lightweight(p) for p in products if p],
+            'items': items,
+            'products': items,
             'total': len(products)
         }), 200
-
     except Exception as e:
         current_app.logger.error(f"Error getting trending products: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
@@ -1213,11 +1261,12 @@ def get_top_picks_products():
                 Product.is_visible == True
             ).order_by(Product.price.desc()).limit(limit).all()
 
+        items = [serialize_product_lightweight(p) for p in products if p]
         return jsonify({
-            'items': [serialize_product_lightweight(p) for p in products if p],
+            'items': items,
+            'products': items,
             'total': len(products)
         }), 200
-
     except Exception as e:
         current_app.logger.error(f"Error getting top picks: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
@@ -1260,11 +1309,12 @@ def get_daily_finds_products():
                 Product.is_flash_sale == True
             ).limit(limit).all()
 
+        items = [serialize_product_lightweight(p) for p in products if p]
         return jsonify({
-            'items': [serialize_product_lightweight(p) for p in products if p],
+            'items': items,
+            'products': items,
             'total': len(products)
         }), 200
-
     except Exception as e:
         current_app.logger.error(f"Error getting daily finds: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
@@ -1293,11 +1343,12 @@ def get_new_arrivals_products():
             Product.is_new_arrival == True
         ).order_by(Product.created_at.desc()).limit(limit).all()
 
+        items = [serialize_product_lightweight(p) for p in products if p]
         return jsonify({
-            'items': [serialize_product_lightweight(p) for p in products if p],
+            'items': items,
+            'products': items,
             'total': len(products)
         }), 200
-
     except Exception as e:
         current_app.logger.error(f"Error getting new arrivals: {str(e)}")
         return jsonify({'error': 'Internal server error'}), 500
@@ -1408,13 +1459,29 @@ def get_products_fast():
         cache_key = f"mizizzi:products:fast:{page}:{per_page}:{category_id}:{brand_id}:{is_featured}:{is_sale}:{sort_by}:{sort_order}"
 
         # Try cache first
-        cached = product_cache.get_raw(cache_key)
+        cached = product_cache.get_raw(cache_key) if product_cache and hasattr(product_cache, 'get_raw') else None
         if cached:
-            cache_time = (time.perf_counter() - start) * 1000
-            response = Response(cached, status=200, mimetype='application/json')
-            response.headers['X-Cache'] = 'HIT'
-            response.headers['X-Cache-Time-Ms'] = str(round(cache_time, 2))
-            return response
+            try:
+                if isinstance(cached, bytes):
+                    cached_str = cached.decode('utf-8')
+                else:
+                    cached_str = cached
+                payload = json.loads(cached_str)
+                if 'products' not in payload and 'items' in payload:
+                    payload['products'] = payload['items']
+                json_out = json.dumps(payload)
+                cache_time = (time.perf_counter() - start) * 1000
+                response = Response(json_out, status=200, mimetype='application/json')
+                response.headers['X-Cache'] = 'HIT'
+                response.headers['X-Cache-Time-Ms'] = str(round(cache_time, 2))
+                return response
+            except Exception:
+                # fallback: return raw cached string
+                cache_time = (time.perf_counter() - start) * 1000
+                response = Response(cached if isinstance(cached, str) else cached.decode('utf-8'), status=200, mimetype='application/json')
+                response.headers['X-Cache'] = 'HIT'
+                response.headers['X-Cache-Time-Ms'] = str(round(cache_time, 2))
+                return response
 
         # Convert string booleans
         def str_to_bool(val):
@@ -1468,6 +1535,7 @@ def get_products_fast():
 
         data = {
             'items': products,
+            'products': products,
             'pagination': {
                 'page': pagination.page,
                 'per_page': pagination.per_page,
@@ -1481,7 +1549,8 @@ def get_products_fast():
 
         # Cache the pre-serialized JSON
         json_str = fast_json_dumps(data)
-        product_cache.set_raw(cache_key, json_str, ttl=30)
+        if product_cache and hasattr(product_cache, 'set_raw'):
+            product_cache.set_raw(cache_key, json_str, ttl=30)
 
         total_time = (time.perf_counter() - start) * 1000
         response = Response(json_str, status=200, mimetype='application/json')
