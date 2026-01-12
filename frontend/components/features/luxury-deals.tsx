@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect, useCallback, memo, useRef } from "react"
+import { useState, useCallback, memo, useRef, useEffect } from "react"
 import { motion, AnimatePresence, type PanInfo } from "framer-motion"
 import Link from "next/link"
 import { ChevronRight, ChevronLeft, Crown, Star } from "lucide-react"
@@ -10,25 +10,6 @@ import type { Product } from "@/types"
 import { useRouter } from "next/navigation"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { cloudinaryService } from "@/services/cloudinary-service"
-import { useLuxuryDeals, invalidateLuxuryDeals } from "@/hooks/use-swr-luxury-deals"
-
-const LogoPlaceholder = () => (
-  <div className="absolute inset-0 flex items-center justify-center bg-white">
-    <motion.div
-      initial={{ scale: 0.9, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      transition={{ duration: 0.3, ease: "easeOut" }}
-      className="relative h-12 w-12 sm:h-16 sm:w-16"
-    >
-      <Image
-        src="/images/screenshot-20from-202025-02-18-2013-30-22.png"
-        alt="Loading"
-        fill
-        className="object-contain"
-      />
-    </motion.div>
-  </div>
-)
 
 const StarRating = ({ rating = 4, reviewCount = 0 }: { rating?: number; reviewCount?: number }) => {
   return (
@@ -73,33 +54,13 @@ function getProductImageUrl(product: Product): string {
     }
     return product.images[0].url
   }
-  return "/placeholder.svg?height=300&width=300"
+  return ""
 }
 
 const ProductCard = memo(({ product, isMobile }: { product: Product; isMobile: boolean }) => {
-  const [imageLoaded, setImageLoaded] = useState(false)
-  const [imageError, setImageError] = useState(false)
-  const [showPlaceholder, setShowPlaceholder] = useState(true)
-
   const discountPercentage = product.sale_price
     ? Math.round(((product.price - product.sale_price) / product.price) * 100)
     : 0
-
-  const handleImageLoad = () => {
-    setImageLoaded(true)
-    setTimeout(() => setShowPlaceholder(false), 300)
-  }
-
-  const handleImageError = () => {
-    setImageError(true)
-    setImageLoaded(false)
-  }
-
-  useEffect(() => {
-    setImageLoaded(false)
-    setImageError(false)
-    setShowPlaceholder(true)
-  }, [product.id])
 
   const imageUrl = getProductImageUrl(product)
   const rating = product.rating || 3 + Math.random() * 2
@@ -107,33 +68,11 @@ const ProductCard = memo(({ product, isMobile }: { product: Product; isMobile: b
 
   return (
     <Link href={`/product/${product.slug || product.id}`} prefetch={false}>
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-        whileHover={{ y: -2 }}
-        className="h-full"
-      >
-        <div className="group h-full overflow-hidden bg-white border-r border-gray-100 transition-all duration-200 hover:shadow-sm">
+      <motion.div whileHover={{ y: -8 }} transition={{ duration: 0.2, ease: "easeOut" }} className="h-full">
+        <div className="group h-full overflow-hidden bg-white border border-transparent rounded-lg transition-all duration-200 hover:shadow-lg hover:border-gray-200">
           {/* Image Container - Square aspect ratio */}
           <div className="relative aspect-square overflow-hidden bg-[#f8f8f8]">
-            <AnimatePresence>
-              {(showPlaceholder || imageError) && (
-                <motion.div
-                  initial={{ opacity: 1 }}
-                  exit={{ opacity: 0, transition: { duration: 0.3 } }}
-                  className="absolute inset-0 z-10"
-                >
-                  <LogoPlaceholder />
-                </motion.div>
-              )}
-            </AnimatePresence>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: imageLoaded ? 1 : 0 }}
-              transition={{ duration: 0.3 }}
-              className="absolute inset-0"
-            >
+            {imageUrl ? (
               <Image
                 src={imageUrl || "/placeholder.svg"}
                 alt={product.name}
@@ -141,10 +80,12 @@ const ProductCard = memo(({ product, isMobile }: { product: Product; isMobile: b
                 sizes={isMobile ? "25vw" : "16vw"}
                 className="object-cover transition-transform duration-300 group-hover:scale-105"
                 loading="lazy"
-                onLoad={handleImageLoad}
-                onError={handleImageError}
               />
-            </motion.div>
+            ) : (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Image src="/logo.png" alt={product.name} width={60} height={60} className="opacity-30" />
+              </div>
+            )}
             {/* Discount Badge - Dark Cherry Red */}
             {product.sale_price && discountPercentage > 0 && (
               <div className="absolute top-1 left-1 bg-[#8B1538] text-white text-[10px] sm:text-xs font-medium px-1.5 py-0.5 rounded-sm z-20">
@@ -182,60 +123,11 @@ const ProductCard = memo(({ product, isMobile }: { product: Product; isMobile: b
 
 ProductCard.displayName = "ProductCard"
 
-const LuxuryDealsSkeleton = ({ isMobile }: { isMobile: boolean }) => (
-  <section className="w-full mb-4 sm:mb-8">
-    <div className="w-full">
-      <div className="bg-[#8B1538] text-white flex items-center justify-between px-2 sm:px-4 py-1.5 sm:py-2">
-        <div className="flex items-center gap-1 sm:gap-2">
-          <Crown className={`text-yellow-300 fill-yellow-300 ${isMobile ? "h-4 w-4" : "h-5 w-5"}`} />
-          <span className={`font-bold ${isMobile ? "text-sm" : "text-base"}`}>Luxury Deals</span>
-        </div>
-        <div className={`bg-white/20 rounded animate-pulse ${isMobile ? "h-4 w-12" : "h-5 w-16"}`}></div>
-      </div>
-      <div className={isMobile ? "p-1" : "p-2"}>
-        <div className="flex gap-[1px] bg-gray-100 overflow-hidden">
-          {[...Array(isMobile ? 4 : 6)].map((_, index) => (
-            <div key={index} className={`bg-white flex-shrink-0 ${isMobile ? "p-2 w-[calc(25%-1px)]" : "p-3 flex-1"}`}>
-              <div
-                className={`w-full mb-2 bg-white relative overflow-hidden flex items-center justify-center ${isMobile ? "aspect-square" : "aspect-square"}`}
-              >
-                <Image
-                  src="/images/screenshot-20from-202025-02-18-2013-30-22.png"
-                  alt="Loading"
-                  width={isMobile ? 48 : 64}
-                  height={isMobile ? 48 : 64}
-                  className="object-contain opacity-60"
-                />
-              </div>
-              <div className="space-y-2">
-                <div className="h-3 bg-gray-100 rounded w-3/4 relative overflow-hidden">
-                  <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100" />
-                </div>
-                <div className="h-3 bg-gray-100 rounded w-1/2 relative overflow-hidden">
-                  <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100" />
-                </div>
-                <div className="h-4 bg-gray-100 rounded w-2/3 relative overflow-hidden">
-                  <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100" />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-    <style jsx>{`
-      @keyframes shimmer {
-        100% {
-          transform: translateX(100%);
-        }
-      }
-    `}</style>
-  </section>
-)
+interface LuxuryDealsProps {
+  products: Product[]
+}
 
-export function LuxuryDeals() {
-  const { luxuryDeals, isLoading, isError, mutate, hasCachedData } = useLuxuryDeals()
-
+export function LuxuryDeals({ products }: LuxuryDealsProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isHovering, setIsHovering] = useState(false)
   const [hoverSide, setHoverSide] = useState<"left" | "right" | null>(null)
@@ -249,17 +141,6 @@ export function LuxuryDeals() {
 
   const itemsPerView = isSmallMobile ? 3 : isMobile ? 3 : isTablet ? 5 : 6
   const mobileItemWidth = "calc((100vw - 32px) / 3)"
-  const itemWidthPx = isSmallMobile ? 110 : isMobile ? 120 : 180
-
-  useEffect(() => {
-    const handleProductImagesUpdated = () => {
-      invalidateLuxuryDeals()
-    }
-    window.addEventListener("productImagesUpdated", handleProductImagesUpdated as EventListener)
-    return () => {
-      window.removeEventListener("productImagesUpdated", handleProductImagesUpdated as EventListener)
-    }
-  }, [])
 
   const handleViewAll = useCallback(
     (e: React.MouseEvent) => {
@@ -269,7 +150,7 @@ export function LuxuryDeals() {
     [router],
   )
 
-  const maxIndex = Math.max(0, luxuryDeals.length - itemsPerView)
+  const maxIndex = Math.max(0, products.length - itemsPerView)
 
   const goToPrevious = useCallback(() => {
     setCurrentIndex((prev) => Math.max(0, prev - 1))
@@ -345,35 +226,8 @@ export function LuxuryDeals() {
     return () => currentCarousel.removeEventListener("wheel", handleWheelEvent)
   }, [currentIndex, maxIndex, goToPrevious, goToNext, isMobile])
 
-  if (isLoading && !hasCachedData) {
-    return <LuxuryDealsSkeleton isMobile={isMobile} />
-  }
-
-  if (isError && luxuryDeals.length === 0) {
-    return (
-      <section className="w-full mb-4 sm:mb-8">
-        <div className="w-full p-1 sm:p-2">
-          <div className="mb-2 sm:mb-4">
-            <h2 className="text-base sm:text-lg lg:text-xl font-bold">Luxury Deals</h2>
-          </div>
-          <div className="bg-red-50 p-3 sm:p-4 rounded-md text-[#8B1538] text-center text-sm">
-            <div className="mx-auto w-12 h-12 mb-2 text-[#8B1538]">
-              <Crown className="w-full h-full" />
-            </div>
-            <p className="mb-2">Failed to load luxury deals</p>
-            <button
-              onClick={() => mutate()}
-              className="px-4 py-2 bg-[#8B1538] text-white rounded-md hover:bg-[#6d1029] transition-colors text-sm"
-            >
-              Try Again
-            </button>
-          </div>
-        </div>
-      </section>
-    )
-  }
-
-  if (!luxuryDeals || luxuryDeals.length === 0) {
+  // Don't render if no products
+  if (!products || products.length === 0) {
     return null
   }
 
@@ -422,7 +276,7 @@ export function LuxuryDeals() {
                   paddingBottom: "8px",
                 }}
               >
-                {luxuryDeals.map((product) => (
+                {products.map((product) => (
                   <div
                     key={product.id}
                     className="flex-shrink-0 pointer-events-auto"
@@ -459,7 +313,7 @@ export function LuxuryDeals() {
                   cursor: isDragging ? "grabbing" : "grab",
                 }}
               >
-                {luxuryDeals.map((product, index) => (
+                {products.map((product, index) => (
                   <motion.div
                     key={product.id}
                     className="flex-shrink-0 pointer-events-auto"

@@ -827,6 +827,40 @@
   .category-card-premium:hover .category-image-container img {
     transform: scale(1.1);
   }
+
+  /* Added page-level scroll/touch optimizations from page.tsx */
+  /* Page-level scroll / touch optimizations */
+  .page-root {
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+    scroll-behavior: smooth;
+  }
+
+  /* Small, hardware-accelerated arrow animation using transform only */
+  .arrow-animate {
+    display: inline-block;
+    will-change: transform;
+    animation: arrowMove 1.5s ease-in-out infinite;
+  }
+
+  @keyframes arrowMove {
+    0% {
+      transform: translateX(0);
+    }
+    50% {
+      transform: translateX(4px);
+    }
+    100% {
+      transform: translateX(0);
+    }
+  }
+
+  /* Optionally hint compositing for carousel / heavy visual components if present */
+  .page-root .carousel,
+  .page-root .category-grid,
+  .page-root .ProductGrid {
+    will-change: transform, opacity;
+  }
 }
 
 @layer utilities {

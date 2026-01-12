@@ -1,9 +1,7 @@
 "use client"
 
-import { useEffect } from "react"
-
 import type React from "react"
-import { useState, useCallback, memo, useRef } from "react"
+import { useState, useEffect, useCallback, memo, useRef } from "react"
 import { motion, AnimatePresence, type PanInfo } from "framer-motion"
 import Link from "next/link"
 import { ChevronRight, ChevronLeft, Zap, Star } from "lucide-react"
@@ -12,24 +10,6 @@ import type { Product } from "@/types"
 import { useRouter } from "next/navigation"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { cloudinaryService } from "@/services/cloudinary-service"
-
-const LogoPlaceholder = () => (
-  <div className="absolute inset-0 flex items-center justify-center bg-white">
-    <motion.div
-      initial={{ scale: 0.9, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      transition={{ duration: 0.3, ease: "easeOut" }}
-      className="relative h-12 w-12 sm:h-16 sm:w-16"
-    >
-      <Image
-        src="/images/screenshot-20from-202025-02-18-2013-30-22.png"
-        alt="Loading"
-        fill
-        className="object-contain"
-      />
-    </motion.div>
-  </div>
-)
 
 const StarRating = ({ rating = 4, reviewCount = 0 }: { rating?: number; reviewCount?: number }) => {
   return (
@@ -55,7 +35,28 @@ const StarRating = ({ rating = 4, reviewCount = 0 }: { rating?: number; reviewCo
   )
 }
 
-function getProductImageUrl(product: Product): string {
+const StockIndicator = ({ stock }: { stock: number }) => {
+  const maxStock = 500
+  const stockPercentage = Math.min((stock / maxStock) * 100, 100)
+
+  return (
+    <div className="mt-1.5 space-y-1">
+      <p className="text-[10px] sm:text-xs font-medium text-gray-800">
+        {stock <= 0 ? <span className="text-red-600">Out of stock</span> : `${stock} items left`}
+      </p>
+      <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
+        <motion.div
+          className="h-full bg-[#8B1538] rounded-full"
+          initial={{ width: 0 }}
+          animate={{ width: stock <= 0 ? "0%" : `${Math.max(stockPercentage, 5)}%` }}
+          transition={{ duration: 0.5, ease: "easeOut" }}
+        />
+      </div>
+    </div>
+  )
+}
+
+const getProductImageUrl = (product: Product): string => {
   if (product.image_urls && product.image_urls.length > 0) {
     if (typeof product.image_urls[0] === "string" && !product.image_urls[0].startsWith("http")) {
       return cloudinaryService.generateOptimizedUrl(product.image_urls[0])
@@ -77,232 +78,132 @@ function getProductImageUrl(product: Product): string {
   return ""
 }
 
-const ProductCard = memo(
-  ({ product, isMobile, imagePriority }: { product: Product; isMobile: boolean; imagePriority?: boolean }) => {
-    const [imageLoaded, setImageLoaded] = useState(false)
-    const [imageError, setImageError] = useState(false)
-    const [showPlaceholder, setShowPlaceholder] = useState(true)
+const ProductCard = memo(({ product, isMobile }: { product: Product; isMobile: boolean }) => {
+  const [imageLoaded, setImageLoaded] = useState(false)
+  const [imageError, setImageError] = useState(false)
+  const [showPlaceholder, setShowPlaceholder] = useState(true)
 
-    const discountPercentage = product.sale_price
-      ? Math.round(((product.price - product.sale_price) / product.price) * 100)
-      : 0
+  const discountPercentage = product.sale_price
+    ? Math.round(((product.price - product.sale_price) / product.price) * 100)
+    : 0
 
-    const handleImageLoad = () => {
-      setImageLoaded(true)
-      setTimeout(() => setShowPlaceholder(false), 300)
-    }
+  const stock = typeof product.stock === "number" ? product.stock : 100
 
-    const handleImageError = () => {
-      setImageError(true)
-      setImageLoaded(false)
-    }
+  const handleImageLoad = () => {
+    setImageLoaded(true)
+    setTimeout(() => setShowPlaceholder(false), 300)
+  }
 
-    useEffect(() => {
-      setImageLoaded(false)
-      setImageError(false)
-      setShowPlaceholder(true)
-    }, [product.id])
+  const handleImageError = () => {
+    setImageError(true)
+    setImageLoaded(false)
+  }
 
-    const imageUrl = getProductImageUrl(product)
-    const rating = product.rating || 3 + Math.random() * 2
-    const reviewCount = product.review_count || Math.floor(Math.random() * 5000) + 100
+  useEffect(() => {
+    setImageLoaded(false)
+    setImageError(false)
+    setShowPlaceholder(true)
+  }, [product.id])
 
-    const hasValidImage = imageUrl && imageUrl.length > 0
+  const imageUrl = getProductImageUrl(product)
 
-    return (
-      <Link href={`/product/${product.slug || product.id}`} prefetch={false}>
-        <motion.div
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3 }}
-          whileHover={{ y: -2 }}
-          className="h-full"
-        >
-          <div className="group h-full overflow-hidden bg-white border-r border-gray-100 transition-all duration-200 hover:shadow-sm">
-            {/* Image Container - Square aspect ratio */}
-            <div className="relative aspect-square overflow-hidden bg-[#f8f8f8]">
-              <AnimatePresence>
-                {(showPlaceholder || imageError || !hasValidImage) && (
-                  <motion.div
-                    initial={{ opacity: 1 }}
-                    exit={{ opacity: 0, transition: { duration: 0.3 } }}
-                    className="absolute inset-0 z-10"
-                  >
-                    <LogoPlaceholder />
-                  </motion.div>
-                )}
-              </AnimatePresence>
-              {hasValidImage && (
+  return (
+    <Link href={`/product/${product.slug || product.id}`} prefetch={false}>
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        whileHover={{ y: -2 }}
+        className="h-full"
+      >
+        <div className="group h-full overflow-hidden bg-white border-r border-gray-100 transition-all duration-200 hover:shadow-sm">
+          {/* Image Container - Square aspect ratio */}
+          <div className="relative aspect-square overflow-hidden bg-[#f8f8f8]">
+            <AnimatePresence>
+              {(showPlaceholder || imageError) && (
                 <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: imageLoaded ? 1 : 0 }}
-                  transition={{ duration: 0.3 }}
-                  className="absolute inset-0"
+                  initial={{ opacity: 1 }}
+                  exit={{ opacity: 0, transition: { duration: 0.3 } }}
+                  className="absolute inset-0 z-10 flex items-center justify-center bg-white"
                 >
-                  <Image
-                    src={imageUrl || "/placeholder.svg"}
-                    alt={product.name}
-                    fill
-                    sizes={isMobile ? "25vw" : "16vw"}
-                    className="object-cover transition-transform duration-300 group-hover:scale-105"
-                    loading="lazy"
-                    onLoad={handleImageLoad}
-                    onError={handleImageError}
-                    priority={imagePriority}
-                  />
+                  <motion.div
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ duration: 0.3, ease: "easeOut" }}
+                    className="relative h-12 w-12 sm:h-16 sm:w-16"
+                  >
+                    <Image src="/logo.png" alt="Loading" fill className="object-contain" />
+                  </motion.div>
                 </motion.div>
               )}
-              {/* Discount Badge - Dark Cherry Red */}
-              {product.sale_price && discountPercentage > 0 && (
-                <div className="absolute top-1 left-1 bg-[#8B1538] text-white text-[10px] sm:text-xs font-medium px-1.5 py-0.5 rounded-sm z-20">
-                  -{discountPercentage}%
-                </div>
+            </AnimatePresence>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: imageLoaded ? 1 : 0 }}
+              transition={{ duration: 0.3 }}
+              className="absolute inset-0"
+            >
+              {imageUrl && (
+                <Image
+                  src={imageUrl || "/placeholder.svg"}
+                  alt={product.name}
+                  fill
+                  sizes={isMobile ? "25vw" : "16vw"}
+                  className="object-cover transition-transform duration-300 group-hover:scale-105"
+                  loading="lazy"
+                  onLoad={handleImageLoad}
+                  onError={handleImageError}
+                />
+              )}
+            </motion.div>
+            {/* Discount Badge - Dark Cherry Red */}
+            {product.sale_price && discountPercentage > 0 && (
+              <div className="absolute top-1 left-1 bg-[#8B1538] text-white text-[10px] sm:text-xs font-medium px-1.5 py-0.5 rounded-sm z-20">
+                -{discountPercentage}%
+              </div>
+            )}
+            {stock > 0 && stock <= 5 && (
+              <div className="absolute bottom-1.5 left-1.5 bg-red-500 text-white text-[9px] sm:text-[10px] font-semibold px-1.5 py-0.5 rounded-sm z-20 animate-pulse">
+                Almost Gone!
+              </div>
+            )}
+          </div>
+          {/* Product Info - Compact */}
+          <div className={isMobile ? "p-2" : "p-3"}>
+            <h3
+              className={`text-gray-800 line-clamp-2 leading-tight mb-1.5 ${isMobile ? "text-xs min-h-[32px]" : "text-sm min-h-[40px]"}`}
+            >
+              {product.name}
+            </h3>
+            <div className="mb-1.5">
+              <span className={`font-semibold text-[#8B1538] ${isMobile ? "text-sm" : "text-base"}`}>
+                KSh {(product.sale_price || product.price).toLocaleString()}
+              </span>
+              {product.sale_price && (
+                <span className={`text-gray-400 line-through ml-1.5 ${isMobile ? "text-[10px]" : "text-xs"}`}>
+                  KSh {product.price.toLocaleString()}
+                </span>
               )}
             </div>
-            {/* Product Info - Compact */}
-            <div className={isMobile ? "p-2" : "p-3"}>
-              {/* Product Name - 2 lines max */}
-              <h3
-                className={`text-gray-800 line-clamp-2 leading-tight mb-1.5 ${isMobile ? "text-xs min-h-[32px]" : "text-sm min-h-[40px]"}`}
-              >
-                {product.name}
-              </h3>
-              {/* Price - Dark Cherry Red */}
-              <div className="mb-1.5">
-                <span className={`font-semibold text-[#8B1538] ${isMobile ? "text-sm" : "text-base"}`}>
-                  KSh {(product.sale_price || product.price).toLocaleString()}
-                </span>
-                {product.sale_price && (
-                  <span className={`text-gray-400 line-through ml-1.5 ${isMobile ? "text-[10px]" : "text-xs"}`}>
-                    KSh {product.price.toLocaleString()}
-                  </span>
-                )}
-              </div>
-              {/* Star Rating */}
-              <StarRating rating={rating} reviewCount={reviewCount} />
-            </div>
+            {/* Stock Indicator */}
+            <StockIndicator stock={stock} />
           </div>
-        </motion.div>
-      </Link>
-    )
-  },
-)
+        </div>
+      </motion.div>
+    </Link>
+  )
+})
 
 ProductCard.displayName = "ProductCard"
 
-const FlashSalesSkeleton = ({ isMobile }: { isMobile: boolean }) => (
-  <section className="w-full mb-4 sm:mb-8">
-    <div className="w-full">
-      {/* Header - matches real header styling */}
-      <div className="bg-[#8B1538] text-white flex items-center justify-between px-2 sm:px-4 py-1.5 sm:py-2">
-        <div className="flex items-center gap-1 sm:gap-2">
-          <Zap className={`text-yellow-300 fill-yellow-300 ${isMobile ? "h-4 w-4" : "h-5 w-5"}`} />
-          <span className={`font-bold ${isMobile ? "text-sm" : "text-base"}`}>Flash Sales</span>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Timer placeholders with pulse animation */}
-          <div className="flex gap-1">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="bg-white/20 rounded px-1.5 py-0.5 min-w-[24px] text-center animate-pulse">
-                <span className="text-xs font-mono text-white/60">--</span>
-              </div>
-            ))}
-          </div>
-          <div className="flex items-center gap-0.5 sm:gap-1 text-white/60 text-xs sm:text-sm">
-            <span>See All</span>
-            <ChevronRight className={isMobile ? "h-3.5 w-3.5" : "h-4 w-4"} />
-          </div>
-        </div>
-      </div>
+interface FlashSalesProps {
+  products?: Product[]
+}
 
-      {/* Product grid skeleton */}
-      <div className={isMobile ? "p-1" : "p-2"}>
-        <div className="flex gap-[1px] bg-gray-100 overflow-hidden">
-          {[...Array(isMobile ? 4 : 6)].map((_, index) => (
-            <div
-              key={index}
-              className={`bg-white flex-shrink-0 ${isMobile ? "p-2 w-[calc(25%-1px)]" : "p-3 flex-1"}`}
-              style={{ animationDelay: `${index * 100}ms` }}
-            >
-              {/* Image placeholder with shimmer */}
-              <div
-                className={`w-full mb-2 bg-gradient-to-br from-gray-50 to-gray-100 relative overflow-hidden flex items-center justify-center ${isMobile ? "aspect-square" : "aspect-square"}`}
-              >
-                {/* Shimmer effect */}
-                <div
-                  className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite]"
-                  style={{
-                    background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.5) 50%, transparent 100%)",
-                    animationDelay: `${index * 150}ms`,
-                  }}
-                />
-                {/* Logo placeholder */}
-                <Image
-                  src="/images/screenshot-20from-202025-02-18-2013-30-22.png"
-                  alt="Loading"
-                  width={isMobile ? 32 : 48}
-                  height={isMobile ? 32 : 48}
-                  className="object-contain opacity-40"
-                />
-              </div>
+export function FlashSales({ products: initialProducts }: FlashSalesProps) {
+  const products = initialProducts || []
 
-              {/* Text placeholders with varying widths */}
-              <div className="space-y-2">
-                <div className="h-3 bg-gradient-to-r from-gray-200 to-gray-100 rounded-full w-full relative overflow-hidden">
-                  <div
-                    className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite]"
-                    style={{
-                      background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.8) 50%, transparent 100%)",
-                      animationDelay: `${index * 150 + 100}ms`,
-                    }}
-                  />
-                </div>
-                <div className="h-3 bg-gradient-to-r from-gray-200 to-gray-100 rounded-full w-2/3 relative overflow-hidden">
-                  <div
-                    className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite]"
-                    style={{
-                      background: "linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.8) 50%, transparent 100%)",
-                      animationDelay: `${index * 150 + 200}ms`,
-                    }}
-                  />
-                </div>
-                {/* Price placeholder */}
-                <div className="h-4 bg-[#8B1538]/10 rounded-full w-1/2 relative overflow-hidden">
-                  <div
-                    className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite]"
-                    style={{
-                      background: "linear-gradient(90deg, transparent 0%, rgba(139,21,56,0.1) 50%, transparent 100%)",
-                      animationDelay: `${index * 150 + 300}ms`,
-                    }}
-                  />
-                </div>
-                {/* Star rating placeholder */}
-                <div className="flex gap-0.5">
-                  {[...Array(5)].map((_, i) => (
-                    <div
-                      key={i}
-                      className="h-3 w-3 bg-yellow-100 rounded-full animate-pulse"
-                      style={{ animationDelay: `${i * 50}ms` }}
-                    />
-                  ))}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-    <style jsx>{`
-      @keyframes shimmer {
-        100% {
-          transform: translateX(200%);
-        }
-      }
-    `}</style>
-  </section>
-)
-
-export function FlashSales({ products }: { products: Product[] }) {
+  const [timeLeft, setTimeLeft] = useState({ hours: 1, minutes: 17, seconds: 1 })
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isHovering, setIsHovering] = useState(false)
   const [hoverSide, setHoverSide] = useState<"left" | "right" | null>(null)
@@ -316,15 +217,6 @@ export function FlashSales({ products }: { products: Product[] }) {
 
   const itemsPerView = isSmallMobile ? 3 : isMobile ? 3 : isTablet ? 5 : 6
   const mobileItemWidth = "calc((100vw - 32px) / 3)"
-  const itemWidthPx = isSmallMobile ? 110 : isMobile ? 120 : 180
-
-  const handleViewAll = useCallback(
-    (e: React.MouseEvent) => {
-      e.preventDefault()
-      router.push("/flash-sales")
-    },
-    [router],
-  )
 
   const maxIndex = Math.max(0, products.length - itemsPerView)
 
@@ -342,8 +234,7 @@ export function FlashSales({ products }: { products: Product[] }) {
       const rect = carouselRef.current.getBoundingClientRect()
       const x = e.clientX - rect.left
       const width = rect.width
-      const leftHalf = x < width / 2
-      setHoverSide(leftHalf ? "left" : "right")
+      setHoverSide(x < width / 2 ? "left" : "right")
     },
     [isDragging, isMobile],
   )
@@ -370,6 +261,7 @@ export function FlashSales({ products }: { products: Product[] }) {
       const threshold = 50
       const velocity = info.velocity.x
       const offset = info.offset.x
+
       if (Math.abs(offset) > threshold || Math.abs(velocity) > 300) {
         if (offset > 0 || velocity > 0) {
           if (currentIndex > 0) goToPrevious()
@@ -402,14 +294,37 @@ export function FlashSales({ products }: { products: Product[] }) {
     return () => currentCarousel.removeEventListener("wheel", handleWheelEvent)
   }, [currentIndex, maxIndex, goToPrevious, goToNext, isMobile])
 
-  if (!products || products.length === 0) {
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        const total = prev.hours * 3600 + prev.minutes * 60 + prev.seconds - 1
+        if (total <= 0) {
+          clearInterval(timer)
+          return { hours: 0, minutes: 0, seconds: 0 }
+        }
+        return {
+          hours: Math.floor(total / 3600),
+          minutes: Math.floor((total % 3600) / 60),
+          seconds: total % 60,
+        }
+      })
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [])
+
+  const handleViewAll = (e: React.MouseEvent) => {
+    e.preventDefault()
+    router.push("/flash-sales")
+  }
+
+  if (!products.length) {
     return null
   }
 
   return (
     <section className="w-full mb-4 sm:mb-8">
       <div className="w-full">
-        {/* Header */}
+        {/* Header - Dark Cherry Red matching New Arrivals */}
         <div className="bg-[#8B1538] text-white flex items-center justify-between px-2 sm:px-4 py-1.5 sm:py-2">
           <div className="flex items-center gap-1 sm:gap-2">
             <Zap className={`text-yellow-300 fill-yellow-300 ${isMobile ? "h-4 w-4" : "h-5 w-5"}`} />
@@ -418,17 +333,18 @@ export function FlashSales({ products }: { products: Product[] }) {
             </h2>
           </div>
           <div className="flex items-center gap-2">
+            <span className={`font-medium ${isMobile ? "text-xs" : "text-sm"}`}>Time Left:</span>
             <div className="flex gap-1">
               <div className="bg-white/20 rounded px-1.5 py-0.5 min-w-[24px] text-center">
-                <span className="text-xs font-mono">00</span>
+                <span className="text-xs font-mono">{String(timeLeft.hours).padStart(2, "0")}</span>
               </div>
               <span className="text-xs">:</span>
               <div className="bg-white/20 rounded px-1.5 py-0.5 min-w-[24px] text-center">
-                <span className="text-xs font-mono">00</span>
+                <span className="text-xs font-mono">{String(timeLeft.minutes).padStart(2, "0")}</span>
               </div>
               <span className="text-xs">:</span>
               <div className="bg-white/20 rounded px-1.5 py-0.5 min-w-[24px] text-center">
-                <span className="text-xs font-mono">00</span>
+                <span className="text-xs font-mono">{String(timeLeft.seconds).padStart(2, "0")}</span>
               </div>
             </div>
             <button
@@ -443,6 +359,7 @@ export function FlashSales({ products }: { products: Product[] }) {
           </div>
         </div>
 
+        {/* Carousel Container - Matching New Arrivals */}
         <div className={isMobile ? "p-1" : "p-2"}>
           <div
             ref={carouselRef}
@@ -465,69 +382,92 @@ export function FlashSales({ products }: { products: Product[] }) {
                   paddingBottom: "8px",
                 }}
               >
-                {products.map((product, index) => (
+                {products.map((product) => (
                   <div
-                    key={product.id ?? index}
-                    className="flex-shrink-0 w-[calc(33%-4px)]"
-                    style={{ scrollSnapAlign: "start" }}
+                    key={product.id}
+                    className="flex-shrink-0 pointer-events-auto"
+                    style={{
+                      width: mobileItemWidth,
+                      minWidth: isSmallMobile ? "100px" : "110px",
+                      maxWidth: "130px",
+                      scrollSnapAlign: "start",
+                    }}
                   >
-                    <ProductCard product={product} isMobile={true} imagePriority={index < 4} />
+                    <ProductCard product={product} isMobile={true} />
                   </div>
                 ))}
               </div>
             ) : (
-              <>
-                <motion.div
-                  drag="x"
-                  dragElastic={0.2}
-                  dragMomentum={false}
-                  onDragStart={handleDragStart}
-                  onDragEnd={handleDragEnd}
-                  animate={{
-                    x: -currentIndex * itemWidthPx,
-                  }}
-                  transition={{
-                    type: "spring",
-                    damping: 25,
-                    stiffness: 400,
-                    mass: 1,
-                  }}
-                  className="flex gap-2 cursor-grab active:cursor-grabbing"
-                >
-                  {products.map((product, index) => (
-                    <motion.div key={product.id ?? index} className="flex-shrink-0" style={{ width: itemWidthPx }}>
-                      <ProductCard product={product} isMobile={false} imagePriority={index < 6} />
-                    </motion.div>
-                  ))}
-                </motion.div>
-
-                {/* Navigation */}
-                {currentIndex > 0 && (
-                  <motion.button
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: isHovering && hoverSide === "left" ? 1 : 0.4 }}
-                    onClick={goToPrevious}
-                    className="absolute left-1 top-1/2 -translate-y-1/2 z-20 w-8 h-8 flex items-center justify-center rounded-full bg-white/80 hover:bg-white shadow-md transition-all"
+              // Desktop: Motion animation matching New Arrivals
+              <motion.div
+                className="flex gap-[1px]"
+                drag="x"
+                dragConstraints={{ left: 0, right: 0 }}
+                dragElastic={0.1}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                animate={{
+                  x: `-${currentIndex * (isTablet ? 20 : 16.666)}%`,
+                }}
+                transition={{
+                  type: "spring",
+                  stiffness: 300,
+                  damping: 30,
+                  mass: 0.8,
+                }}
+                style={{
+                  cursor: isDragging ? "grabbing" : "grab",
+                }}
+              >
+                {products.map((product, index) => (
+                  <motion.div
+                    key={product.id}
+                    className="flex-shrink-0 pointer-events-auto"
+                    style={{ width: `${isTablet ? 20 : 16.666}%` }}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: index * 0.05 }}
                   >
-                    <ChevronLeft className="h-5 w-5 text-gray-900" />
-                  </motion.button>
-                )}
-
-                {currentIndex < maxIndex && (
-                  <motion.button
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: isHovering && hoverSide === "right" ? 1 : 0.4 }}
-                    onClick={goToNext}
-                    className="absolute right-1 top-1/2 -translate-y-1/2 z-20 w-8 h-8 flex items-center justify-center rounded-full bg-white/80 hover:bg-white shadow-md transition-all"
-                  >
-                    <ChevronRight className="h-5 w-5 text-gray-900" />
-                  </motion.button>
-                )}
-              </>
+                    <ProductCard product={product} isMobile={false} />
+                  </motion.div>
+                ))}
+              </motion.div>
             )}
+
+            {/* Navigation Arrows - Desktop only matching New Arrivals */}
+            <AnimatePresence>
+              {!isMobile && isHovering && !isDragging && hoverSide === "left" && currentIndex > 0 && (
+                <motion.button
+                  initial={{ opacity: 0, x: -20, scale: 0.8 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={{ opacity: 0, x: -20, scale: 0.8 }}
+                  transition={{ duration: 0.2 }}
+                  onClick={goToPrevious}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/95 backdrop-blur-sm rounded-full p-2 shadow-lg hover:bg-white hover:scale-110 transition-all z-20"
+                >
+                  <ChevronLeft className="w-5 h-5 text-gray-700" />
+                </motion.button>
+              )}
+            </AnimatePresence>
+            <AnimatePresence>
+              {!isMobile && isHovering && !isDragging && hoverSide === "right" && currentIndex < maxIndex && (
+                <motion.button
+                  initial={{ opacity: 0, x: 20, scale: 0.8 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={{ opacity: 0, x: 20, scale: 0.8 }}
+                  transition={{ duration: 0.2 }}
+                  onClick={goToNext}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/95 backdrop-blur-sm rounded-full p-2 shadow-lg hover:bg-white hover:scale-110 transition-all z-20"
+                >
+                  <ChevronRight className="w-5 h-5 text-gray-700" />
+                </motion.button>
+              )}
+            </AnimatePresence>
           </div>
         </div>
       </div>
     </section>
   )
 }
+
+export default FlashSales

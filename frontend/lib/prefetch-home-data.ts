@@ -6,6 +6,7 @@ import { prefetchDailyFinds } from "@/hooks/use-swr-daily-finds"
 import { prefetchTopPicks } from "@/hooks/use-swr-top-picks"
 import { prefetchTrending } from "@/hooks/use-swr-trending"
 import { prefetchProductGrid } from "@/hooks/use-swr-product-grid"
+import { eagerPrefetchProducts } from "@/lib/cache/products-quick-fetch"
 
 let prefetchPromise: Promise<void> | null = null
 
@@ -22,6 +23,7 @@ export async function prefetchHomeData(): Promise<void> {
       // load just as fast as Flash Sales and Luxury Deals
       await Promise.all([
         prefetchFlashSales(),
+        eagerPrefetchProducts({ flash_sale: true, limit: 50 }),
         prefetchLuxuryDeals(),
         prefetchTopPicks(),
         prefetchNewArrivals(),

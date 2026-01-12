@@ -1,4 +1,4 @@
-export const revalidate = 60
+"use client"
 
 import { useState, useEffect, useCallback } from "react"
 import { motion, AnimatePresence } from "framer-motion"
@@ -33,54 +33,9 @@ const carouselItems = [
   },
 ]
 
-export default async function FlashSalesPage() {
-  let flashSales: Product[] = []
-
-  try {
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"}/api/products/flash-sales`,
-      { cache: "force-cache", next: { revalidate: 60 } },
-    )
-
-    if (response.ok) {
-      flashSales = await response.json()
-    }
-  } catch (error) {
-    console.error("Error fetching flash sales:", error)
-    // Fallback: try local product service
-    try {
-      flashSales = await productService.getFlashSaleProducts()
-    } catch (fallbackError) {
-      console.error("Fallback fetch also failed:", fallbackError)
-    }
-  }
-
-  const calculateDiscount = (price: number, salePrice: number | null) => {
-    if (!salePrice || salePrice >= price) return 0
-    return Math.round(((price - salePrice) / price) * 100)
-  }
-
-  return (
-    <FlashSalesClient
-      initialProducts={flashSales}
-      carouselItems={carouselItems}
-      calculateDiscount={calculateDiscount}
-    />
-  )
-}
-;("use client")
-
-function FlashSalesClient({
-  initialProducts,
-  carouselItems,
-  calculateDiscount,
-}: {
-  initialProducts: Product[]
-  carouselItems: Array<{ image: string; title: string; subtitle: string; description: string }>
-  calculateDiscount: (price: number, salePrice: number | null) => number
-}) {
-  const [flashSales, setFlashSales] = useState<Product[]>(initialProducts)
-  const [loading, setLoading] = useState(false)
+export default function FlashSalesPage() {
+  const [flashSales, setFlashSales] = useState<Product[]>([])
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [timeLeft, setTimeLeft] = useState({
     hours: 5,
@@ -93,6 +48,25 @@ function FlashSalesClient({
   const [hasMore, setHasMore] = useState(true)
   const [currentSlide, setCurrentSlide] = useState(0)
   const [isTransitioning, setIsTransitioning] = useState(false)
+
+  // Fetch flash sale products
+  useEffect(() => {
+    const fetchFlashSales = async () => {
+      try {
+        setLoading(true)
+        setError(null)
+        const products = await productService.getFlashSaleProducts()
+        setFlashSales(products)
+        setHasMore(products.length >= 20)
+      } catch (error) {
+        console.error("Error fetching flash sales:", error)
+        setError("Failed to load flash sales. Please try again.")
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchFlashSales()
+  }, [])
 
   // Countdown timer
   useEffect(() => {
@@ -126,11 +100,11 @@ function FlashSalesClient({
 
   const nextSlide = useCallback(() => {
     goToSlide((currentSlide + 1) % carouselItems.length)
-  }, [currentSlide, goToSlide, carouselItems.length])
+  }, [currentSlide, goToSlide])
 
   const prevSlide = useCallback(() => {
     goToSlide((currentSlide - 1 + carouselItems.length) % carouselItems.length)
-  }, [currentSlide, goToSlide, carouselItems.length])
+  }, [currentSlide, goToSlide])
 
   // Carousel auto-rotation with smooth transitions
   useEffect(() => {
@@ -181,6 +155,12 @@ function FlashSalesClient({
       }
       return 0
     })
+
+  // Calculate discount percentage
+  const calculateDiscount = (price: number, salePrice: number | null) => {
+    if (!salePrice || salePrice >= price) return 0
+    return Math.round(((price - salePrice) / price) * 100)
+  }
 
   // Render loading state
   if (loading && flashSales.length === 0) {
@@ -380,7 +360,6 @@ function FlashSalesClient({
                         fill
                         sizes="(max-width: 640px) 33vw, (max-width: 768px) 25vw, (max-width: 1024px) 20vw, 14vw"
                         className="object-cover transition-transform duration-300 group-hover:scale-105"
-                        priority={index < 6}
                       />
                       {product.sale_price && product.sale_price < product.price && (
                         <div className="absolute left-0 top-1.5 bg-red-500 text-white text-[9px] font-semibold px-1.5 py-0.5">

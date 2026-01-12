@@ -2,6 +2,7 @@ import useSWR, { type SWRConfiguration, mutate as globalMutate } from "swr"
 import type { Product } from "@/types"
 import { productService } from "@/services/product"
 import { cloudinaryService } from "@/services/cloudinary-service"
+import { quickFetchProducts, eagerPrefetchProducts } from "@/lib/cache/products-quick-fetch"
 
 // In-memory cache for instant display
 let flashSalesCache: Product[] | null = null
@@ -23,39 +24,23 @@ const processProducts = (products: Product[]): Product[] => {
 
 const flashSalesFetcher = async (): Promise<Product[]> => {
   try {
-    // First try to get actual flash sale products
-    const flashProducts = await productService.getFlashSaleProducts()
-
-    if (flashProducts && flashProducts.length > 0) {
-      const processed = processProducts(flashProducts).slice(0, 12)
-      flashSalesCache = processed
-      lastFetchTime = Date.now()
-      return processed
-    }
-
-    console.log("[v0] No flash sale products found, fetching sale products as fallback")
-    const saleProducts = await productService.getProducts({
+    // Try flash sales first, then fallback to sales products
+    let products = await quickFetchProducts({
       limit: 12,
-      sale: true,
-      sort_by: "price",
-      sort_order: "asc",
+      flash_sale: true,
     })
 
-    if (saleProducts && saleProducts.length > 0) {
-      const processed = processProducts(saleProducts).slice(0, 12)
-      flashSalesCache = processed
-      lastFetchTime = Date.now()
-      return processed
+    if (!products || products.length === 0) {
+      console.log("[v0] No flash sale products found, fetching sale products as fallback")
+      products = await productService.getProducts({
+        limit: 12,
+        sale: true,
+        sort_by: "price",
+        sort_order: "asc",
+      })
     }
 
-    console.log("[v0] No sale products found, fetching regular products as final fallback")
-    const regularProducts = await productService.getProducts({
-      limit: 12,
-      sort_by: "price",
-      sort_order: "asc",
-    })
-
-    const processed = processProducts(regularProducts)
+    const processed = processProducts(products || []).slice(0, 12)
     flashSalesCache = processed
     lastFetchTime = Date.now()
     return processed
@@ -101,13 +86,17 @@ export function useFlashSales(config?: SWRConfiguration) {
   }
 }
 
-// Prefetch flash sales - call this on app mount for instant loading
 export async function prefetchFlashSales(): Promise<void> {
   if (flashSalesCache && Date.now() - lastFetchTime < CACHE_DURATION) {
     return
   }
 
   try {
+    await eagerPrefetchProducts({
+      limit: 12,
+      flash_sale: true,
+    })
+
     const data = await flashSalesFetcher()
     await globalMutate("flash-sales", data, false)
   } catch (error) {
