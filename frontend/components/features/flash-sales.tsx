@@ -11,9 +11,9 @@ import { useRouter } from "next/navigation"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { cloudinaryService } from "@/services/cloudinary-service"
 
-const StarRating = ({ rating = 4, reviewCount = 0 }: { rating?: number; reviewCount?: number }) => {
+const StarRating = ({ rating = 4 }: { rating?: number }) => {
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center">
       <div className="flex">
         {[1, 2, 3, 4, 5].map((star) => (
           <Star
@@ -28,9 +28,6 @@ const StarRating = ({ rating = 4, reviewCount = 0 }: { rating?: number; reviewCo
           />
         ))}
       </div>
-      {reviewCount > 0 && (
-        <span className="text-[10px] sm:text-xs text-gray-400">({reviewCount.toLocaleString()})</span>
-      )}
     </div>
   )
 }
@@ -113,10 +110,13 @@ const ProductCard = memo(({ product, isMobile }: { product: Product; isMobile: b
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        whileHover={{ y: -2 }}
+        whileHover={{
+          y: -8,
+          transition: { duration: 0.2, ease: "easeOut" },
+        }}
         className="h-full"
       >
-        <div className="group h-full overflow-hidden bg-white border-r border-gray-100 transition-all duration-200 hover:shadow-sm">
+        <div className="group h-full overflow-hidden bg-white border border-gray-200 rounded-md transition-shadow duration-200 hover:shadow-lg">
           {/* Image Container - Square aspect ratio */}
           <div className="relative aspect-square overflow-hidden bg-[#f8f8f8]">
             <AnimatePresence>

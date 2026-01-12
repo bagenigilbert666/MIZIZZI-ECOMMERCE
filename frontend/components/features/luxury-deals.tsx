@@ -24,9 +24,9 @@ const LogoPlaceholder = () => (
   </div>
 )
 
-const StarRating = ({ rating = 4, reviewCount = 0 }: { rating?: number; reviewCount?: number }) => {
+const StarRating = ({ rating = 4 }: { rating?: number }) => {
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center">
       <div className="flex">
         {[1, 2, 3, 4, 5].map((star) => (
           <Star
@@ -41,9 +41,6 @@ const StarRating = ({ rating = 4, reviewCount = 0 }: { rating?: number; reviewCo
           />
         ))}
       </div>
-      {reviewCount > 0 && (
-        <span className="text-[10px] sm:text-xs text-gray-400">({reviewCount.toLocaleString()})</span>
-      )}
     </div>
   )
 }
@@ -97,7 +94,6 @@ const ProductCard = memo(({ product, isMobile }: { product: Product; isMobile: b
 
   const imageUrl = getProductImageUrl(product)
   const rating = product.rating || 3 + Math.random() * 2
-  const reviewCount = product.review_count || Math.floor(Math.random() * 5000) + 100
 
   return (
     <Link href={`/product/${product.slug || product.id}`} prefetch={false}>
@@ -168,7 +164,7 @@ const ProductCard = memo(({ product, isMobile }: { product: Product; isMobile: b
               )}
             </div>
             {/* Star Rating */}
-            <StarRating rating={rating} reviewCount={reviewCount} />
+            <StarRating rating={rating} />
           </div>
         </div>
       </motion.div>
