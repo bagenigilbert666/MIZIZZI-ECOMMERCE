@@ -10,7 +10,6 @@ import Link from "next/link"
 
 import type { Product } from "@/types"
 import { useMediaQuery } from "@/hooks/use-media-query"
-import { useNewArrivals } from "@/hooks/use-swr-new-arrivals"
 import { cloudinaryService } from "@/services/cloudinary-service"
 
 const LogoPlaceholder = () => (
@@ -74,7 +73,7 @@ function getProductImageUrl(product: Product): string {
     }
     return product.images[0].url
   }
-  return "/placeholder.svg?height=300&width=300"
+  return ""
 }
 
 const ProductCard = memo(({ product, isMobile }: { product: Product; isMobile: boolean }) => {
@@ -112,10 +111,10 @@ const ProductCard = memo(({ product, isMobile }: { product: Product; isMobile: b
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        whileHover={{ y: -2 }}
+        whileHover={{ y: -8 }}
         className="h-full"
       >
-        <div className="group h-full overflow-hidden bg-white border-r border-gray-100 transition-all duration-200 hover:shadow-sm">
+        <div className="group h-full overflow-hidden bg-white border border-gray-100 rounded-lg transition-all duration-300 hover:shadow-lg">
           {/* Image Container - Square aspect ratio */}
           <div className="relative aspect-square overflow-hidden bg-[#f8f8f8]">
             <AnimatePresence>
@@ -135,16 +134,22 @@ const ProductCard = memo(({ product, isMobile }: { product: Product; isMobile: b
               transition={{ duration: 0.3 }}
               className="absolute inset-0"
             >
-              <Image
-                src={imageUrl || "/placeholder.svg"}
-                alt={product.name}
-                fill
-                sizes={isMobile ? "25vw" : "16vw"}
-                className="object-cover transition-transform duration-300 group-hover:scale-105"
-                loading="lazy"
-                onLoad={handleImageLoad}
-                onError={handleImageError}
-              />
+              {imageUrl ? (
+                <Image
+                  src={imageUrl || "/placeholder.svg"}
+                  alt={product.name}
+                  fill
+                  sizes={isMobile ? "25vw" : "16vw"}
+                  className="object-cover transition-transform duration-300 group-hover:scale-105"
+                  loading="lazy"
+                  onLoad={handleImageLoad}
+                  onError={handleImageError}
+                />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
+                  <Image src="/logo.png" alt="Placeholder" width={48} height={48} className="opacity-30" />
+                </div>
+              )}
             </motion.div>
             {/* Discount Badge - Dark Cherry Red */}
             {product.sale_price && discountPercentage > 0 && (
@@ -183,61 +188,11 @@ const ProductCard = memo(({ product, isMobile }: { product: Product; isMobile: b
 
 ProductCard.displayName = "ProductCard"
 
-const NewArrivalsSkeleton = ({ isMobile }: { isMobile: boolean }) => (
-  <section className="w-full mb-4 sm:mb-8">
-    <div className="w-full">
-      <div className="bg-[#8B1538] text-white flex items-center justify-between px-2 sm:px-4 py-1.5 sm:py-2">
-        <div className="flex items-center gap-1 sm:gap-2">
-          <Sparkles className={`text-yellow-300 ${isMobile ? "h-4 w-4" : "h-5 w-5"}`} />
-          <span className={`font-bold ${isMobile ? "text-sm" : "text-base"}`}>New Arrivals</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className={`font-medium ${isMobile ? "text-xs" : "text-sm"}`}>See All</span>
-        </div>
-      </div>
-      <div className={isMobile ? "p-1" : "p-2"}>
-        <div className="flex gap-[1px] bg-gray-100 overflow-hidden">
-          {[...Array(isMobile ? 4 : 6)].map((_, index) => (
-            <div key={index} className={`bg-white flex-shrink-0 ${isMobile ? "p-2 w-[calc(25%-1px)]" : "p-3 flex-1"}`}>
-              <div
-                className={`w-full mb-2 bg-white relative overflow-hidden flex items-center justify-center ${isMobile ? "aspect-square" : "aspect-square"}`}
-              >
-                <Image
-                  src="/images/screenshot-20from-202025-02-18-2013-30-22.png"
-                  alt="Loading"
-                  width={isMobile ? 48 : 64}
-                  height={isMobile ? 48 : 64}
-                  className="object-contain opacity-60"
-                />
-              </div>
-              <div className="space-y-2">
-                <div className="h-3 bg-gray-100 rounded w-3/4 relative overflow-hidden">
-                  <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100" />
-                </div>
-                <div className="h-3 bg-gray-100 rounded w-1/2 relative overflow-hidden">
-                  <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100" />
-                </div>
-                <div className="h-4 bg-gray-100 rounded w-2/3 relative overflow-hidden">
-                  <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-gray-100 via-gray-50 to-gray-100" />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-    <style jsx>{`
-      @keyframes shimmer {
-        100% {
-          transform: translateX(100%);
-        }
-      }
-    `}</style>
-  </section>
-)
+interface NewArrivalsProps {
+  products: Product[]
+}
 
-export function NewArrivals() {
-  const { newArrivals, isLoading, hasCachedData, mutate } = useNewArrivals()
+export function NewArrivals({ products }: NewArrivalsProps) {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [isHovering, setIsHovering] = useState(false)
   const [hoverSide, setHoverSide] = useState<"left" | "right" | null>(null)
@@ -252,7 +207,7 @@ export function NewArrivals() {
   const itemsPerView = isSmallMobile ? 3 : isMobile ? 3 : isTablet ? 5 : 6
   const mobileItemWidth = "calc((100vw - 32px) / 3)"
 
-  const maxIndex = Math.max(0, newArrivals.length - itemsPerView)
+  const maxIndex = Math.max(0, products.length - itemsPerView)
 
   const goToPrevious = useCallback(() => {
     setCurrentIndex((prev) => Math.max(0, prev - 1))
@@ -333,11 +288,7 @@ export function NewArrivals() {
     router.push("/new-arrivals")
   }
 
-  if (isLoading && !hasCachedData) {
-    return <NewArrivalsSkeleton isMobile={isMobile} />
-  }
-
-  if (newArrivals.length === 0) {
+  if (products.length === 0) {
     return null
   }
 
@@ -387,7 +338,7 @@ export function NewArrivals() {
                   paddingBottom: "8px",
                 }}
               >
-                {newArrivals.map((product) => (
+                {products.map((product) => (
                   <div
                     key={product.id}
                     className="flex-shrink-0 pointer-events-auto"
@@ -424,7 +375,7 @@ export function NewArrivals() {
                   cursor: isDragging ? "grabbing" : "grab",
                 }}
               >
-                {newArrivals.map((product, index) => (
+                {products.map((product, index) => (
                   <motion.div
                     key={product.id}
                     className="flex-shrink-0 pointer-events-auto"

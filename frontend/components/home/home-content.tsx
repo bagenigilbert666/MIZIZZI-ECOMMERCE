@@ -5,9 +5,13 @@ import Link from "next/link"
 import { NetworkStatus } from "@/components/shared/network-status"
 import { CategoryGrid } from "@/components/features/category-grid-enhanced"
 import { Carousel } from "@/components/features/carousel"
-import { ShoppingBag, Star, TrendingUp, Sparkles, Gift, Package } from "lucide-react"
+import { ShoppingBag, Star, Package } from "lucide-react"
 import { FlashSales } from "@/components/features/flash-sales"
 import { LuxuryDeals } from "@/components/features/luxury-deals"
+import { NewArrivals } from "@/components/features/new-arrivals"
+import { TopPicks } from "@/components/features/top-picks"
+import { TrendingNow } from "@/components/features/trending-now"
+import { DailyFinds } from "@/components/features/daily-finds"
 import type { Product } from "@/types"
 
 const SectionSkeleton = ({ icon: Icon, title, color = "#8B1538" }: { icon?: any; title?: string; color?: string }) => (
@@ -97,37 +101,28 @@ const BrandShowcase = dynamic(() => import("@/components/features/brand-showcase
   ssr: false,
 })
 
-const TrendingNow = dynamic(() => import("@/components/features/trending-now").then((mod) => mod.TrendingNow), {
-  loading: () => <SectionSkeleton icon={TrendingUp} title="Trending Now" />,
-  ssr: false,
-})
-
 const ProductGrid = dynamic(() => import("@/components/products/product-grid").then((mod) => mod.ProductGrid), {
   loading: () => <ProductGridSkeleton />,
-  ssr: false,
-})
-
-const NewArrivals = dynamic(() => import("@/components/features/new-arrivals").then((mod) => mod.NewArrivals), {
-  loading: () => <SectionSkeleton icon={Sparkles} title="New Arrivals" />,
-  ssr: false,
-})
-
-const TopPicks = dynamic(() => import("@/components/features/top-picks").then((mod) => mod.TopPicks), {
-  loading: () => <SectionSkeleton icon={Star} title="Top Picks" />,
-  ssr: false,
-})
-
-const DailyFinds = dynamic(() => import("@/components/features/daily-finds").then((mod) => mod.DailyFinds), {
-  loading: () => <SectionSkeleton icon={Gift} title="Daily Finds" />,
   ssr: false,
 })
 
 interface HomeContentProps {
   flashSaleProducts: Product[]
   luxuryProducts: Product[]
+  newArrivals: Product[]
+  topPicks: Product[]
+  trendingProducts: Product[]
+  dailyFinds: Product[]
 }
 
-export function HomeContent({ flashSaleProducts, luxuryProducts }: HomeContentProps) {
+export function HomeContent({
+  flashSaleProducts,
+  luxuryProducts,
+  newArrivals,
+  topPicks,
+  trendingProducts,
+  dailyFinds,
+}: HomeContentProps) {
   return (
     <>
       <div className="page-root flex flex-col pb-8 w-full" style={{ backgroundColor: "var(--color-background)" }}>
@@ -154,19 +149,19 @@ export function HomeContent({ flashSaleProducts, luxuryProducts }: HomeContentPr
             </section>
 
             <section className="rounded-lg bg-white shadow-sm overflow-hidden">
-              <TopPicks />
+              <TopPicks products={topPicks} />
             </section>
 
             <section className="rounded-lg bg-white shadow-sm overflow-hidden">
-              <NewArrivals />
+              <NewArrivals products={newArrivals} />
             </section>
 
             <section className="rounded-lg bg-white shadow-sm overflow-hidden">
-              <TrendingNow />
+              <TrendingNow products={trendingProducts} />
             </section>
 
             <section className="rounded-lg bg-white shadow-sm overflow-hidden">
-              <DailyFinds />
+              <DailyFinds products={dailyFinds} />
             </section>
 
             <section className="rounded-lg bg-white shadow-sm overflow-hidden">
