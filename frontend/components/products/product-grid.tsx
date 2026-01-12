@@ -7,7 +7,7 @@ import { productService } from "@/services/product"
 import { ShoppingBag, Star } from "lucide-react"
 import type { Product } from "@/types"
 
-const StarRating = ({ rating = 4, reviewCount = 0 }: { rating?: number; reviewCount?: number }) => {
+const StarRating = ({ rating = 4 }: { rating?: number }) => {
   return (
     <div className="flex items-center gap-0.5 sm:gap-1">
       <div className="flex">
@@ -24,9 +24,6 @@ const StarRating = ({ rating = 4, reviewCount = 0 }: { rating?: number; reviewCo
           />
         ))}
       </div>
-      {reviewCount > 0 && (
-        <span className="text-[8px] sm:text-[10px] md:text-xs text-gray-400">({reviewCount.toLocaleString()})</span>
-      )}
     </div>
   )
 }
@@ -41,7 +38,6 @@ const ProductCard = memo(
       (product.image_urls && product.image_urls[0]) || product.thumbnail_url || "/diverse-fashion-display.png"
 
     const rating = product.rating || 3 + Math.random() * 2
-    const reviewCount = product.review_count || Math.floor(Math.random() * 5000) + 100
 
     const cardVariants = {
       hidden: {
@@ -105,7 +101,7 @@ const ProductCard = memo(
                 )}
               </div>
 
-              <StarRating rating={rating} reviewCount={reviewCount} />
+              <StarRating rating={rating} />
             </div>
           </div>
         </motion.div>
