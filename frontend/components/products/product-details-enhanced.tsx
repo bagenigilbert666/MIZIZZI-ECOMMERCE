@@ -1343,27 +1343,30 @@ export default function ProductDetailsEnhanced({
         {/* Product Details Tabs */}
         <motion.div {...appleVariants.fadeIn} className="mt-8">
           <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-            {/* Tab Navigation */}
-            <div className="flex border-b border-gray-100">
-              {[
-                { id: "details", label: "Product Details" },
-                { id: "specs", label: "Specifications" },
-                { id: "reviews", label: `Reviews (${reviewSummary?.total_reviews || 0})` },
-              ].map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id as any)}
-                  className={cn(
-                    "flex-1 py-4 text-sm font-semibold transition-all relative",
-                    activeTab === tab.id ? "text-[#8B1538]" : "text-gray-500 hover:text-gray-700",
-                  )}
-                >
-                  {tab.label}
-                  {activeTab === tab.id && (
-                    <motion.div layoutId="activeTab" className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#8B1538]" />
-                  )}
-                </button>
-              ))}
+            {/* Tab Headers */}
+            <div className="border-b border-gray-100">
+              <div className="flex">
+                {["details", "specifications", "reviews"].map((tab) => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab as any)}
+                    className={cn(
+                      "flex-1 py-4 px-6 text-sm font-semibold transition-all relative",
+                      activeTab === tab ? "text-[#8B1538]" : "text-gray-500 hover:text-gray-700",
+                    )}
+                  >
+                    {tab === "details" && "Product Details"}
+                    {tab === "specifications" && "Specifications"}
+                    {tab === "reviews" && `Reviews (${reviewSummary?.total_reviews || 0})`}
+                    {activeTab === tab && (
+                      <motion.div
+                        layoutId="activeTab"
+                        className="absolute bottom-0 left-0 right-0 h-0.5 bg-[#8B1538]"
+                      />
+                    )}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Tab Content */}
@@ -1376,10 +1379,36 @@ export default function ProductDetailsEnhanced({
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
                   >
+                    {/* // Added inline style tag with !important rules to force images full-width */}
+                    <style>{`
+            .product-description-content img {
+              width: 100% !important;
+              max-width: 100% !important;
+              height: auto !important;
+              display: block !important;
+              margin: 2rem auto !important;
+              border-radius: 1rem !important;
+              box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1) !important;
+              object-fit: contain !important;
+            }
+            .product-description-content figure {
+              width: 100% !important;
+              margin: 2rem 0 !important;
+            }
+            .product-description-content picture {
+              width: 100% !important;
+              display: block !important;
+            }
+          `}</style>
                     <div className="prose prose-lg max-w-none">
                       {product?.description ? (
                         <div
-                          className="text-gray-700 space-y-6 [&>p]:leading-relaxed [&>p]:text-[15px] [&>p]:text-gray-600 [&>h2]:text-xl [&>h2]:font-bold [&>h2]:text-gray-900 [&>h2]:mt-8 [&>h2]:mb-4 [&>h3]:text-lg [&>h3]:font-semibold [&>h3]:text-gray-800 [&>h3]:mt-6 [&>h3]:mb-3 [&>ul]:list-disc [&>ul]:pl-6 [&>ul]:space-y-2 [&>ul>li]:text-gray-600 [&>ol]:list-decimal [&>ol]:pl-6 [&>ol]:space-y-2 [&>ol>li]:text-gray-600 [&>img]:rounded-xl [&>img]:shadow-lg [&>img]:my-6 [&>img]:mx-auto [&>img]:max-w-full [&>img]:h-auto [&>img]:object-contain [&_img]:rounded-xl [&_img]:shadow-lg [&_img]:my-6 [&_img]:mx-auto [&_img]:max-w-full [&_img]:h-auto [&_img]:object-contain"
+                          className="product-description-content text-gray-700 space-y-6
+                            [&>p]:leading-relaxed [&>p]:text-[15px] [&>p]:text-gray-600 [&>p]:mb-4
+                            [&>h2]:text-xl [&>h2]:font-bold [&>h2]:text-gray-900 [&>h2]:mt-8 [&>h2]:mb-4 
+                            [&>h3]:text-lg [&>h3]:font-semibold [&>h3]:text-gray-800 [&>h3]:mt-6 [&>h3]:mb-3 
+                            [&>ul]:list-disc [&>ul]:pl-6 [&>ul]:space-y-2 [&>ul>li]:text-gray-600 
+                            [&>ol]:list-decimal [&>ol]:pl-6 [&>ol]:space-y-2 [&>ol>li]:text-gray-600"
                           dangerouslySetInnerHTML={{
                             __html: product.description,
                           }}
