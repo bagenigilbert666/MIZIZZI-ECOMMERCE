@@ -99,7 +99,9 @@ export default function ProductDetailsEnhanced({
   const [selectedVariant, setSelectedVariant] = useState<any>(null)
   const [quantity, setQuantity] = useState(1)
   const [isAddingToCart, setIsAddingToCart] = useState(false)
-  const [exploreProducts, setExploreProducts] = useState<any[]>(similarProducts || [])
+  const [exploreProducts, setExploreProducts] = useState<any[]>(
+    similarProducts && similarProducts.length > 0 ? similarProducts : [],
+  )
   const [explorePage, setExplorePage] = useState(1)
   const [exploreHasMore, setExploreHasMore] = useState(true)
   const [exploreLoading, setExploreLoading] = useState(false)
@@ -289,48 +291,114 @@ export default function ProductDetailsEnhanced({
   }, [fetchInventoryData])
 
   useEffect(() => {
-    const run = async () => {
-      if (!product?.category_id || (similarProducts && similarProducts.length > 0)) {
+    const fetchRelatedProducts = async () => {
+      // Only fetch if we don't have products already and some initial products are not enough
+      if (exploreProducts.length >= 12) {
         setExploreLoading(false)
         return
       }
+
       setExploreLoading(true)
       try {
-        const products = await productService.getProductsByCategory(String(product.category_id))
-        setExploreProducts(
-          products
-            .filter((p: any) => p.id !== product.id)
-            .sort(() => 0.5 - Math.random())
-            .slice(0, 18), // Increased from 6 to 18 for 3 rows
-        )
+        let allProducts: any[] = []
+
+        // First: Try to get products from the same category
+        if (product?.category_id) {
+          try {
+            const categoryProducts = await productService.getProductsByCategory(String(product.category_id))
+            allProducts = categoryProducts.filter((p: any) => p.id !== product.id)
+          } catch (e) {
+            console.error("[v0] Error fetching category products:", e)
+          }
+        }
+
+        // If not enough from category, fetch more general products
+        if (allProducts.length < 12) {
+          try {
+            const response = await fetch(`/api/products?limit=30&page=1`)
+            const data = await response.json()
+            const generalProducts = (data?.products || data?.items || data || []).filter(
+              (p: any) => p.id !== product.id && !allProducts.some((ap: any) => ap.id === p.id),
+            )
+            allProducts = [...allProducts, ...generalProducts]
+          } catch (e) {
+            console.error("[v0] Error fetching general products:", e)
+          }
+        }
+
+        // Smart sorting: prioritize by category match, then price similarity, then rating
+        const productPrice = product?.sale_price || product?.price || 0
+        const sortedProducts = allProducts.sort((a: any, b: any) => {
+          // Same category gets priority
+          const aCategoryMatch = a.category_id === product?.category_id ? 1 : 0
+          const bCategoryMatch = b.category_id === product?.category_id ? 1 : 0
+          if (aCategoryMatch !== bCategoryMatch) return bCategoryMatch - aCategoryMatch
+
+          // Then sort by price similarity (closer price = higher priority)
+          const aPriceDiff = Math.abs((a.sale_price || a.price || 0) - productPrice)
+          const bPriceDiff = Math.abs((b.sale_price || b.price || 0) - productPrice)
+          if (aPriceDiff !== bPriceDiff) return aPriceDiff - bPriceDiff
+
+          // Finally by rating
+          return (b.rating || 0) - (a.rating || 0)
+        })
+
+        setExploreProducts(sortedProducts.slice(0, 12))
+        setExploreHasMore(sortedProducts.length > 12)
+      } catch (error) {
+        console.error("[v0] Error in fetchRelatedProducts:", error)
       } finally {
         setExploreLoading(false)
       }
     }
-    run()
 
-    try {
-      const recentItems = JSON.parse(localStorage.getItem("recentlyViewed") || "[]")
-      const exists = recentItems.some((i: any) => i.id === product.id)
-      if (!exists) {
-        const updated = [
-          {
-            id: product.id,
-            name: product.name,
-            price: currentPrice,
-            image: productImages[0] || "/placeholder-rhtiu.png",
-            slug: product.slug || product.id,
-            image_urls: productImages,
-            thumbnail_url: product.thumbnail_url,
-          },
-          ...recentItems,
-        ].slice(0, 6)
-        localStorage.setItem("recentlyViewed", JSON.stringify(updated)) // Fixed typo JSON.JSON to JSON
-        setRecentlyViewed(updated)
-      } else {
-        setRecentlyViewed(recentItems)
+    if (product?.id && exploreProducts.length < 12) {
+      fetchRelatedProducts()
+    } else if (!product?.id) {
+      // Handle case where product might be null initially
+      setExploreLoading(false)
+    }
+  }, [product?.id, product?.category_id, product?.price, product?.sale_price, exploreProducts.length])
+
+  useEffect(() => {
+    const run = async () => {
+      // Removed redundant check for similarProducts.length > 0 as initial state handles it.
+      // The fetchRelatedProducts hook now handles populating exploreProducts.
+      if (!product?.category_id && exploreProducts.length === 0) {
+        setExploreLoading(false)
+        return
       }
-    } catch {}
+      // Set loading true only if we actually need to fetch
+      if (exploreProducts.length < 12 && !exploreLoading) {
+        setExploreLoading(true)
+      }
+
+      // The logic for fetching 'exploreProducts' is now handled by the 'fetchRelatedProducts' effect.
+      // This block is kept for the 'recently viewed' logic.
+      try {
+        const recentItems = JSON.parse(localStorage.getItem("recentlyViewed") || "[]")
+        const exists = recentItems.some((i: any) => i.id === product.id)
+        if (!exists) {
+          const updated = [
+            {
+              id: product.id,
+              name: product.name,
+              price: currentPrice,
+              image: productImages[0] || "/placeholder-rhtiu.png",
+              slug: product.slug || product.id,
+              image_urls: productImages,
+              thumbnail_url: product.thumbnail_url,
+            },
+            ...recentItems,
+          ].slice(0, 6)
+          localStorage.setItem("recentlyViewed", JSON.stringify(updated)) // Fixed typo JSON.JSON to JSON
+          setRecentlyViewed(updated)
+        } else {
+          setRecentlyViewed(recentItems)
+        }
+      } catch {}
+    }
+    run()
   }, [
     product.id,
     product.category_id,
@@ -339,7 +407,9 @@ export default function ProductDetailsEnhanced({
     product.slug,
     product.thumbnail_url,
     productImages,
-    similarProducts,
+    similarProducts, // Keep this for potential future use or if initial state needs re-evaluation
+    exploreProducts.length, // Dependency to ensure re-evaluation if exploreProducts changes
+    exploreLoading, // Dependency to manage loading state correctly
   ])
 
   useEffect(() => {
@@ -892,7 +962,7 @@ export default function ProductDetailsEnhanced({
     try {
       const nextPage = explorePage + 1
       const response = await fetch(
-        `/api/products?limit=18&page=${nextPage}${product?.category?.slug ? `&category_slug=${product.category.slug}` : ""}`,
+        `/api/products?limit=12&page=${nextPage}${product?.category?.slug ? `&category_slug=${product.category.slug}` : ""}`,
       )
       const data = await response.json()
 
@@ -905,7 +975,7 @@ export default function ProductDetailsEnhanced({
           return [...prev, ...filteredData]
         })
         setExplorePage(nextPage)
-        setExploreHasMore(filteredData.length >= 18)
+        setExploreHasMore(filteredData.length >= 12)
       } else {
         setExploreHasMore(false)
       }
@@ -996,7 +1066,7 @@ export default function ProductDetailsEnhanced({
             <div className="bg-white rounded-2xl overflow-hidden shadow-sm sticky top-6">
               <div className="relative aspect-[4/3] cursor-zoom-in group" ref={imageRef} onClick={handleImageClick}>
                 <Image
-                  src={getProductImageUrl(product, selectedImage) || "/generic-product-display.png"}
+                  src={productImages[selectedImage] || "/generic-product-display.png"}
                   alt={product?.name || "Product image"}
                   fill
                   sizes="(max-width: 768px) 100vw, 40vw"
@@ -1346,7 +1416,7 @@ export default function ProductDetailsEnhanced({
             {/* Tab Headers */}
             <div className="border-b border-gray-100">
               <div className="flex">
-                {["details", "specifications", "reviews"].map((tab) => (
+                {["details", "specs", "reviews"].map((tab) => (
                   <button
                     key={tab}
                     onClick={() => setActiveTab(tab as any)}
@@ -1356,7 +1426,7 @@ export default function ProductDetailsEnhanced({
                     )}
                   >
                     {tab === "details" && "Product Details"}
-                    {tab === "specifications" && "Specifications"}
+                    {tab === "specs" && "Specifications"}
                     {tab === "reviews" && `Reviews (${reviewSummary?.total_reviews || 0})`}
                     {activeTab === tab && (
                       <motion.div
@@ -1405,9 +1475,9 @@ export default function ProductDetailsEnhanced({
                         <div
                           className="product-description-content text-gray-700 space-y-6
                             [&>p]:leading-relaxed [&>p]:text-[15px] [&>p]:text-gray-600 [&>p]:mb-4
-                            [&>h2]:text-xl [&>h2]:font-bold [&>h2]:text-gray-900 [&>h2]:mt-8 [&>h2]:mb-4 
-                            [&>h3]:text-lg [&>h3]:font-semibold [&>h3]:text-gray-800 [&>h3]:mt-6 [&>h3]:mb-3 
-                            [&>ul]:list-disc [&>ul]:pl-6 [&>ul]:space-y-2 [&>ul>li]:text-gray-600 
+                            [&>h2]:text-xl [&>h2]:font-bold [&>h2]:text-gray-900 [&>h2]:mt-8 [&>h2]:mb-4
+                            [&>h3]:text-lg [&>h3]:font-semibold [&>h3]:text-gray-800 [&>h3]:mt-6 [&>h3]:mb-3
+                            [&>ul]:list-disc [&>ul]:pl-6 [&>ul]:space-y-2 [&>ul>li]:text-gray-600
                             [&>ol]:list-decimal [&>ol]:pl-6 [&>ol]:space-y-2 [&>ol>li]:text-gray-600"
                           dangerouslySetInnerHTML={{
                             __html: product.description,
@@ -1433,24 +1503,26 @@ export default function ProductDetailsEnhanced({
                   >
                     {specifications.length > 0 ? (
                       <div className="grid gap-6 md:grid-cols-2">
-                        {specifications.map((spec, idx) => (
-                          <div key={idx} className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
-                            <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-200">
-                              <div className="w-10 h-10 rounded-xl bg-[#8B1538]/10 flex items-center justify-center">
-                                <Shield className="w-5 h-5 text-[#8B1538]" />
-                              </div>
-                              <h4 className="font-bold text-gray-900">{spec.category}</h4>
-                            </div>
-                            <div className="space-y-3">
-                              {spec.items.map((item, itemIdx) => (
-                                <div key={itemIdx} className="flex justify-between items-start gap-4">
-                                  <span className="text-sm text-gray-500 flex-shrink-0">{item.label}</span>
-                                  <span className="text-sm text-gray-900 font-medium text-right">{item.value}</span>
+                        {specifications.map(
+                          (spec: { category: string; items: { label: string; value: string }[] }, idx: number) => (
+                            <div key={idx} className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
+                              <div className="flex items-center gap-3 mb-4 pb-3 border-b border-gray-200">
+                                <div className="w-10 h-10 rounded-xl bg-[#8B1538]/10 flex items-center justify-center">
+                                  <Shield className="w-5 h-5 text-[#8B1538]" />
                                 </div>
-                              ))}
+                                <h4 className="font-bold text-gray-900">{spec.category}</h4>
+                              </div>
+                              <div className="space-y-3">
+                                {spec.items.map((item: { label: string; value: string }, itemIdx: number) => (
+                                  <div key={itemIdx} className="flex justify-between items-start gap-4">
+                                    <span className="text-sm text-gray-500 flex-shrink-0">{item.label}</span>
+                                    <span className="text-sm text-gray-900 font-medium text-right">{item.value}</span>
+                                  </div>
+                                ))}
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          ),
+                        )}
                       </div>
                     ) : (
                       <div className="text-center py-16">
@@ -1501,9 +1573,14 @@ export default function ProductDetailsEnhanced({
                           <h3 className="text-sm font-semibold text-gray-900 mb-4">Rating Distribution</h3>
                           <div className="space-y-3">
                             {[5, 4, 3, 2, 1].map((star) => {
-                              const count = reviewSummary.rating_distribution?.[star.toString()] || 0
+                              const distribution = reviewSummary?.rating_distribution as
+                                | Record<string, number>
+                                | undefined
+                              const count = distribution?.[star.toString()] ?? 0
                               const percentage =
-                                reviewSummary.total_reviews > 0 ? (count / reviewSummary.total_reviews) * 100 : 0
+                                reviewSummary && reviewSummary.total_reviews > 0
+                                  ? (count / reviewSummary.total_reviews) * 100
+                                  : 0
                               return (
                                 <div key={star} className="flex items-center gap-3">
                                   <div className="flex items-center gap-1 w-8">
@@ -1665,7 +1742,8 @@ export default function ProductDetailsEnhanced({
               </div>
 
               {/* Products Grid - Same as product-grid.tsx */}
-              <div className="grid grid-cols-3 gap-[1px] bg-gray-100 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+              {/* Changed grid columns to reflect 12 products (2 rows of 6) */}
+              <div className="grid grid-cols-2 gap-[1px] bg-gray-100 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
                 {exploreProducts.map((item, index) => {
                   const itemDiscount = item.sale_price
                     ? Math.round(((item.price - item.sale_price) / item.price) * 100)
@@ -1690,12 +1768,17 @@ export default function ProductDetailsEnhanced({
                         <div className="group h-full overflow-hidden bg-white border border-gray-100 rounded-lg transition-all duration-300 hover:shadow-lg">
                           <div className="relative aspect-square overflow-hidden bg-[#f8f8f8]">
                             <Image
-                              src={getProductImageUrl(item) || "/generic-product-display.png"}
+                              src={getProductImageUrl(item) || "/logo.png"}
                               alt={item.name}
                               fill
                               sizes="(max-width: 640px) 33vw, (max-width: 1024px) 25vw, 16vw"
                               className="object-cover transition-transform duration-300 group-hover:scale-105"
                               loading="lazy"
+                              onError={(e) => {
+                                // Fallback to Mizizzi logo if image fails to load
+                                const target = e.target as HTMLImageElement
+                                target.src = "/logo.png"
+                              }}
                             />
 
                             {item.sale_price && itemDiscount > 0 && (
@@ -1800,14 +1883,12 @@ export default function ProductDetailsEnhanced({
       </div>
 
       {/* Image Zoom Modal */}
-      {isImageZoomModalOpen && (
-        <ImageZoomModal
-          images={productImages}
-          initialIndex={zoomSelectedImage}
-          onClose={() => setIsImageZoomModalOpen(false)}
-          productName={product?.name || "Product"}
-        />
-      )}
+      <ImageZoomModal
+        product={product}
+        isOpen={isImageZoomModalOpen}
+        onClose={() => setIsImageZoomModalOpen(false)}
+        selectedImageIndex={zoomSelectedImage}
+      />
     </div>
   )
 }
