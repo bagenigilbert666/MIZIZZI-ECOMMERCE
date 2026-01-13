@@ -43,42 +43,61 @@ function normalizeProductPrices(product: Product): Product {
 /**
  * Server-side function to fetch luxury deal products
  * This runs on the server before the page is sent to the browser
- * Similar to how Jumia pre-renders products for instant display
+ * Only returns products that are explicitly marked as luxury deals
  */
 export async function getLuxuryProducts(limit = 12): Promise<Product[]> {
   try {
-    // Try fetching luxury products first
-    const url = `${API_BASE_URL}/api/products/?is_luxury=true&per_page=${limit}`
+    const urls = [
+      `${API_BASE_URL}/api/products/?is_luxury=true&per_page=${limit}`,
+      `${API_BASE_URL}/api/products/?is_luxury_deal=true&per_page=${limit}`,
+    ]
 
-    const response = await fetch(url, {
-      next: {
-        revalidate: 60, // Cache for 60 seconds on the server
-        tags: ["luxury-deals"], // Tag for on-demand revalidation
-      },
-      headers: {
-        "Content-Type": "application/json",
-      },
-    })
+    let allProducts: Product[] = []
 
-    if (!response.ok) {
-      console.error(`[SSR] Failed to fetch luxury products: ${response.status}`)
-      // Fallback to high-priced products
-      return await getFallbackLuxuryProducts(limit)
+    // Try fetching from both endpoints
+    for (const url of urls) {
+      try {
+        const response = await fetch(url, {
+          next: {
+            revalidate: 60, // Cache for 60 seconds on the server
+            tags: ["luxury-deals"], // Tag for on-demand revalidation
+          },
+          headers: {
+            "Content-Type": "application/json",
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          const products: Product[] = extractProducts(data)
+          allProducts = [...allProducts, ...products]
+        }
+      } catch (e) {
+        console.error(`[SSR] Failed to fetch from ${url}:`, e)
+      }
     }
 
-    const data = await response.json()
-    let products: Product[] = extractProducts(data)
+    const luxuryProducts = allProducts.filter((p) => {
+      const o = p as any
+      return o.is_luxury === true || o.is_luxury_deal === true || o.isLuxury === true
+    })
 
-    // Filter for luxury products (double-check)
-    products = products.filter((p) => Boolean((p as any).is_luxury))
+    // Remove duplicates by ID
+    const uniqueProducts = luxuryProducts.reduce((acc: Product[], current) => {
+      const exists = acc.find((p) => p.id === current.id)
+      if (!exists) {
+        acc.push(current)
+      }
+      return acc
+    }, [])
 
-    // If no luxury products found, get fallback
-    if (products.length === 0) {
-      return await getFallbackLuxuryProducts(limit)
+    if (uniqueProducts.length === 0) {
+      console.log("[SSR] No luxury products found in database")
+      return []
     }
 
     // Normalize and enhance products
-    const enhancedProducts = products.map((product) => {
+    const enhancedProducts = uniqueProducts.slice(0, limit).map((product) => {
       product = normalizeProductPrices(product)
 
       return {
@@ -91,48 +110,6 @@ export async function getLuxuryProducts(limit = 12): Promise<Product[]> {
     return enhancedProducts
   } catch (error) {
     console.error("[SSR] Error fetching luxury products:", error)
-    return await getFallbackLuxuryProducts(limit)
-  }
-}
-
-/**
- * Fallback function to get high-priced products as luxury items
- */
-async function getFallbackLuxuryProducts(limit = 12): Promise<Product[]> {
-  try {
-    const url = `${API_BASE_URL}/api/products/?per_page=${limit}&sort_by=price&sort_order=desc`
-
-    const response = await fetch(url, {
-      next: {
-        revalidate: 60,
-        tags: ["luxury-deals-fallback"],
-      },
-      headers: {
-        "Content-Type": "application/json",
-      },
-    })
-
-    if (!response.ok) {
-      return []
-    }
-
-    const data = await response.json()
-    const products: Product[] = extractProducts(data)
-
-    // Normalize and enhance products
-    const enhancedProducts = products.map((product) => {
-      product = normalizeProductPrices(product)
-
-      return {
-        ...product,
-        seller: product.seller || defaultSeller,
-        product_type: "luxury" as const,
-      }
-    })
-
-    return enhancedProducts
-  } catch (error) {
-    console.error("[SSR] Error fetching fallback luxury products:", error)
     return []
   }
 }
