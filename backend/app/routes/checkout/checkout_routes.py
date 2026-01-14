@@ -14,8 +14,8 @@ import string
 
 # Import models
 from ...models.models import (
-    db, User, Cart, CartItem, Order, OrderItem, OrderStatus,
-    PaymentStatus, Address, ShippingMethod, Product,
+    db, User, Cart, CartItem, Order, OrderItem, OrderStatus, 
+    PaymentStatus, Address, ShippingMethod, Product, 
     ProductVariant, Inventory, Payment, PaymentTransaction
 )
 
@@ -26,11 +26,18 @@ checkout_routes = Blueprint('checkout', __name__)
 logger = logging.getLogger(__name__)
 
 def generate_order_number():
-    """Generate a unique order number"""
-    prefix = "MZ"
-    timestamp = datetime.now().strftime("%y%m%d")
-    random_chars = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-    return f"{prefix}{timestamp}{random_chars}"
+    """Generate unique order number using Jumia-style algorithm."""
+    import random
+    import time
+    
+    # Use current timestamp as seed for better uniqueness
+    random.seed(int(time.time() * 1000000) % 1000000)
+    
+    # Generate 9-digit number starting with 3 (like Jumia pattern)
+    first_digit = 3
+    remaining_digits = ''.join([str(random.randint(0, 9)) for _ in range(8)])
+    
+    return f"{first_digit}{remaining_digits}"
 
 @checkout_routes.route('/validate-cart', methods=['POST'])
 @jwt_required()
@@ -38,37 +45,37 @@ def validate_cart():
     """
     Validate cart items before checkout.
     Checks stock availability and price changes.
-
+    
     Returns:
         JSON with validation results
     """
     user_id = get_jwt_identity()
-
+    
     try:
         # Get user's active cart
         cart = Cart.query.filter_by(user_id=user_id, is_active=True).first()
-
+        
         if not cart or not cart.items:
             return jsonify({
                 'success': False,
                 'error': 'Cart is empty',
                 'code': 'EMPTY_CART'
             }), 400
-
+        
         # Check each item for stock and price changes
         stock_issues = []
         price_changes = []
-
+        
         for item in cart.items:
             product = Product.query.get(item.product_id)
-
+            
             if not product:
                 stock_issues.append({
                     'product_id': item.product_id,
                     'message': 'Product no longer exists'
                 })
                 continue
-
+                
             if not product.is_active:
                 stock_issues.append({
                     'product_id': item.product_id,
@@ -76,7 +83,7 @@ def validate_cart():
                     'message': 'Product is no longer available'
                 })
                 continue
-
+            
             # Check variant if applicable
             if item.variant_id:
                 variant = ProductVariant.query.get(item.variant_id)
@@ -87,7 +94,7 @@ def validate_cart():
                         'message': 'Selected variant no longer exists'
                     })
                     continue
-
+                
                 # Check variant stock
                 if variant.stock < item.quantity:
                     stock_issues.append({
@@ -98,7 +105,7 @@ def validate_cart():
                         'requested': item.quantity,
                         'message': f'Only {variant.stock} items available'
                     })
-
+                
                 # Check variant price
                 current_price = float(variant.sale_price or variant.price)
                 if abs(current_price - item.price) > 0.01:  # Allow for small floating point differences
@@ -120,7 +127,7 @@ def validate_cart():
                         'requested': item.quantity,
                         'message': f'Only {product.stock} items available'
                     })
-
+                
                 # Check product price
                 current_price = float(product.sale_price or product.price)
                 if abs(current_price - item.price) > 0.01:  # Allow for small floating point differences
@@ -131,7 +138,7 @@ def validate_cart():
                         'new_price': current_price,
                         'message': 'Price has changed'
                     })
-
+        
         # Return validation results
         return jsonify({
             'success': True,
@@ -139,7 +146,7 @@ def validate_cart():
             'stock_issues': stock_issues,
             'price_changes': price_changes
         })
-
+        
     except Exception as e:
         logger.error(f"Error validating cart: {str(e)}")
         return jsonify({
@@ -152,21 +159,21 @@ def validate_cart():
 def get_shipping_methods():
     """
     Get available shipping methods.
-
+    
     Query Parameters:
         country: Country code (optional)
-
+        
     Returns:
         JSON with shipping methods
     """
     try:
         country = request.args.get('country', 'KE')
-
+        
         # Get shipping methods from database
         shipping_methods = ShippingMethod.query.filter(
             ShippingMethod.is_active == True
         ).all()
-
+        
         # If no shipping methods found, return default methods
         if not shipping_methods:
             default_methods = [
@@ -193,12 +200,12 @@ def get_shipping_methods():
                     'min_order_value': 10000.00
                 }
             ]
-
+            
             return jsonify({
                 'success': True,
                 'shipping_methods': default_methods
             })
-
+        
         # Format shipping methods
         formatted_methods = []
         for method in shipping_methods:
@@ -211,12 +218,12 @@ def get_shipping_methods():
                 'min_order_value': float(method.min_order_value) if method.min_order_value else None,
                 'max_weight': float(method.max_weight) if method.max_weight else None
             })
-
+        
         return jsonify({
             'success': True,
             'shipping_methods': formatted_methods
         })
-
+        
     except Exception as e:
         logger.error(f"Error fetching shipping methods: {str(e)}")
         return jsonify({
@@ -229,62 +236,62 @@ def get_shipping_methods():
 def calculate_totals():
     """
     Calculate order totals including taxes, shipping, and discounts.
-
+    
     Request Body:
         shipping_method_id: ID of selected shipping method (optional)
         coupon_code: Coupon code (optional)
-
+        
     Returns:
         JSON with calculated totals
     """
     user_id = get_jwt_identity()
-
+    
     try:
         data = request.get_json() or {}
-
+        
         # Get user's active cart
         cart = Cart.query.filter_by(user_id=user_id, is_active=True).first()
-
+        
         if not cart or not cart.items:
             return jsonify({
                 'success': False,
                 'error': 'Cart is empty',
                 'code': 'EMPTY_CART'
             }), 400
-
+        
         # Get shipping method if provided
         shipping_method_id = data.get('shipping_method_id')
         shipping_cost = 0.0
-
+        
         if shipping_method_id:
             shipping_method = ShippingMethod.query.get(shipping_method_id)
             if shipping_method:
                 shipping_cost = float(shipping_method.cost)
-
+                
                 # Check if order qualifies for free shipping
                 if shipping_method.min_order_value and cart.subtotal >= shipping_method.min_order_value:
                     shipping_cost = 0.0
-
+        
         # Calculate subtotal
         subtotal = 0.0
         for item in cart.items:
             subtotal += item.price * item.quantity
-
+        
         # Calculate tax (16% VAT for Kenya)
         tax_rate = 0.16
         tax = subtotal * tax_rate
-
+        
         # Apply coupon if provided
         coupon_code = data.get('coupon_code')
         discount = 0.0
-
+        
         if coupon_code:
             # Apply coupon logic here
             pass
-
+        
         # Calculate total
         total = subtotal + tax + shipping_cost - discount
-
+        
         return jsonify({
             'success': True,
             'subtotal': subtotal,
@@ -295,7 +302,7 @@ def calculate_totals():
             'currency': 'KES',
             'items_count': sum(item.quantity for item in cart.items)
         })
-
+        
     except Exception as e:
         logger.error(f"Error calculating totals: {str(e)}")
         return jsonify({
@@ -303,13 +310,12 @@ def calculate_totals():
             'error': f"Failed to calculate totals: {str(e)}"
         }), 500
 
-# Update the process_checkout function to handle payment-first approach
 @checkout_routes.route('/process', methods=['POST'])
 @jwt_required()
 def process_checkout():
     """
     Process checkout and create an order.
-
+    
     Request Body:
         payment_method: Payment method code
         shipping_method: Shipping method ID (optional)
@@ -317,55 +323,54 @@ def process_checkout():
         billing_address: Billing address ID (optional)
         same_as_shipping: Whether billing address is same as shipping (default: true)
         notes: Order notes (optional)
-        payment_data: Payment data if payment has already been made (optional)
-
+        
     Returns:
         JSON with order details
     """
     user_id = get_jwt_identity()
-
+    
     try:
         data = request.get_json()
-
+        
         if not data:
             return jsonify({
                 'success': False,
                 'error': 'No data provided'
             }), 400
-
+        
         # Validate required fields
         required_fields = ['payment_method', 'shipping_address']
         missing_fields = [field for field in required_fields if field not in data]
-
+        
         if missing_fields:
             return jsonify({
                 'success': False,
                 'error': f"Missing required fields: {', '.join(missing_fields)}"
             }), 400
-
+        
         # Get user's active cart
         cart = Cart.query.filter_by(user_id=user_id, is_active=True).first()
-
+        
         if not cart or not cart.items:
             return jsonify({
                 'success': False,
                 'error': 'Cart is empty',
                 'code': 'EMPTY_CART'
             }), 400
-
+        
         # Get shipping address
         shipping_address_id = data.get('shipping_address')
         shipping_address = Address.query.filter_by(id=shipping_address_id, user_id=user_id).first()
-
+        
         if not shipping_address:
             return jsonify({
                 'success': False,
                 'error': 'Invalid shipping address'
             }), 400
-
+        
         # Get or use shipping address for billing
         same_as_shipping = data.get('same_as_shipping', True)
-
+        
         if same_as_shipping:
             billing_address = shipping_address
         else:
@@ -375,86 +380,74 @@ def process_checkout():
                     'success': False,
                     'error': 'Billing address is required when same_as_shipping is false'
                 }), 400
-
+                
             billing_address = Address.query.filter_by(id=billing_address_id, user_id=user_id).first()
-
+            
             if not billing_address:
                 return jsonify({
                     'success': False,
                     'error': 'Invalid billing address'
                 }), 400
-
+        
         # Get shipping method
         shipping_method_id = data.get('shipping_method')
         shipping_method = None
         shipping_cost = 0.0
-
+        
         if shipping_method_id:
             shipping_method = ShippingMethod.query.get(shipping_method_id)
             if shipping_method:
                 shipping_cost = float(shipping_method.cost)
-
+                
                 # Check if order qualifies for free shipping
                 if shipping_method.min_order_value and cart.subtotal >= shipping_method.min_order_value:
                     shipping_cost = 0.0
-
+        
         # Calculate totals
         subtotal = 0.0
         for item in cart.items:
             subtotal += item.price * item.quantity
-
+        
         # Calculate tax (16% VAT for Kenya)
         tax_rate = 0.16
         tax = subtotal * tax_rate
-
+        
         # Apply coupon if provided
         coupon_code = data.get('coupon_code')
         discount = 0.0
-
+        
         if coupon_code:
             # Apply coupon logic here
             pass
-
+        
         # Calculate total
         total = subtotal + tax + shipping_cost - discount
-
-        # Check if payment data is provided (payment-first approach)
-        payment_data = data.get('payment_data', {})
-        payment_status = PaymentStatus.PENDING
-
-        # If payment data is provided and it's for M-PESA, check if it's valid
-        if payment_data and data.get('payment_method') == 'mpesa':
-            # Verify the payment data
-            if payment_data.get('transaction_id') and payment_data.get('checkout_request_id'):
-                # This means payment has been completed
-                payment_status = PaymentStatus.PAID
-                logger.info(f"Order being created with completed M-PESA payment: {payment_data}")
-
+        
         # Create order
         order = Order(
             user_id=user_id,
             order_number=generate_order_number(),
-            status=OrderStatus.PENDING if payment_status == PaymentStatus.PENDING else OrderStatus.PROCESSING,
+            status=OrderStatus.PENDING,
             total_amount=total,
             shipping_address=shipping_address.to_dict(),
             billing_address=billing_address.to_dict(),
             payment_method=data.get('payment_method'),
-            payment_status=payment_status,
+            payment_status=PaymentStatus.PENDING,
             shipping_method=shipping_method.name if shipping_method else 'Standard Shipping',
             shipping_cost=shipping_cost,
             notes=data.get('notes', '')
         )
-
+        
         db.session.add(order)
         db.session.flush()  # Get order ID without committing
-
+        
         # Create order items
         for cart_item in cart.items:
             product = Product.query.get(cart_item.product_id)
-
+            
             if not product:
                 continue
-
+                
             # Create order item
             order_item = OrderItem(
                 order_id=order.id,
@@ -464,49 +457,60 @@ def process_checkout():
                 price=cart_item.price,
                 total=cart_item.price * cart_item.quantity
             )
-
+            
             db.session.add(order_item)
-
+            
             # Update product stock
             if cart_item.variant_id:
                 variant = ProductVariant.query.get(cart_item.variant_id)
                 if variant:
                     variant.stock -= cart_item.quantity
             else:
-                product.stock -= cart_item.quantity
-
+                pass
+                
             # Update inventory if available
             inventory = Inventory.query.filter_by(
                 product_id=cart_item.product_id,
                 variant_id=cart_item.variant_id
             ).first()
-
+            
             if inventory:
-                inventory.stock_level -= cart_item.quantity
-                inventory.update_status()
-
+                inventory.stock_level = max(0, inventory.stock_level - cart_item.quantity)
+                inventory.last_updated = datetime.now()
+                
+                available_qty = max(0, inventory.stock_level - inventory.reserved_quantity)
+                
+                # Update inventory status
+                if available_qty <= 0:
+                    inventory.status = 'out_of_stock'
+                elif available_qty <= inventory.low_stock_threshold:
+                    inventory.status = 'low_stock'
+                else:
+                    inventory.status = 'active'
+                
+                if not cart_item.variant_id:
+                    product.stock = available_qty
+                    product.stock_quantity = available_qty
+            else:
+                product.stock = max(0, product.stock - cart_item.quantity)
+                product.stock_quantity = max(0, (product.stock_quantity or 0) - cart_item.quantity)
+        
         # Create payment record
         payment = Payment(
             order_id=order.id,
             amount=total,
             payment_method=data.get('payment_method'),
-            status=payment_status
+            status=PaymentStatus.PENDING
         )
-
-        # If payment data is provided, add transaction details
-        if payment_data and payment_status == PaymentStatus.PAID:
-            payment.transaction_id = payment_data.get('transaction_id')
-            payment.completed_at = datetime.now()
-            payment.transaction_data = payment_data
-
+        
         db.session.add(payment)
-
+        
         # Clear the cart
         cart.is_active = False
-
+        
         # Commit all changes
         db.session.commit()
-
+        
         # Return order details
         return jsonify({
             'success': True,
@@ -523,11 +527,10 @@ def process_checkout():
                 'id': payment.id,
                 'amount': float(payment.amount),
                 'payment_method': payment.payment_method,
-                'status': payment.status.value,
-                'transaction_id': payment.transaction_id
+                'status': payment.status.value
             }
         })
-
+        
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error processing checkout: {str(e)}")
@@ -541,44 +544,44 @@ def process_checkout():
 def mpesa_payment():
     """
     Process M-PESA payment for an order.
-
+    
     Request Body:
         order_id: ID of the order to pay for
         phone: Customer's phone number
-
+        
     Returns:
         JSON with payment initiation status
     """
     # Get request data
     data = request.get_json()
-
+    
     if not data:
         return jsonify({
             'success': False,
             'error': 'No data provided'
         }), 400
-
+    
     # Extract data
     order_id = data.get('order_id')
     phone = data.get('phone')
-
+    
     # Validate required fields
     if not order_id or not phone:
         return jsonify({
             'success': False,
             'error': 'Order ID and phone number are required'
         }), 400
-
+    
     try:
         # Get order details
         order = Order.query.get(order_id)
-
+        
         if not order:
             return jsonify({
                 'success': False,
                 'error': 'Order not found'
             }), 404
-
+            
         # Validate order belongs to user
         user_id = get_jwt_identity()
         if order.user_id != user_id:
@@ -586,34 +589,34 @@ def mpesa_payment():
                 'success': False,
                 'error': 'Unauthorized access to order'
             }), 403
-
+            
         # Check if order is already paid
         if order.payment_status == PaymentStatus.PAID:
             return jsonify({
                 'success': False,
                 'error': 'Order is already paid'
             }), 400
-
+        
         # Format phone number
         if phone.startswith("+"):
             phone = phone[1:]
         if phone.startswith("0"):
             phone = "254" + phone[1:]
-
+        
         # Import the direct M-PESA implementation
         try:
-            from ...mpesa.direct_mpesa import initiate_stk_push, MpesaError
+            from ...mpesa.direct_mpesa import initiate_stk_push
         except ImportError:
             # Try alternative import paths
             try:
-                from ...mpesa.direct_mpesa import initiate_stk_push, MpesaError
+                from ...direct_mpesa import initiate_stk_push
             except ImportError:
                 logger.error("Failed to import initiate_stk_push function")
                 return jsonify({
                     'success': False,
                     'error': 'M-PESA integration is not available'
                 }), 500
-
+        
         # Use the direct implementation to initiate payment
         response = initiate_stk_push(
             phone_number=phone,
@@ -621,13 +624,13 @@ def mpesa_payment():
             account_reference=f"ORDER-{order.order_number}",
             transaction_desc=f"Payment for order {order.order_number}"
         )
-
+        
         if not response:
             return jsonify({
                 'success': False,
                 'error': 'Failed to initiate payment'
             }), 500
-
+        
         # Create transaction record
         transaction = PaymentTransaction(
             user_id=user_id,
@@ -640,10 +643,10 @@ def mpesa_payment():
             status="pending",
             transaction_metadata=response
         )
-
+        
         db.session.add(transaction)
         db.session.commit()
-
+        
         # Return the response
         return jsonify({
             'success': True,
@@ -659,7 +662,7 @@ def mpesa_payment():
             'customer_message': response.get('CustomerMessage'),
             'transaction_id': transaction.id
         })
-
+        
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error processing M-PESA payment: {str(e)}")
@@ -673,23 +676,23 @@ def mpesa_payment():
 def check_payment_status(order_id):
     """
     Check the payment status of an order.
-
+    
     Path Parameters:
         order_id: ID of the order to check
-
+        
     Returns:
         JSON with payment status
     """
     try:
         # Get order details
         order = Order.query.get(order_id)
-
+        
         if not order:
             return jsonify({
                 'success': False,
                 'error': 'Order not found'
             }), 404
-
+            
         # Validate order belongs to user
         user_id = get_jwt_identity()
         if order.user_id != user_id:
@@ -697,16 +700,16 @@ def check_payment_status(order_id):
                 'success': False,
                 'error': 'Unauthorized access to order'
             }), 403
-
+        
         # Get payment details
         payment = Payment.query.filter_by(order_id=order.id).first()
-
+        
         # Get transaction details
         transaction = PaymentTransaction.query.filter_by(
             reference_id=str(order.id),
             transaction_type="payment"
         ).order_by(PaymentTransaction.created_at.desc()).first()
-
+        
         return jsonify({
             'success': True,
             'order': {
@@ -732,7 +735,7 @@ def check_payment_status(order_id):
                 'completed_at': transaction.completed_at.isoformat() if transaction and transaction.completed_at else None
             }
         })
-
+        
     except Exception as e:
         logger.error(f"Error checking payment status: {str(e)}")
         return jsonify({
@@ -745,23 +748,23 @@ def check_payment_status(order_id):
 def complete_order(order_id):
     """
     Complete an order after successful payment.
-
+    
     Path Parameters:
         order_id: ID of the order to complete
-
+        
     Returns:
         JSON with order completion status
     """
     try:
         # Get order details
         order = Order.query.get(order_id)
-
+        
         if not order:
             return jsonify({
                 'success': False,
                 'error': 'Order not found'
             }), 404
-
+            
         # Validate order belongs to user
         user_id = get_jwt_identity()
         if order.user_id != user_id:
@@ -769,20 +772,20 @@ def complete_order(order_id):
                 'success': False,
                 'error': 'Unauthorized access to order'
             }), 403
-
+        
         # Update order status
         order.status = OrderStatus.PROCESSING
         order.payment_status = PaymentStatus.PAID
-
+        
         # Update payment status
         payment = Payment.query.filter_by(order_id=order.id).first()
         if payment:
             payment.status = PaymentStatus.PAID
             payment.completed_at = datetime.now()
-
+        
         # Commit changes
         db.session.commit()
-
+        
         return jsonify({
             'success': True,
             'message': 'Order completed successfully',
@@ -793,7 +796,7 @@ def complete_order(order_id):
                 'payment_status': order.payment_status.value
             }
         })
-
+        
     except Exception as e:
         db.session.rollback()
         logger.error(f"Error completing order: {str(e)}")
@@ -806,7 +809,7 @@ def complete_order(order_id):
 def checkout_status():
     """
     Get the status of the checkout system.
-
+    
     Returns:
         JSON with checkout system status
     """

@@ -1794,13 +1794,13 @@ def sync_inventory_to_products():
         return jsonify({"error": "Failed to sync inventory", "details": str(e)}), 500
 
 # New endpoint for debugging stock mismatches
-@admin_inventory_routes.route('/debug-stock', methods=['GET'])
+@admin_inventory_routes.route('/debug-stock', methods=['GET', 'OPTIONS'])
 @jwt_required()
-def debug_stock():
-    """
-    Debug endpoint to compare inventory vs product stock values.
-    Helps identify mismatches between inventory and product tables.
-    """
+def debug_stock_sync():
+    """Debug endpoint to show stock sync status between inventory and products."""
+    if request.method == 'OPTIONS':
+        return jsonify({}), 200
+
     # Check admin access
     admin_check = require_admin()
     if admin_check:
@@ -1810,39 +1810,58 @@ def debug_stock():
         from app.models.models import Inventory, Product
         from app.configuration.extensions import db
 
+        # Get all inventory with product details
+        results = db.session.query(
+            Product.id,
+            Product.name,
+            Product.stock,
+            Product.stock_quantity,
+            Inventory.stock_level,
+            Inventory.reserved_quantity
+        ).outerjoin(
+            Inventory, 
+            (Inventory.product_id == Product.id) & (Inventory.variant_id.is_(None))
+        ).all()
+        
+        items = []
         mismatches = []
         
-        # Get all inventory items for base products
-        inventory_items = Inventory.query.filter(
-            Inventory.variant_id.is_(None)
-        ).all()
-
-        for inventory in inventory_items:
-            product = db.session.get(Product, inventory.product_id)
-            if product:
-                available_qty = max(0, inventory.stock_level - inventory.reserved_quantity)
-                
-                # Check for mismatches in product.stock and product.stock_quantity
-                if product.stock != available_qty or product.stock_quantity != available_qty:
-                    mismatches.append({
-                        'product_id': product.id,
-                        'product_name': product.name,
-                        'inventory_stock_level': inventory.stock_level,
-                        'inventory_reserved': inventory.reserved_quantity,
-                        'inventory_available': available_qty,
-                        'product_stock': product.stock,
-                        'product_stock_quantity': product.stock_quantity,
-                        'mismatch': True
-                    })
-
+        for row in results:
+            product_id, name, product_stock, product_stock_qty, inv_stock, inv_reserved = row
+            
+            # Calculate expected available
+            if inv_stock is not None:
+                expected_available = max(0, inv_stock - (inv_reserved or 0))
+            else:
+                expected_available = None
+            
+            is_synced = (expected_available is None) or (product_stock == expected_available)
+            
+            item = {
+                'product_id': product_id,
+                'product_name': name,
+                'product_stock': product_stock,
+                'product_stock_quantity': product_stock_qty,
+                'inventory_stock_level': inv_stock,
+                'inventory_reserved': inv_reserved,
+                'inventory_available': expected_available,
+                'is_synced': is_synced
+            }
+            
+            items.append(item)
+            
+            if not is_synced:
+                mismatches.append(item)
+        
         return jsonify({
-            "success": True,
-            "total_inventory_items": len(inventory_items),
-            "mismatches_found": len(mismatches),
-            "mismatches": mismatches,
-            "recommendation": "Run POST /api/inventory/admin/sync-to-products to fix mismatches" if mismatches else "All synced correctly"
+            'success': True,
+            'total_products': len(items),
+            'synced_count': len(items) - len(mismatches),
+            'mismatch_count': len(mismatches),
+            'mismatches': mismatches,
+            'all_items': items
         }), 200
 
     except Exception as e:
-        logger.error(f"Error in debug-stock: {str(e)}")
-        return jsonify({"error": "Failed to check stock", "details": str(e)}), 500
+        logger.error(f"Error debugging stock: {str(e)}")
+        return jsonify({"error": "Failed to debug stock", "details": str(e)}), 500
