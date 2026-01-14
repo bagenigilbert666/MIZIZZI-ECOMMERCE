@@ -444,8 +444,8 @@ def create_inventory():
             low_stock_threshold=data.get('low_stock_threshold', 5),
             sku=data.get('sku'),
             location=data.get('location', 'Main Warehouse'),
-            status='out_of_stock' if data.get('stock_level', 0) <= 0 else 'active'
-        )
+            status='out_of_stock' if data.get('stock_level', 0) <= 0 else 'active')
+        
 
         db.session.add(inventory)
         db.session.commit()
@@ -513,12 +513,12 @@ def update_inventory(inventory_id):
 
         product = db.session.get(Product, inventory.product_id)
         if product:
-            # Calculate available stock (stock_level minus reserved)
+            # stock_quantity = total stock level (inventory.stock_level)
+            # stock = available stock (stock_level - reserved_quantity)
             available_stock = max(0, inventory.stock_level - inventory.reserved_quantity)
-            # Update both stock fields in the Product table
-            product.stock = available_stock
-            product.stock_quantity = available_stock
-            logger.info(f"Synced inventory to product {product.id}: stock={available_stock}")
+            product.stock = available_stock  # Available for purchase
+            product.stock_quantity = inventory.stock_level  # Total in inventory
+            logger.info(f"Synced inventory to product {product.id}: available={available_stock}, total={inventory.stock_level}")
 
         db.session.commit()
 
@@ -641,12 +641,12 @@ def adjust_inventory(inventory_id):
 
         product = db.session.get(Product, inventory.product_id)
         if product:
-            # Calculate available stock (stock_level minus reserved)
+            # stock_quantity = total stock level (inventory.stock_level)
+            # stock = available stock (stock_level - reserved_quantity)
             available_stock = max(0, inventory.stock_level - inventory.reserved_quantity)
-            # Update both stock fields in the Product table
-            product.stock = available_stock
-            product.stock_quantity = available_stock
-            logger.info(f"Adjusted and synced inventory to product {product.id}: stock={available_stock}")
+            product.stock = available_stock  # Available for purchase
+            product.stock_quantity = inventory.stock_level  # Total in inventory
+            logger.info(f"Adjusted and synced inventory to product {product.id}: available={available_stock}, total={inventory.stock_level}")
 
         db.session.commit()
 
