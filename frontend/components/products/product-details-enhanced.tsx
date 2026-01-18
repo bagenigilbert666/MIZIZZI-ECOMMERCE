@@ -247,7 +247,12 @@ export default function ProductDetailsEnhanced({
       }
     }
     const valid = imageUrls.filter((u): u is string => Boolean(u && typeof u === "string" && u.trim() !== ""))
-    return valid.length ? valid : ["/clean-product-shot.png"]
+    // Fallback to thumbnail_url if no image_urls found
+    if (valid.length === 0 && p?.thumbnail_url && typeof p.thumbnail_url === "string") {
+      return [p.thumbnail_url]
+    }
+    // Final fallback to generic placeholder
+    return valid.length ? valid : ["/generic-product-display.png"]
   }
 
   const productImages = useMemo(() => {
@@ -1064,7 +1069,7 @@ export default function ProductDetailsEnhanced({
           {/* LEFT COLUMN: Image Gallery */}
           <motion.div {...appleVariants.fadeIn} className="lg:col-span-5">
             <div className="bg-white rounded-2xl overflow-hidden shadow-sm sticky top-6">
-              <div className="relative aspect-[4/3] cursor-zoom-in group" ref={imageRef} onClick={handleImageClick}>
+              <div className="relative aspect-[4/3] cursor-zoom-in group bg-gray-50" ref={imageRef} onClick={handleImageClick}>
                 <Image
                   src={productImages[selectedImage] || "/generic-product-display.png"}
                   alt={product?.name || "Product image"}
@@ -1072,6 +1077,12 @@ export default function ProductDetailsEnhanced({
                   sizes="(max-width: 768px) 100vw, 40vw"
                   className="object-contain p-6 transition-transform duration-500 group-hover:scale-105"
                   priority
+                  loading="eager"
+                  quality={85}
+                  onError={() => {
+                    // Fallback to generic image if specific image fails
+                    console.log("[v0] Image failed to load:", productImages[selectedImage])
+                  }}
                 />
 
                 {/* Discount Badge */}
@@ -1121,7 +1132,7 @@ export default function ProductDetailsEnhanced({
                     <button
                       key={i}
                       className={cn(
-                        "relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all",
+                        "relative w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden border-2 transition-all bg-gray-50",
                         selectedImage === i
                           ? "border-[#8B1538] ring-2 ring-[#8B1538]/20"
                           : "border-gray-200 hover:border-gray-300",
@@ -1134,6 +1145,8 @@ export default function ProductDetailsEnhanced({
                         fill
                         sizes="80px"
                         className="object-cover"
+                        loading={i === 0 ? "eager" : "lazy"}
+                        quality={75}
                       />
                     </button>
                   ))}

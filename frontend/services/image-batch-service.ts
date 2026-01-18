@@ -3,9 +3,9 @@ import type { ProductImage } from "@/types"
 // Configuration
 const BATCH_SIZE = 10 // Maximum number of product IDs to batch in a single request
 const BATCH_DELAY = 50 // Milliseconds to wait before processing the next batch
-const REQUEST_TIMEOUT = 5000 // Milliseconds to wait before timing out a request
+const REQUEST_TIMEOUT = 2000 // Milliseconds to wait before timing out a request (reduced to 2 seconds)
 const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes cache duration
-const MAX_RETRIES = 2 // Maximum number of retries for failed requests
+const MAX_RETRIES = 1 // Maximum number of retries for failed requests (reduced to 1)
 
 // Cache for product images
 interface CacheEntry {
@@ -93,7 +93,6 @@ export const imageBatchService = {
       // If we're already processing the queue, just return an empty array for now
       // The actual images will be loaded in the background
       if (state.isProcessingQueue) {
-        console.log(`Queue is already being processed, returning empty array for product ${productId}`)
         return []
       }
 
@@ -108,7 +107,6 @@ export const imageBatchService = {
     }
 
     // If batch mode is disabled or the batch request failed, fall back to individual request
-    console.log(`Falling back to individual request for product ${productId}`)
     return this.fetchIndividualProductImages(productId)
   },
 
@@ -119,7 +117,6 @@ export const imageBatchService = {
   queueProductId(productId: string): void {
     if (!state.queue.includes(productId)) {
       state.queue.push(productId)
-      console.log(`Added product ${productId} to batch queue. Queue size: ${state.queue.length}`)
     }
   },
 
@@ -133,7 +130,6 @@ export const imageBatchService = {
     }
 
     state.isProcessingQueue = true
-    console.log(`Processing batch queue with ${state.queue.length} items`)
 
     try {
       // Process in batches
@@ -148,11 +144,9 @@ export const imageBatchService = {
           // Try to fetch the batch
           await this.fetchBatchProductImages(batch)
         } catch (error) {
-          console.error(`Batch request failed for products ${batch.join(", ")}:`, error)
-
+          // Silently fail - batch errors are expected and handled gracefully
           // If batch mode failed, fall back to individual requests
           if (!state.isBatchModeEnabled) {
-            console.log("Batch mode disabled, falling back to individual requests")
             await Promise.allSettled(batch.map((id) => this.fetchIndividualProductImages(id)))
           }
         } finally {
@@ -179,21 +173,17 @@ export const imageBatchService = {
       return
     }
 
-    console.log(`Fetching batch of ${productIds.length} products: ${productIds.join(", ")}`)
-
     // If we haven't tested the batch endpoint yet, or don't have a working endpoint
     if (!state.hasTestedBatchEndpoint || !state.workingEndpoint) {
       await this.testBatchEndpoint(productIds[0])
 
       // If testing failed, disable batch mode and return
       if (!state.isBatchModeEnabled) {
-        console.log("Batch mode disabled after testing, falling back to individual requests")
         return
       }
     }
 
     if (!state.workingEndpoint) {
-      console.error("No working batch endpoint found")
       state.isBatchModeEnabled = false
       return
     }
@@ -205,8 +195,7 @@ export const imageBatchService = {
 
       // Create a controller for timeout
       const controller = new AbortController()
-      // Provide a reason when aborting to avoid "signal is aborted without reason" in some runtimes
-      const timeoutId = setTimeout(() => controller.abort("timeout"), REQUEST_TIMEOUT)
+      const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT)
 
       // Get auth token if available
       const token =
@@ -246,18 +235,22 @@ export const imageBatchService = {
         console.warn("Unexpected response format from batch endpoint:", data)
       }
     } catch (error: any) {
-      console.error(`Batch request failed:`, error)
-
-      // Check if this is a CORS error or network error
-      if (
+      // Check if this is a timeout or network error
+      const isTimeout = error.name === "AbortError"
+      const isNetworkError =
         error.name === "TypeError" ||
-        error.name === "AbortError" ||
         (error.message &&
           (error.message.includes("NetworkError") ||
             error.message.includes("Failed to fetch") ||
-            error.message.includes("Network request failed")))
-      ) {
-        console.log("Detected network/CORS error, disabling batch mode")
+            error.message.includes("Network request failed") ||
+            error.message.includes("timeout")))
+
+      // Only log network errors in development, suppress timeouts
+      if (!isTimeout && process.env.NODE_ENV === "development") {
+        console.error(`Batch request failed:`, error)
+      }
+
+      if (isNetworkError || isTimeout) {
         state.isBatchModeEnabled = false
         state.failedEndpoints.add(state.workingEndpoint || "")
         state.workingEndpoint = null
@@ -321,8 +314,7 @@ export const imageBatchService = {
 
         // Create a controller for timeout
         const controller = new AbortController()
-        // Provide a reason when aborting to avoid runtime errors
-        const timeoutId = setTimeout(() => controller.abort("timeout"), 3000) // Shorter timeout for testing
+        const timeoutId = setTimeout(() => controller.abort(), 3000) // Shorter timeout for testing
 
         try {
           // Make a test request with a single product ID
@@ -412,12 +404,10 @@ export const imageBatchService = {
         for (const endpoint of endpoints) {
           try {
             const url = `${API_BASE_URL}${endpoint}`
-            console.log(`[v0] Trying endpoint: ${url}`)
 
             // Create a controller for timeout
             const controller = new AbortController()
-            // Provide a reason when aborting to avoid runtime AbortError message
-            const timeoutId = setTimeout(() => controller.abort("timeout"), REQUEST_TIMEOUT)
+            const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT)
 
             const response = await fetch(url, {
               headers: {
@@ -441,7 +431,6 @@ export const imageBatchService = {
               } else if (data.items && Array.isArray(data.items)) {
                 images = data.items
               } else {
-                console.warn(`Unexpected response format from ${endpoint}:`, data)
                 continue
               }
 
@@ -449,8 +438,7 @@ export const imageBatchService = {
               break
             }
           } catch (error) {
-            console.error(`Error with endpoint ${endpoint}:`, error)
-            // Continue to the next endpoint
+            // Silently fail and try next endpoint
           }
         }
 
@@ -463,7 +451,6 @@ export const imageBatchService = {
         // If all endpoints failed, throw an error to trigger retry
         throw new Error("All endpoints failed")
       } catch (error) {
-        console.error(`Attempt ${retries + 1} failed for product ${productId}:`, error)
         retries++
 
         if (retries <= MAX_RETRIES) {
@@ -473,7 +460,6 @@ export const imageBatchService = {
       }
     }
 
-    console.error(`All attempts failed for product ${productId}, returning empty array`)
     return []
   },
 
@@ -487,9 +473,6 @@ export const imageBatchService = {
     const cacheEntry = state.cache.get(productId)
 
     if (cacheEntry && Date.now() - cacheEntry.timestamp < CACHE_DURATION) {
-      if (process.env.NODE_ENV === "development") {
-        console.log(`Found ${cacheEntry.data.length} cached images in memory for product ${productId}`)
-      }
       return cacheEntry.data
     }
 
@@ -504,17 +487,8 @@ export const imageBatchService = {
             // Filter out any blob URLs that shouldn't be in cache
             const permanentImages = parsed.data.filter((img: ProductImage) => !img.url.startsWith("blob:"))
 
-            if (permanentImages.length !== parsed.data.length) {
-              console.warn(`[v0] Filtered out ${parsed.data.length - permanentImages.length} blob URLs from cache`)
-            }
-
             // Update in-memory cache with filtered data
             this.cacheImages(productId, permanentImages)
-            if (process.env.NODE_ENV === "development") {
-              console.log(
-                `Found ${permanentImages.length} cached permanent images in localStorage for product ${productId}`,
-              )
-            }
             return permanentImages
           } else {
             // Remove expired localStorage entry
@@ -522,7 +496,7 @@ export const imageBatchService = {
           }
         }
       } catch (error) {
-        console.error(`Error reading from localStorage for product ${productId}:`, error)
+        // Silently handle cache errors
       }
     }
 
@@ -537,10 +511,6 @@ export const imageBatchService = {
   cacheImages(productId: string, images: ProductImage[]): void {
     const permanentImages = images.filter((img) => !img.url.startsWith("blob:"))
 
-    if (permanentImages.length !== images.length) {
-      console.warn(`[v0] Filtered out ${images.length - permanentImages.length} blob URLs from cache storage`)
-    }
-
     const cacheEntry = {
       data: permanentImages,
       timestamp: Date.now(),
@@ -554,11 +524,9 @@ export const imageBatchService = {
         const localStorageKey = `product_images_${productId}`
         localStorage.setItem(localStorageKey, JSON.stringify(cacheEntry))
       } catch (error) {
-        console.error(`Error storing to localStorage for product ${productId}:`, error)
+        // Silently handle storage errors (quota exceeded, etc.)
       }
     }
-
-    console.log(`Cached ${permanentImages.length} permanent images for product ${productId}`)
   },
 
   /**
