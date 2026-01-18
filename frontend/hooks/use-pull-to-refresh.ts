@@ -5,26 +5,25 @@ import { useRouter } from "next/navigation"
 
 interface UsePullToRefreshOptions {
   threshold?: number
-  resistance?: number
-  onRefresh?: () => void | Promise<void>
+  maxPullDistance?: number
+  onRefresh?: () => Promise<void> | void
   disabled?: boolean
 }
 
 export function usePullToRefresh({
   threshold = 80,
-  resistance = 2.5,
+  maxPullDistance = 150,
   onRefresh,
   disabled = false,
 }: UsePullToRefreshOptions = {}) {
+  const [isPulling, setIsPulling] = useState(false)
   const [pullDistance, setPullDistance] = useState(0)
   const [isRefreshing, setIsRefreshing] = useState(false)
-  const [isReady, setIsReady] = useState(false)
   const startY = useRef(0)
-  const currentY = useRef(0)
-  const isPulling = useRef(false)
+  const containerRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
-  const triggerRefresh = useCallback(async () => {
+  const handleRefresh = useCallback(async () => {
     setIsRefreshing(true)
     
     try {
@@ -33,118 +32,85 @@ export function usePullToRefresh({
       } else {
         // Default behavior: refresh the page
         router.refresh()
-        await new Promise((resolve) => setTimeout(resolve, 1000))
+        // Add a small delay to show the animation
+        await new Promise(resolve => setTimeout(resolve, 800))
       }
     } catch (error) {
       console.error("[v0] Pull to refresh error:", error)
     } finally {
       setIsRefreshing(false)
       setPullDistance(0)
-      setIsReady(false)
+      setIsPulling(false)
     }
   }, [onRefresh, router])
 
   useEffect(() => {
     if (disabled) return
 
+    const container = containerRef.current
+    if (!container) return
+
+    let isAtTop = false
+
     const handleTouchStart = (e: TouchEvent) => {
-      // Only start if we're at the top of the page
-      if (window.scrollY === 0 && !isRefreshing) {
+      const scrollableElement = container
+      isAtTop = scrollableElement.scrollTop === 0
+      
+      if (isAtTop) {
         startY.current = e.touches[0].pageY
-        isPulling.current = true
       }
     }
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (!isPulling.current || isRefreshing) return
+      if (!isAtTop || isRefreshing) return
 
-      currentY.current = e.touches[0].pageY
-      const distance = currentY.current - startY.current
+      const currentY = e.touches[0].pageY
+      const distance = currentY - startY.current
 
-      if (distance > 0 && window.scrollY === 0) {
-        // Prevent default scroll behavior when pulling down
+      if (distance > 0) {
+        // Prevent default scrolling when pulling down at the top
         e.preventDefault()
         
-        // Apply resistance to make it feel natural
-        const adjustedDistance = distance / resistance
-        setPullDistance(adjustedDistance)
+        setIsPulling(true)
         
-        // Set ready state when threshold is reached
-        setIsReady(adjustedDistance >= threshold)
+        // Apply resistance effect - the further you pull, the slower it moves
+        const resistance = 2.5
+        const adjustedDistance = Math.min(distance / resistance, maxPullDistance)
+        setPullDistance(adjustedDistance)
       }
     }
 
     const handleTouchEnd = () => {
-      if (!isPulling.current) return
+      if (!isPulling) return
 
-      isPulling.current = false
-
-      if (pullDistance >= threshold && !isRefreshing) {
-        triggerRefresh()
-      } else {
-        // Animate back to original position
-        setPullDistance(0)
-        setIsReady(false)
-      }
-    }
-
-    // Mouse events for desktop testing
-    const handleMouseDown = (e: MouseEvent) => {
-      if (window.scrollY === 0 && !isRefreshing) {
-        startY.current = e.pageY
-        isPulling.current = true
-      }
-    }
-
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!isPulling.current || isRefreshing) return
-
-      currentY.current = e.pageY
-      const distance = currentY.current - startY.current
-
-      if (distance > 0 && window.scrollY === 0) {
-        const adjustedDistance = distance / resistance
-        setPullDistance(adjustedDistance)
-        setIsReady(adjustedDistance >= threshold)
-      }
-    }
-
-    const handleMouseUp = () => {
-      if (!isPulling.current) return
-
-      isPulling.current = false
-
-      if (pullDistance >= threshold && !isRefreshing) {
-        triggerRefresh()
+      if (pullDistance >= threshold) {
+        handleRefresh()
       } else {
         setPullDistance(0)
-        setIsReady(false)
+        setIsPulling(false)
       }
     }
 
-    // Add touch event listeners
-    document.addEventListener("touchstart", handleTouchStart, { passive: false })
-    document.addEventListener("touchmove", handleTouchMove, { passive: false })
-    document.addEventListener("touchend", handleTouchEnd)
-
-    // Add mouse event listeners for desktop
-    document.addEventListener("mousedown", handleMouseDown)
-    document.addEventListener("mousemove", handleMouseMove)
-    document.addEventListener("mouseup", handleMouseUp)
+    container.addEventListener("touchstart", handleTouchStart, { passive: true })
+    container.addEventListener("touchmove", handleTouchMove, { passive: false })
+    container.addEventListener("touchend", handleTouchEnd, { passive: true })
 
     return () => {
-      document.removeEventListener("touchstart", handleTouchStart)
-      document.removeEventListener("touchmove", handleTouchMove)
-      document.removeEventListener("touchend", handleTouchEnd)
-      document.removeEventListener("mousedown", handleMouseDown)
-      document.removeEventListener("mousemove", handleMouseMove)
-      document.removeEventListener("mouseup", handleMouseUp)
+      container.removeEventListener("touchstart", handleTouchStart)
+      container.removeEventListener("touchmove", handleTouchMove)
+      container.removeEventListener("touchend", handleTouchEnd)
     }
-  }, [disabled, isRefreshing, pullDistance, threshold, resistance, triggerRefresh])
+  }, [disabled, isPulling, pullDistance, threshold, isRefreshing, maxPullDistance, handleRefresh])
+
+  // Calculate if user has pulled far enough to trigger refresh
+  const isReady = isPulling && pullDistance >= threshold && !isRefreshing
 
   return {
+    containerRef,
+    isPulling,
     pullDistance,
     isRefreshing,
+    threshold,
     isReady,
   }
 }

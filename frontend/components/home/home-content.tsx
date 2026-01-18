@@ -58,19 +58,21 @@ export function HomeContent({
   featureCards = [],
   productShowcase = [],
 }: HomeContentProps) {
-  const { pullDistance, isRefreshing, isReady } = usePullToRefresh({
-    threshold: 80,
-    resistance: 2.5,
-  })
+  const { containerRef, isPulling, pullDistance, isRefreshing, threshold, isReady } = usePullToRefresh()
 
   return (
     <>
-      <PullToRefreshIndicator
-        pullDistance={pullDistance}
-        isRefreshing={isRefreshing}
+      <PullToRefreshIndicator 
+        pullDistance={pullDistance} 
+        isRefreshing={isRefreshing} 
+        threshold={threshold}
         isReady={isReady}
       />
-      <div className="page-root flex flex-col pb-8 w-full" style={{ backgroundColor: "var(--color-background)" }}>
+      <div 
+        ref={containerRef}
+        className="page-root flex flex-col pb-8 w-full" 
+        style={{ backgroundColor: "var(--color-background)" }}
+      >
         <NetworkStatus className="mx-auto w-full max-w-[1200px] px-1 sm:px-2 md:px-4 pt-2" />
 
         <div className="w-full mt-2 sm:mt-3 sm:py-2" style={{ backgroundColor: "var(--color-background)" }}>
