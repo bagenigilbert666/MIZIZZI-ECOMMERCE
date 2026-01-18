@@ -12,6 +12,7 @@ import Script from "next/script"
 import { ThemeProvider } from "@/contexts/theme-context"
 import type { Viewport } from "next"
 import { getFooterSettings } from "@/lib/server/get-footer-settings"
+import { PullToRefreshWrapper } from "@/components/shared/pull-to-refresh-wrapper"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -71,6 +72,7 @@ export default async function RootLayout({
           <StateProviders>
             <AppProviders>
               <NotificationProvider>
+                <PullToRefreshWrapper />
                 <PageTransitionWrapper />
                 {/* Add the VerificationHandler to handle auth state persistence */}
                 <VerificationHandler />

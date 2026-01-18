@@ -21,10 +21,9 @@ export function PullToRefresh({
     window.location.reload()
   }, [])
 
-  const { isPulling, isRefreshing, pullDistance, shouldTriggerRefresh } = usePullToRefresh({
-    onRefresh: handleRefresh,
+  const { pullDistance, isRefreshing } = usePullToRefresh({
+    onRefresh: disabled ? undefined : handleRefresh,
     threshold,
-    disabled,
   })
 
   // Calculate opacity and scale based on pull distance
@@ -32,6 +31,10 @@ export function PullToRefresh({
   const opacity = Math.min(progress * 1.5, 1)
   const scale = 0.6 + progress * 0.4
   const rotation = progress * 180
+
+  // derive booleans from pullDistance
+  const isPulling = pullDistance > 0
+  const shouldTriggerRefresh = pullDistance >= threshold
 
   if (!isPulling && !isRefreshing) {
     return null
