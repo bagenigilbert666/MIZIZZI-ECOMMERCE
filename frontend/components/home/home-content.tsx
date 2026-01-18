@@ -13,6 +13,7 @@ import { TrendingNow } from "@/components/features/trending-now"
 import { DailyFinds } from "@/components/features/daily-finds"
 import { ProductGrid } from "@/components/products/product-grid"
 import { BrandShowcase } from "@/components/features/brand-showcase"
+import { PullToRefresh } from "@/components/features/pull-to-refresh"
 import type { Product } from "@/types"
 import type { Category } from "@/lib/server/get-categories"
 import type {
@@ -58,6 +59,7 @@ export function HomeContent({
 }: HomeContentProps) {
   return (
     <>
+      <PullToRefresh />
       <div className="page-root flex flex-col pb-8 w-full" style={{ backgroundColor: "var(--color-background)" }}>
         <NetworkStatus className="mx-auto w-full max-w-[1200px] px-1 sm:px-2 md:px-4 pt-2" />
 
