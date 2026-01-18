@@ -45,7 +45,7 @@ class CloudinaryService {
   private apiKey: string
 
   constructor() {
-    this.baseUrl = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
+    this.baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
     this.cloudName = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME || ""
     this.uploadPreset = process.env.NEXT_PUBLIC_CLOUDINARY_UPLOAD_PRESET || ""
     this.apiKey = process.env.NEXT_PUBLIC_CLOUDINARY_API_KEY || ""
@@ -332,9 +332,8 @@ class CloudinaryService {
         throw new Error("Public ID is required")
       }
 
-      // Call the backend DELETE endpoint that expects a JSON body with public_id
-      const response = await fetch(`${this.baseUrl}/api/admin/cloudinary/delete-by-public-id`, {
-        method: "DELETE",
+      const response = await fetch(`${this.baseUrl}/api/admin/cloudinary/delete`, {
+        method: "POST",
         headers: {
           ...this.getAuthHeaders(),
           "Content-Type": "application/json",
@@ -351,17 +350,14 @@ class CloudinaryService {
       const result = await response.json()
       console.log("[v0] Cloudinary delete result:", result)
 
-      // Backend returns cloudinary_result with Cloudinary's response inside
-      const cloudResult = result.cloudinary_result || result
-
       return {
-        success: result.success === true || cloudResult?.result === "ok" || cloudResult?.result === "not found",
+        success: result.success || result.result === "ok" || result.result === "not found",
         message:
-          cloudResult?.result === "ok"
+          result.result === "ok"
             ? "Image deleted from Cloudinary"
-            : cloudResult?.result === "not found"
+            : result.result === "not found"
               ? "Image already deleted or not found in Cloudinary"
-              : (result.message || "Image deletion completed"),
+              : "Image deletion completed",
       }
     } catch (error) {
       console.error("Error deleting from Cloudinary:", error)

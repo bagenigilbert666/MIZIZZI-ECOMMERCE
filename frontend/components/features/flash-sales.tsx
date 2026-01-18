@@ -73,24 +73,50 @@ const StockIndicator = ({
 }
 
 const getProductImageUrl = (product: Product): string => {
-  if (product.image_urls && product.image_urls.length > 0) {
-    if (typeof product.image_urls[0] === "string" && !product.image_urls[0].startsWith("http")) {
-      return cloudinaryService.generateOptimizedUrl(product.image_urls[0])
+  // First priority: Check thumbnail_url
+  if (product.thumbnail_url && typeof product.thumbnail_url === "string" && product.thumbnail_url.length > 0) {
+    if (product.thumbnail_url.startsWith("http") || product.thumbnail_url.startsWith("/")) {
+      return product.thumbnail_url
     }
-    return product.image_urls[0]
-  }
-  if (product.thumbnail_url) {
-    if (typeof product.thumbnail_url === "string" && !product.thumbnail_url.startsWith("http")) {
-      return cloudinaryService.generateOptimizedUrl(product.thumbnail_url)
+    // Try to generate Cloudinary URL
+    const cloudUrl = cloudinaryService.generateOptimizedUrl(product.thumbnail_url)
+    if (cloudUrl && cloudUrl !== "/placeholder.svg") {
+      return cloudUrl
     }
-    return product.thumbnail_url
   }
-  if (product.images && product.images.length > 0 && product.images[0].url) {
-    if (typeof product.images[0].url === "string" && !product.images[0].url.startsWith("http")) {
-      return cloudinaryService.generateOptimizedUrl(product.images[0].url)
+
+  // Second priority: Check image_urls array
+  if (product.image_urls && Array.isArray(product.image_urls) && product.image_urls.length > 0) {
+    const firstUrl = product.image_urls[0]
+    if (typeof firstUrl === "string" && firstUrl.length > 0) {
+      if (firstUrl.startsWith("http") || firstUrl.startsWith("/")) {
+        return firstUrl
+      }
+      const cloudUrl = cloudinaryService.generateOptimizedUrl(firstUrl)
+      if (cloudUrl && cloudUrl !== "/placeholder.svg") {
+        return cloudUrl
+      }
     }
-    return product.images[0].url
   }
+
+  // Third priority: Check images array
+  if (product.images && Array.isArray(product.images) && product.images.length > 0) {
+    const primaryImage = product.images.find((img: any) => img.is_primary)
+    const imageToUse = primaryImage || product.images[0]
+    if (imageToUse && imageToUse.url) {
+      if (typeof imageToUse.url === "string" && imageToUse.url.length > 0) {
+        if (imageToUse.url.startsWith("http") || imageToUse.url.startsWith("/")) {
+          return imageToUse.url
+        }
+        const cloudUrl = cloudinaryService.generateOptimizedUrl(imageToUse.url)
+        if (cloudUrl && cloudUrl !== "/placeholder.svg") {
+          return cloudUrl
+        }
+      }
+    }
+  }
+
+  // Fallback
   return ""
 }
 
@@ -112,11 +138,13 @@ const ProductCard = memo(({ product, isMobile }: { product: FlashSaleProduct | P
   const rating = product.rating || 3 + Math.random() * 2
 
   const handleImageLoad = () => {
+    console.log("[v0] Image loaded successfully for product:", product.id)
     setImageLoaded(true)
     setTimeout(() => setShowPlaceholder(false), 300)
   }
 
   const handleImageError = () => {
+    console.log("[v0] Image error for product:", product.id)
     setImageError(true)
     setImageLoaded(false)
   }
@@ -128,6 +156,14 @@ const ProductCard = memo(({ product, isMobile }: { product: FlashSaleProduct | P
   }, [product.id])
 
   const imageUrl = getProductImageUrl(product)
+  const hasValidImage = imageUrl && imageUrl.length > 0
+
+  console.log("[v0] ProductCard render -", {
+    productId: product.id,
+    productName: product.name,
+    imageUrl: imageUrl ? imageUrl.substring(0, 50) + "..." : "NO_URL",
+    hasValidImage,
+  })
 
   return (
     <Link href={`/product/${product.slug || product.id}`} prefetch={false}>
@@ -143,7 +179,7 @@ const ProductCard = memo(({ product, isMobile }: { product: FlashSaleProduct | P
         >
           <div className="relative aspect-square overflow-hidden bg-[#f8f8f8]">
             <AnimatePresence>
-              {(showPlaceholder || imageError) && (
+              {(showPlaceholder || imageError || !hasValidImage) && (
                 <motion.div
                   initial={{ opacity: 1 }}
                   exit={{ opacity: 0, transition: { duration: 0.3 } }}
@@ -159,7 +195,7 @@ const ProductCard = memo(({ product, isMobile }: { product: FlashSaleProduct | P
               transition={{ duration: 0.3 }}
               className="absolute inset-0"
             >
-              {imageUrl && (
+              {hasValidImage && (
                 <Image
                   src={imageUrl || "/placeholder.svg"}
                   alt={product.name}
@@ -169,6 +205,7 @@ const ProductCard = memo(({ product, isMobile }: { product: FlashSaleProduct | P
                   loading="lazy"
                   onLoad={handleImageLoad}
                   onError={handleImageError}
+                  crossOrigin="anonymous"
                 />
               )}
             </motion.div>

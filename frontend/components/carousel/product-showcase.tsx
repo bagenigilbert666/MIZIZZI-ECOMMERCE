@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { Gem, Shirt, Watch, Crown, Award, Timer, TrendingUp, Users, Package, type LucideIcon } from "lucide-react"
+import { Gem, Shirt, Watch, Crown, Award, Timer, TrendingUp, Users, type LucideIcon } from "lucide-react"
 
 const iconMap: Record<string, LucideIcon> = {
   Gem,
@@ -27,161 +27,55 @@ interface ProductCategory {
   is_active: boolean
 }
 
-const STORAGE_KEY = "mizizzi_product_showcase_cache"
-const STORAGE_EXPIRY_KEY = "mizizzi_product_showcase_cache_expiry"
-const CACHE_DURATION = 24 * 60 * 60 * 1000
+interface ProductShowcaseProps {
+  categories?: ProductCategory[]
+}
 
-const getCachedData = (): ProductCategory[] | null => {
-  if (typeof window === "undefined") return null
-  try {
-    const expiry = localStorage.getItem(STORAGE_EXPIRY_KEY)
-    if (expiry && Date.now() > Number.parseInt(expiry, 10)) {
-      localStorage.removeItem(STORAGE_KEY)
-      localStorage.removeItem(STORAGE_EXPIRY_KEY)
-      return null
+export const ProductShowcase = React.memo(({ categories: serverCategories }: ProductShowcaseProps) => {
+  const [categories] = useState<ProductCategory[]>(() => {
+    if (serverCategories && serverCategories.length > 0) {
+      return serverCategories
     }
-    const cached = localStorage.getItem(STORAGE_KEY)
-    return cached ? JSON.parse(cached) : null
-  } catch {
-    return null
-  }
-}
-
-const setCachedData = (items: ProductCategory[]) => {
-  if (typeof window === "undefined") return
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items))
-    localStorage.setItem(STORAGE_EXPIRY_KEY, String(Date.now() + CACHE_DURATION))
-  } catch {}
-}
-
-const ProductShowcaseSkeleton = () => (
-  <section
-    className="h-full w-full max-w-md md:max-w-lg mx-auto rounded-2xl overflow-hidden shadow-lg bg-gradient-to-br from-gray-100 to-gray-200 border border-gray-200 relative"
-    aria-label="Loading product showcase"
-  >
-    {/* Animated shimmer overlay */}
-    <div className="absolute inset-0 overflow-hidden">
-      <motion.div
-        className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/40 to-transparent"
-        animate={{ translateX: ["100%", "-100%"] }}
-        transition={{ duration: 1.5, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
-      />
-    </div>
-
-    <div className="relative z-10 h-full p-5 md:p-7 flex flex-col justify-between">
-      {/* Header skeleton */}
-      <div className="flex items-center gap-3 mb-4">
-        <div className="p-3 rounded-xl bg-gradient-to-br from-primary/20 to-primary/30 animate-pulse">
-          <Package className="h-6 w-6 text-primary/50" />
-        </div>
-        <div className="h-4 w-32 bg-gray-300 rounded animate-pulse" />
-      </div>
-
-      {/* Metric skeleton */}
-      <div className="mb-3">
-        <div className="h-8 w-24 bg-gray-300 rounded mb-2 animate-pulse" />
-        <div className="h-3 w-40 bg-gray-300/70 rounded animate-pulse" />
-      </div>
-
-      {/* Features skeleton */}
-      <div className="space-y-2 mt-2">
-        {[0, 1, 2, 3].map((i) => (
-          <motion.div
-            key={i}
-            className="flex items-center gap-3"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: i * 0.1 }}
-          >
-            <div className="w-2 h-2 rounded-full bg-primary/30 animate-pulse" />
-            <div className="h-3 bg-gray-300/70 rounded animate-pulse" style={{ width: `${60 + i * 10}%` }} />
-          </motion.div>
-        ))}
-      </div>
-
-      {/* Brand text */}
-      <div className="absolute bottom-4 left-1/2 -translate-x-1/2">
-        <p className="text-xs text-gray-400 font-medium">Loading products...</p>
-      </div>
-    </div>
-
-    {/* Dots skeleton */}
-    <div className="absolute bottom-3 left-1/2 transform -translate-x-1/2 flex gap-1.5 z-20">
-      {[0, 1, 2, 3].map((i) => (
-        <div key={i} className={`h-0.5 rounded-full bg-gray-400/30 ${i === 0 ? "w-8" : "w-2"}`} />
-      ))}
-    </div>
-  </section>
-)
-
-export const ProductShowcase = React.memo(() => {
-  const [categories, setCategories] = useState<ProductCategory[] | null>(() => {
-    if (typeof window === "undefined") return null
-    return getCachedData()
+    // Default fallback for instant display
+    return [
+      {
+        id: 1,
+        title: "NEW ARRIVALS",
+        metric: "50+",
+        description: "Premium quality products",
+        icon_name: "Gem",
+        image: "/new-arrivals-fashion.png",
+        gradient: "from-rose-500 to-pink-600",
+        features: ["Latest Trends", "Premium Quality", "Exclusive Designs", "Limited Edition"],
+        is_active: true,
+      },
+      {
+        id: 2,
+        title: "BEST SELLERS",
+        metric: "98.7%",
+        description: "Customer satisfaction rate",
+        icon_name: "Award",
+        image: "/best-seller-products.jpg",
+        gradient: "from-amber-500 to-orange-600",
+        features: ["Top Rated", "Most Popular", "Customer Favorites", "Priority Support"],
+        is_active: true,
+      },
+    ]
   })
   const [currentCategory, setCurrentCategory] = useState(0)
-  const [isLoading, setIsLoading] = useState(true)
 
+  // Auto-rotate categories
   useEffect(() => {
-    // Check cache on mount (for SSR hydration)
-    const cached = getCachedData()
-    if (cached) {
-      setCategories(cached)
-      setIsLoading(false)
-    }
-
-    const fetchCategories = async () => {
-      try {
-        const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
-        const response = await fetch(`${API_BASE_URL}/api/panels/items?panel_type=product_showcase&position=left`)
-
-        if (response.ok) {
-          const data = await response.json()
-          if (data.items && data.items.length > 0) {
-            const mappedItems = data.items.map((item: any) => ({
-              id: item.id,
-              title: item.title,
-              metric: item.metric,
-              description: item.description,
-              icon_name: item.icon_name,
-              image: item.image_url,
-              gradient: item.gradient,
-              features: item.features,
-              is_active: item.is_active,
-            }))
-            setCategories(mappedItems)
-            setCachedData(mappedItems)
-          }
-        }
-      } catch {
-        // Silent fail
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchCategories()
-  }, [])
-
-  useEffect(() => {
-    if (!categories || categories.length === 0) return
+    if (categories.length === 0) return
     const interval = setInterval(() => {
       setCurrentCategory((prev) => (prev + 1) % categories.length)
     }, 10000)
     return () => clearInterval(interval)
-  }, [categories])
-
-  if (isLoading || !categories || categories.length === 0) {
-    return <ProductShowcaseSkeleton />
-  }
+  }, [categories.length])
 
   const category = categories[currentCategory]
   const IconComponent = iconMap[category?.icon_name] || iconMap.Gem
-
   const displayFeatures = category?.features?.slice(0, 4) || []
-
-  if (!category) return <ProductShowcaseSkeleton />
 
   return (
     <section
@@ -205,6 +99,7 @@ export const ProductShowcase = React.memo(() => {
               alt={cat.title}
               className="w-full h-full object-cover object-center"
               style={{ filter: "brightness(1.1) contrast(1.15) saturate(1.1)" }}
+              loading="eager"
             />
             <div className="absolute inset-0 bg-gradient-to-br from-black/30 via-black/40 to-black/50" />
           </motion.div>

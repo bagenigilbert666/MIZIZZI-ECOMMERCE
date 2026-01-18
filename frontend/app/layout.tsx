@@ -11,6 +11,7 @@ import { VerificationHandler } from "@/components/auth/verification-handler"
 import Script from "next/script"
 import { ThemeProvider } from "@/contexts/theme-context"
 import type { Viewport } from "next"
+import { getFooterSettings } from "@/lib/server/get-footer-settings"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -31,11 +32,13 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const footerSettings = await getFooterSettings()
+
   return (
     <html lang="en" suppressHydrationWarning className="fixed inset-0 overflow-hidden">
       <head>
@@ -72,7 +75,7 @@ export default function RootLayout({
                 {/* Add the VerificationHandler to handle auth state persistence */}
                 <VerificationHandler />
                 <div className="h-full w-full overflow-y-auto overflow-x-hidden overscroll-none">
-                  <LayoutRenderer>{children}</LayoutRenderer>
+                  <LayoutRenderer footerSettings={footerSettings}>{children}</LayoutRenderer>
                 </div>
                 {/* Add the cart notification component */}
               </NotificationProvider>

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useState, useEffect, useCallback } from "react"
+import React, { useState } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Link from "next/link"
 import {
@@ -18,19 +18,7 @@ import {
   Shield,
   type LucideIcon,
 } from "lucide-react"
-
-interface FeatureCardData {
-  id?: number
-  icon: string
-  title: string
-  description: string
-  href: string
-  iconBg: string
-  iconColor: string
-  hoverBg: string
-  badge?: string
-  count?: number
-}
+import type { FeatureCard } from "@/lib/server/get-carousel-data"
 
 const iconMap: Record<string, LucideIcon> = {
   Zap,
@@ -47,7 +35,7 @@ const iconMap: Record<string, LucideIcon> = {
   Shield,
 }
 
-const DEFAULT_FEATURE_CARDS: FeatureCardData[] = [
+const DEFAULT_FEATURE_CARDS: FeatureCard[] = [
   {
     icon: "Zap",
     title: "FLASH SALES",
@@ -106,73 +94,13 @@ const DEFAULT_FEATURE_CARDS: FeatureCardData[] = [
   },
 ]
 
-const STORAGE_KEY = "feature_cards_cache"
-const CACHE_DURATION = 24 * 60 * 60 * 1000 // 24 hours
-
-const getFromLocalStorage = (): FeatureCardData[] | null => {
-  if (typeof window === "undefined") return null
-  try {
-    const cached = localStorage.getItem(STORAGE_KEY)
-    if (cached) {
-      const { data, timestamp } = JSON.parse(cached)
-      if (Date.now() - timestamp < CACHE_DURATION) {
-        return data
-      }
-    }
-  } catch (error) {
-    console.error("Error reading from localStorage:", error)
-  }
-  return null
+interface FeatureCardsProps {
+  cards?: FeatureCard[]
 }
 
-const saveToLocalStorage = (data: FeatureCardData[]) => {
-  if (typeof window === "undefined") return
-  try {
-    localStorage.setItem(
-      STORAGE_KEY,
-      JSON.stringify({
-        data,
-        timestamp: Date.now(),
-      }),
-    )
-  } catch (error) {
-    console.error("Error saving to localStorage:", error)
-  }
-}
-
-export const FeatureCards = React.memo(() => {
-  const [cards, setCards] = useState<FeatureCardData[]>(DEFAULT_FEATURE_CARDS)
-  const [isHydrated, setIsHydrated] = useState(false)
+export const FeatureCards = React.memo(({ cards: serverCards }: FeatureCardsProps) => {
+  const cards = serverCards && serverCards.length > 0 ? serverCards : DEFAULT_FEATURE_CARDS
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null)
-
-  useEffect(() => {
-    const cached = getFromLocalStorage()
-    if (cached && cached.length > 0) {
-      setCards(cached)
-    }
-    setIsHydrated(true)
-  }, [])
-
-  const fetchCards = useCallback(async () => {
-    try {
-      const response = await fetch("/api/feature-cards")
-      if (response.ok) {
-        const data = await response.json()
-        if (data && Array.isArray(data) && data.length > 0) {
-          setCards(data)
-          saveToLocalStorage(data)
-        }
-      }
-    } catch (error) {
-      // Silently fail - we already have data showing
-    }
-  }, [])
-
-  useEffect(() => {
-    if (isHydrated) {
-      fetchCards()
-    }
-  }, [isHydrated, fetchCards])
 
   return (
     <div className="grid grid-cols-2 gap-3 flex-1">

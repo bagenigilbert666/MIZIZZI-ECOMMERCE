@@ -1,4 +1,5 @@
 import type { Product } from "@/types"
+import { productService } from "@/services/product"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
 
@@ -75,10 +76,15 @@ function isFlashSaleProduct(product: Product): boolean {
 }
 
 function enhanceWithFlashSaleData(product: Product): FlashSaleProduct {
-  const flashStock = (product as any).flash_sale_stock || product.stock || 100
-  const flashSold = (product as any).flash_sale_sold || 0
-  const itemsLeft = Math.max(0, flashStock - flashSold)
-  const progressPercentage = flashStock > 0 ? (itemsLeft / flashStock) * 100 : 0
+  const flashStock = (product as any).flash_sale_stock || (product as any).flashSaleStock || product.stock || 100
+  const flashSold = (product as any).flash_sale_sold || (product as any).flashSaleSold || 0
+
+  // If items_left is already provided by backend, use it
+  const itemsLeft = (product as any).items_left ?? Math.max(0, flashStock - flashSold)
+
+  // If progress_percentage is already provided by backend, use it
+  const progressPercentage =
+    (product as any).progress_percentage ?? (flashStock > 0 ? (itemsLeft / flashStock) * 100 : 0)
 
   return {
     ...product,
@@ -86,8 +92,8 @@ function enhanceWithFlashSaleData(product: Product): FlashSaleProduct {
     flash_sale_sold: flashSold,
     items_left: itemsLeft,
     progress_percentage: Math.round(progressPercentage * 10) / 10,
-    is_almost_gone: itemsLeft <= 5,
-    is_sold_out: itemsLeft === 0,
+    is_almost_gone: (product as any).is_almost_gone ?? itemsLeft <= 5,
+    is_sold_out: (product as any).is_sold_out ?? itemsLeft === 0,
   }
 }
 
@@ -120,11 +126,15 @@ function getDefaultEvent(): FlashSaleEvent {
  * Returns products with items_left, progress bar data, and countdown timer info
  */
 export async function getFlashSaleProducts(limit = 50): Promise<FlashSaleProduct[]> {
+  console.log("[v0] getFlashSaleProducts: Starting fetch from", API_BASE_URL)
+
   try {
-    const newEndpointUrl = `${API_BASE_URL}/api/flash-sale/products?limit=${limit}`
+    // Try the dedicated flash sale endpoint first (has stock tracking data)
+    const flashSaleEndpoint = `${API_BASE_URL}/api/flash-sale/products?limit=${limit}`
+    console.log("[v0] getFlashSaleProducts: Trying dedicated endpoint:", flashSaleEndpoint)
 
     try {
-      const response = await fetch(newEndpointUrl, {
+      const response = await fetch(flashSaleEndpoint, {
         next: {
           revalidate: 60,
           tags: ["flash-sales"],
@@ -134,21 +144,130 @@ export async function getFlashSaleProducts(limit = 50): Promise<FlashSaleProduct
         },
       })
 
+      console.log("[v0] getFlashSaleProducts: Dedicated endpoint status:", response.status)
+
       if (response.ok) {
         const data = await response.json()
-        if (data.items && Array.isArray(data.items)) {
-          return data.items.map((p: Product) => ({
-            ...normalizeProductPrices(p),
-            seller: (p as any).seller || defaultSeller,
-            product_type: "flash_sale" as const,
-          }))
+        console.log("[v0] getFlashSaleProducts: Dedicated endpoint data:", {
+          hasItems: !!data.items,
+          itemCount: data.items?.length || 0,
+          hasEvent: !!data.event,
+          sampleItem: data.items?.[0]
+            ? {
+                id: data.items[0].id,
+                name: data.items[0].name,
+                items_left: data.items[0].items_left,
+                flash_sale_stock: data.items[0].flash_sale_stock,
+              }
+            : null,
+        })
+
+        if (data.items && Array.isArray(data.items) && data.items.length > 0) {
+          const productsWithImages = await Promise.all(
+            data.items.map(async (p: Product) => {
+              const product = normalizeProductPrices(p)
+
+              // Fetch product images if they're not already included
+              if (!product.image_urls || product.image_urls.length === 0) {
+                try {
+                  const images = await productService.getProductImages(product.id.toString())
+                  if (images && images.length > 0) {
+                    product.image_urls = images.map((img) => img.url)
+                    const primaryImage = images.find((img) => img.is_primary)
+                    if (primaryImage) {
+                      product.thumbnail_url = primaryImage.url
+                    } else if (images[0]) {
+                      product.thumbnail_url = images[0].url
+                    }
+                  }
+                } catch (error) {
+                  console.error(`Error fetching images for product ${product.id}:`, error)
+                }
+              }
+
+              return {
+                ...product,
+                items_left: (p as any).items_left,
+                flash_sale_stock: (p as any).flash_sale_stock,
+                flash_sale_sold: (p as any).flash_sale_sold,
+                progress_percentage: (p as any).progress_percentage,
+                is_almost_gone: (p as any).is_almost_gone,
+                is_sold_out: (p as any).is_sold_out,
+                seller: (p as any).seller || defaultSeller,
+                product_type: "flash_sale" as const,
+              }
+            }),
+          )
+
+          return productsWithImages
         }
       }
     } catch (err) {
-      console.error(`[SSR] New flash sale endpoint failed:`, err)
+      console.error(`[v0] getFlashSaleProducts: Dedicated endpoint failed:`, err)
     }
 
-    // Fallback to existing endpoints
+    // Fallback to featured routes endpoint
+    const featuredEndpoint = `${API_BASE_URL}/featured/fast/flash-sale?limit=${limit}`
+    console.log("[v0] getFlashSaleProducts: Trying featured endpoint:", featuredEndpoint)
+
+    try {
+      const response = await fetch(featuredEndpoint, {
+        next: {
+          revalidate: 60,
+          tags: ["flash-sales"],
+        },
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
+
+      console.log("[v0] getFlashSaleProducts: Featured endpoint status:", response.status)
+
+      if (response.ok) {
+        const data = await response.json()
+        const products = data.items || []
+        console.log("[v0] getFlashSaleProducts: Featured endpoint returned", products.length, "products")
+
+        if (products.length > 0) {
+          const productsWithImages = await Promise.all(
+            products.map(async (p: Product) => {
+              const product = normalizeProductPrices(p)
+
+              // Fetch product images if they're not already included
+              if (!product.image_urls || product.image_urls.length === 0) {
+                try {
+                  const images = await productService.getProductImages(product.id.toString())
+                  if (images && images.length > 0) {
+                    product.image_urls = images.map((img) => img.url)
+                    const primaryImage = images.find((img) => img.is_primary)
+                    if (primaryImage) {
+                      product.thumbnail_url = primaryImage.url
+                    } else if (images[0]) {
+                      product.thumbnail_url = images[0].url
+                    }
+                  }
+                } catch (error) {
+                  console.error(`Error fetching images for product ${product.id}:`, error)
+                }
+              }
+
+              const enhanced = enhanceWithFlashSaleData(product)
+              return {
+                ...enhanced,
+                seller: product.seller || defaultSeller,
+                product_type: "flash_sale" as const,
+              }
+            }),
+          )
+
+          return productsWithImages
+        }
+      }
+    } catch (err) {
+      console.error(`[v0] getFlashSaleProducts: Featured endpoint failed:`, err)
+    }
+
+    // Final fallback: query products with is_flash_sale=true
     const urls = [
       `${API_BASE_URL}/api/products/?is_flash_sale=true&per_page=${limit}`,
       `${API_BASE_URL}/api/products/?flash_sale=true&per_page=${limit}`,
@@ -157,6 +276,7 @@ export async function getFlashSaleProducts(limit = 50): Promise<FlashSaleProduct
     let allProducts: Product[] = []
 
     for (const url of urls) {
+      console.log("[v0] getFlashSaleProducts: Trying fallback URL:", url)
       try {
         const response = await fetch(url, {
           next: {
@@ -171,15 +291,19 @@ export async function getFlashSaleProducts(limit = 50): Promise<FlashSaleProduct
         if (response.ok) {
           const data = await response.json()
           const products = extractProducts(data)
+          console.log("[v0] getFlashSaleProducts: Fallback returned", products.length, "products from", url)
           allProducts = [...allProducts, ...products]
         }
       } catch (err) {
-        console.error(`[SSR] Failed to fetch from ${url}:`, err)
+        console.error(`[v0] getFlashSaleProducts: Fallback failed for ${url}:`, err)
       }
     }
 
+    // Filter for flash sale products only
     let flashSaleProducts = allProducts.filter(isFlashSaleProduct)
+    console.log("[v0] getFlashSaleProducts: After filtering, found", flashSaleProducts.length, "flash sale products")
 
+    // Remove duplicates
     const seenIds = new Set<string | number>()
     flashSaleProducts = flashSaleProducts.filter((p) => {
       if (seenIds.has(p.id)) return false
@@ -187,25 +311,49 @@ export async function getFlashSaleProducts(limit = 50): Promise<FlashSaleProduct
       return true
     })
 
-    const enhancedProducts = flashSaleProducts.map((product) => {
-      product = normalizeProductPrices(product)
-      const enhanced = enhanceWithFlashSaleData(product)
+    const enhancedProducts = await Promise.all(
+      flashSaleProducts.map(async (product) => {
+        const p = normalizeProductPrices(product)
 
-      return {
-        ...enhanced,
-        seller: product.seller || defaultSeller,
-        product_type: "flash_sale" as const,
-      }
-    })
+        // Fetch product images if they're not already included
+        if (!p.image_urls || p.image_urls.length === 0) {
+          try {
+            const images = await productService.getProductImages(p.id.toString())
+            if (images && images.length > 0) {
+              p.image_urls = images.map((img) => img.url)
+              const primaryImage = images.find((img) => img.is_primary)
+              if (primaryImage) {
+                p.thumbnail_url = primaryImage.url
+              } else if (images[0]) {
+                p.thumbnail_url = images[0].url
+              }
+            }
+          } catch (error) {
+            console.error(`Error fetching images for product ${p.id}:`, error)
+          }
+        }
 
+        const enhanced = enhanceWithFlashSaleData(p)
+
+        return {
+          ...enhanced,
+          seller: p.seller || defaultSeller,
+          product_type: "flash_sale" as const,
+        }
+      }),
+    )
+
+    console.log("[v0] getFlashSaleProducts: Returning", enhancedProducts.length, "enhanced products")
     return enhancedProducts
   } catch (error) {
-    console.error("[SSR] Error fetching flash sale products:", error)
+    console.error("[v0] getFlashSaleProducts: Critical error:", error)
     return []
   }
 }
 
 export async function getFlashSaleEvent(): Promise<FlashSaleEvent> {
+  console.log("[v0] getFlashSaleEvent: Fetching event data")
+
   try {
     const response = await fetch(`${API_BASE_URL}/api/flash-sale/event`, {
       next: {
@@ -217,31 +365,33 @@ export async function getFlashSaleEvent(): Promise<FlashSaleEvent> {
       },
     })
 
+    console.log("[v0] getFlashSaleEvent: Response status:", response.status)
+
     if (response.ok) {
       const data = await response.json()
+      console.log("[v0] getFlashSaleEvent: Got event data:", {
+        id: data.id,
+        name: data.name,
+        time_remaining: data.time_remaining,
+        is_live: data.is_live,
+      })
       return data
     }
   } catch (error) {
-    console.error("[SSR] Error fetching flash sale event:", error)
+    console.error("[v0] getFlashSaleEvent: Error:", error)
   }
 
+  console.log("[v0] getFlashSaleEvent: Using default event")
   return getDefaultEvent()
 }
 
 export async function getFlashSaleData(limit = 50): Promise<FlashSaleData> {
   const [products, event] = await Promise.all([getFlashSaleProducts(limit), getFlashSaleEvent()])
 
+  console.log("[v0] getFlashSaleData: Final result -", products.length, "products, event:", event?.name)
+
   return {
     products,
     event,
   }
-}
-
-/**
- * Server-side function to fetch inventory for products
- */
-export async function getProductsInventory(productIds: string[]): Promise<Record<string, number>> {
-  if (!productIds.length) return {}
-  const inventory: Record<string, number> = {}
-  return inventory
 }

@@ -3,80 +3,33 @@
 import React, { useState, useEffect } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
+import type { ContactCTASlide } from "@/lib/server/get-carousel-data"
 
-interface SlideData {
-  id: number
-  subtitle: string
-  image: string
-  gradient: string
-  accent_color: string
+const DEFAULT_SLIDES: ContactCTASlide[] = [
+  {
+    id: 1,
+    subtitle: "Best Deals Await!",
+    image: "/images/contact-cta.jpg",
+    gradient: "from-cherry-600 to-cherry-800",
+    accent_color: "text-yellow-300",
+  },
+  {
+    id: 2,
+    subtitle: "Shop Now & Save!",
+    image: "/images/contact-cta-2.jpg",
+    gradient: "from-amber-600 to-orange-700",
+    accent_color: "text-white",
+  },
+]
+
+interface ContactCTAProps {
+  slides?: ContactCTASlide[]
 }
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
-const CACHE_KEY = "contact_cta_slides_cache"
-const CACHE_DURATION = 24 * 60 * 60 * 1000 // 24 hours
-
-const getFromLocalStorage = (): SlideData[] | null => {
-  if (typeof window === "undefined") return null
-  try {
-    const cached = localStorage.getItem(CACHE_KEY)
-    if (cached) {
-      const { data, timestamp } = JSON.parse(cached)
-      if (Date.now() - timestamp < CACHE_DURATION && data?.length > 0) {
-        return data
-      }
-    }
-  } catch (error) {
-    console.error("Failed to read from localStorage:", error)
-  }
-  return null
-}
-
-const saveToLocalStorage = (data: SlideData[]) => {
-  if (typeof window === "undefined") return
-  try {
-    localStorage.setItem(CACHE_KEY, JSON.stringify({ data, timestamp: Date.now() }))
-  } catch (error) {
-    console.error("Failed to save to localStorage:", error)
-  }
-}
-
-export const ContactCTA = React.memo(() => {
-  const [slides, setSlides] = useState<SlideData[]>(() => {
-    if (typeof window !== "undefined") {
-      return getFromLocalStorage() || []
-    }
-    return []
-  })
+export const ContactCTA = React.memo(({ slides: serverSlides }: ContactCTAProps) => {
+  const slides = serverSlides && serverSlides.length > 0 ? serverSlides : DEFAULT_SLIDES
   const [currentSlide, setCurrentSlide] = useState(0)
   const [direction, setDirection] = useState(1)
-  const [isHydrated, setIsHydrated] = useState(false)
-
-  useEffect(() => {
-    const cachedData = getFromLocalStorage()
-    if (cachedData && cachedData.length > 0) {
-      setSlides(cachedData)
-    }
-    setIsHydrated(true)
-
-    // Background fetch to update cache
-    const fetchSlides = async () => {
-      try {
-        const response = await fetch(`${API_BASE_URL}/api/contact-cta/slides`)
-        if (response.ok) {
-          const data = await response.json()
-          if (data.slides && data.slides.length > 0) {
-            setSlides(data.slides)
-            saveToLocalStorage(data.slides)
-          }
-        }
-      } catch (error) {
-        console.error("Failed to fetch CTA slides:", error)
-      }
-    }
-
-    fetchSlides()
-  }, [])
 
   useEffect(() => {
     if (slides.length === 0) return
@@ -88,7 +41,7 @@ export const ContactCTA = React.memo(() => {
     return () => clearInterval(interval)
   }, [slides.length])
 
-  if (!isHydrated || slides.length === 0) return null
+  if (slides.length === 0) return null
 
   const currentPromo = slides[currentSlide]
 

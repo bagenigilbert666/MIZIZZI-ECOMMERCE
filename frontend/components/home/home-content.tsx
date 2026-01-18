@@ -14,6 +14,14 @@ import { DailyFinds } from "@/components/features/daily-finds"
 import { ProductGrid } from "@/components/products/product-grid"
 import { BrandShowcase } from "@/components/features/brand-showcase"
 import type { Product } from "@/types"
+import type { Category } from "@/lib/server/get-categories"
+import type {
+  CarouselItem,
+  PremiumExperience,
+  ContactCTASlide,
+  FeatureCard,
+  ProductShowcaseCategory,
+} from "@/lib/server/get-carousel-data"
 
 interface HomeContentProps {
   flashSaleProducts: Product[]
@@ -24,6 +32,12 @@ interface HomeContentProps {
   dailyFinds: Product[]
   allProducts: Product[]
   allProductsHasMore: boolean
+  categories?: Category[]
+  carouselItems?: CarouselItem[]
+  premiumExperiences?: PremiumExperience[]
+  contactCTASlides?: ContactCTASlide[]
+  featureCards?: FeatureCard[]
+  productShowcase?: ProductShowcaseCategory[]
 }
 
 export function HomeContent({
@@ -35,6 +49,12 @@ export function HomeContent({
   dailyFinds,
   allProducts,
   allProductsHasMore,
+  categories = [],
+  carouselItems = [],
+  premiumExperiences = [],
+  contactCTASlides = [],
+  featureCards = [],
+  productShowcase = [],
 }: HomeContentProps) {
   return (
     <>
@@ -42,12 +62,18 @@ export function HomeContent({
         <NetworkStatus className="mx-auto w-full max-w-[1200px] px-1 sm:px-2 md:px-4 pt-2" />
 
         <div className="w-full mt-2 sm:mt-3 sm:py-2" style={{ backgroundColor: "var(--color-background)" }}>
-          <Carousel />
+          <Carousel
+            carouselItems={carouselItems}
+            premiumExperiences={premiumExperiences}
+            contactCTASlides={contactCTASlides}
+            featureCards={featureCards}
+            productShowcase={productShowcase}
+          />
         </div>
 
         <div className="mx-auto w-full max-w-[1200px] px-0 sm:px-3 md:px-4 mt-3 sm:mt-4">
           <div className="mb-3 sm:rounded-lg bg-white overflow-hidden shadow-sm">
-            <CategoryGrid />
+            <CategoryGrid categories={categories} />
           </div>
         </div>
 

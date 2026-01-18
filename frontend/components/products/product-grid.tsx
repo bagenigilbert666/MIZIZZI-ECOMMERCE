@@ -1,13 +1,27 @@
 "use client"
-import { useState, useCallback, memo } from "react"
+import { useState, useEffect, useCallback, memo } from "react"
 import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
 import Link from "next/link"
 import { productService } from "@/services/product"
 import { ShoppingBag, Star } from "lucide-react"
 import type { Product } from "@/types"
+import { cloudinaryService } from "@/services/cloudinary-service"
 
-const StarRating = ({ rating = 4 }: { rating?: number }) => {
+const LogoPlaceholder = () => (
+  <div className="absolute inset-0 flex items-center justify-center bg-white">
+    <motion.div
+      initial={{ scale: 0.9, opacity: 0 }}
+      animate={{ scale: 1, opacity: 1 }}
+      transition={{ duration: 0.3, ease: "easeOut" }}
+      className="relative h-6 w-6 sm:h-8 sm:w-8"
+    >
+      <Image src="/logo.png" alt="Loading" fill className="object-contain" />
+    </motion.div>
+  </div>
+)
+
+const StarRating = ({ rating = 4, reviewCount = 0 }: { rating?: number; reviewCount?: number }) => {
   return (
     <div className="flex items-center gap-0.5 sm:gap-1">
       <div className="flex">
@@ -24,91 +38,181 @@ const StarRating = ({ rating = 4 }: { rating?: number }) => {
           />
         ))}
       </div>
+      {reviewCount > 0 && (
+        <span className="text-[8px] sm:text-[10px] md:text-xs text-gray-400">({reviewCount.toLocaleString()})</span>
+      )}
     </div>
   )
 }
 
-const ProductCard = memo(
-  ({ product, index, isNewlyLoaded = false }: { product: Product; index: number; isNewlyLoaded?: boolean }) => {
-    const discountPercentage = product.sale_price
-      ? Math.round(((product.price - product.sale_price) / product.price) * 100)
-      : 0
-
-    const imageUrl =
-      (product.image_urls && product.image_urls[0]) || product.thumbnail_url || "/diverse-fashion-display.png"
-
-    const rating = product.rating || 3 + Math.random() * 2
-
-    const cardVariants = {
-      hidden: {
-        opacity: 0,
-        y: 30,
-        scale: 0.95,
-      },
-      visible: {
-        opacity: 1,
-        y: 0,
-        scale: 1,
-        transition: {
-          type: "spring",
-          stiffness: 100,
-          damping: 15,
-          delay: isNewlyLoaded ? index * 0.05 : index * 0.02,
-        },
-      },
+function getProductImageUrl(product: Product): string {
+  // Priority 1: Use thumbnail_url if available
+  if (product.thumbnail_url) {
+    const url = String(product.thumbnail_url)
+    // If it's a full URL, return as-is
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      return url
     }
+    // If it's a Cloudinary public ID or path, optimize it
+    if (url.length > 0 && !url.includes("placeholder")) {
+      return cloudinaryService.generateOptimizedUrl(url, {
+        width: 500,
+        height: 500,
+        crop: "fill",
+        quality: "auto",
+        format: "auto",
+      })
+    }
+  }
 
-    return (
-      <Link href={`/product/${product.slug || product.id}`} prefetch={false}>
-        <motion.div
-          variants={cardVariants}
-          initial="hidden"
-          animate="visible"
-          whileHover={{ y: -8 }}
-          className="h-full"
-        >
-          <div className="group h-full overflow-hidden bg-white border border-gray-100 rounded-lg transition-all duration-300 hover:shadow-lg">
-            <div className="relative aspect-square overflow-hidden bg-[#f8f8f8]">
-              <Image
-                src={imageUrl || "/placeholder.svg"}
-                alt={product.name}
-                fill
-                sizes="(max-width: 640px) 33vw, (max-width: 1024px) 25vw, 16vw"
-                className="object-cover transition-transform duration-300 group-hover:scale-105"
-                loading="lazy"
-              />
+  // Priority 2: Check image_urls array
+  if (product.image_urls && Array.isArray(product.image_urls) && product.image_urls.length > 0) {
+    const firstUrl = String(product.image_urls[0])
+    if (firstUrl.startsWith("http://") || firstUrl.startsWith("https://")) {
+      return firstUrl
+    }
+    if (firstUrl.length > 0 && !firstUrl.includes("placeholder")) {
+      return cloudinaryService.generateOptimizedUrl(firstUrl, {
+        width: 500,
+        height: 500,
+        crop: "fill",
+        quality: "auto",
+        format: "auto",
+      })
+    }
+  }
 
-              {product.sale_price && discountPercentage > 0 && (
-                <div className="absolute top-0.5 left-0.5 sm:top-1 sm:left-1 bg-[#8B1538] text-white text-[8px] sm:text-[10px] md:text-xs font-medium px-1 sm:px-1.5 py-0.5 rounded-sm z-20">
-                  -{discountPercentage}%
-                </div>
+  // Priority 3: Check images array with URL objects
+  if ((product as any).images && Array.isArray((product as any).images) && (product as any).images.length > 0) {
+    const firstImg = (product as any).images[0]
+    if (firstImg) {
+      // Handle both {url: string} and direct string formats
+      const imgUrl = typeof firstImg === "string" ? firstImg : firstImg.url || firstImg.secure_url
+      if (imgUrl) {
+        const urlString = String(imgUrl)
+        if (urlString.startsWith("http://") || urlString.startsWith("https://")) {
+          return urlString
+        }
+        if (urlString.length > 0 && !urlString.includes("placeholder")) {
+          return cloudinaryService.generateOptimizedUrl(urlString, {
+            width: 500,
+            height: 500,
+            crop: "fill",
+            quality: "auto",
+            format: "auto",
+          })
+        }
+      }
+    }
+  }
+
+  return "/modern-tech-product.png"
+}
+
+const ProductCard = memo(({ product, index }: { product: Product; index: number }) => {
+  const [imageLoaded, setImageLoaded] = useState(false)
+  const [imageError, setImageError] = useState(false)
+  const [showPlaceholder, setShowPlaceholder] = useState(true)
+
+  const discountPercentage = product.sale_price
+    ? Math.round(((product.price - product.sale_price) / product.price) * 100)
+    : 0
+
+  const handleImageLoad = useCallback(() => {
+    setImageLoaded(true)
+    setTimeout(() => setShowPlaceholder(false), 300)
+  }, [])
+
+  const handleImageError = useCallback(() => {
+    setImageError(true)
+    setImageLoaded(false)
+  }, [])
+
+  useEffect(() => {
+    setImageLoaded(false)
+    setImageError(false)
+    setShowPlaceholder(true)
+  }, [product.id])
+
+  const imageUrl = getProductImageUrl(product)
+  const rating = product.rating || 3 + Math.random() * 2
+  const reviewCount = product.review_count || Math.floor(Math.random() * 5000) + 100
+
+  return (
+    <Link href={`/product/${product.slug || product.id}`} prefetch={false}>
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, delay: index * 0.02 }}
+        whileHover={{ y: -2 }}
+        className="h-full"
+      >
+        <div className="group h-full overflow-hidden bg-white border-b border-r border-gray-100 transition-all duration-200 hover:shadow-sm">
+          <div className="relative aspect-square overflow-hidden bg-[#f8f8f8]">
+            <AnimatePresence>
+              {(showPlaceholder || imageError) && (
+                <motion.div
+                  initial={{ opacity: 1 }}
+                  exit={{ opacity: 0, transition: { duration: 0.3 } }}
+                  className="absolute inset-0 z-10"
+                >
+                  <LogoPlaceholder />
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {!imageError && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: imageLoaded ? 1 : 0 }}
+                transition={{ duration: 0.3 }}
+                className="absolute inset-0"
+              >
+                <Image
+                  src={imageUrl || "/placeholder.svg"}
+                  alt={product.name}
+                  fill
+                  sizes="(max-width: 640px) 33vw, (max-width: 1024px) 25vw, 16vw"
+                  className="object-cover transition-transform duration-300 group-hover:scale-105"
+                  loading="lazy"
+                  onLoad={handleImageLoad}
+                  onError={handleImageError}
+                  crossOrigin="anonymous"
+                  quality={75}
+                />
+              </motion.div>
+            )}
+
+            {product.sale_price && discountPercentage > 0 && (
+              <div className="absolute top-0.5 left-0.5 sm:top-1 sm:left-1 bg-[#8B1538] text-white text-[8px] sm:text-[10px] md:text-xs font-medium px-1 sm:px-1.5 py-0.5 rounded-sm z-20">
+                -{discountPercentage}%
+              </div>
+            )}
+          </div>
+
+          <div className="p-1.5 sm:p-2 md:p-3">
+            <h3 className="text-gray-800 text-[10px] sm:text-xs md:text-sm line-clamp-2 leading-tight mb-1 sm:mb-1.5 min-h-[24px] sm:min-h-[32px] md:min-h-[40px]">
+              {product.name}
+            </h3>
+
+            <div className="mb-1 sm:mb-1.5">
+              <span className="font-semibold text-[#8B1538] text-[11px] sm:text-sm md:text-base">
+                KSh {(product.sale_price || product.price).toLocaleString()}
+              </span>
+              {product.sale_price && (
+                <span className="text-gray-400 line-through ml-1 sm:ml-1.5 text-[8px] sm:text-[10px] md:text-xs">
+                  KSh {product.price.toLocaleString()}
+                </span>
               )}
             </div>
 
-            <div className="p-1.5 sm:p-2 md:p-3">
-              <h3 className="text-gray-800 text-[10px] sm:text-xs md:text-sm line-clamp-2 leading-tight mb-1 sm:mb-1.5 min-h-[24px] sm:min-h-[32px] md:min-h-[40px]">
-                {product.name}
-              </h3>
-
-              <div className="mb-1 sm:mb-1.5">
-                <span className="font-semibold text-[#8B1538] text-[11px] sm:text-sm md:text-base">
-                  KSh {(product.sale_price || product.price).toLocaleString()}
-                </span>
-                {product.sale_price && (
-                  <span className="text-gray-400 line-through ml-1 sm:ml-1.5 text-[8px] sm:text-[10px] md:text-xs">
-                    KSh {product.price.toLocaleString()}
-                  </span>
-                )}
-              </div>
-
-              <StarRating rating={rating} />
-            </div>
+            <StarRating rating={rating} reviewCount={reviewCount} />
           </div>
-        </motion.div>
-      </Link>
-    )
-  },
-)
+        </div>
+      </motion.div>
+    </Link>
+  )
+})
 
 ProductCard.displayName = "ProductCard"
 
@@ -125,10 +229,9 @@ export function ProductGrid({ initialProducts = [], initialHasMore = true, limit
   const [error, setError] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(initialHasMore)
-  const [newlyLoadedStartIndex, setNewlyLoadedStartIndex] = useState<number | null>(null)
 
-  const fetchMoreProducts = useCallback(
-    async (pageNum: number) => {
+  const fetchProducts = useCallback(
+    async (pageNum = 1, append = false) => {
       try {
         setLoadingMore(true)
         setError(null)
@@ -139,15 +242,16 @@ export function ProductGrid({ initialProducts = [], initialHasMore = true, limit
           page: pageNum,
         })
 
-        setProducts((prev) => {
-          setNewlyLoadedStartIndex(prev.length)
-          return [...prev, ...(data || [])]
-        })
+        if (append) {
+          setProducts((prev) => [...prev, ...(data || [])])
+        } else {
+          setProducts(data || [])
+        }
 
         setHasMore((data || []).length >= limit)
       } catch (err) {
-        console.error("Error fetching more products:", err)
-        setError("Failed to load more products")
+        console.error("Error fetching products:", err)
+        setError("Failed to load products")
       } finally {
         setLoadingMore(false)
       }
@@ -158,14 +262,35 @@ export function ProductGrid({ initialProducts = [], initialHasMore = true, limit
   const handleShowMore = async () => {
     const nextPage = page + 1
     setPage(nextPage)
-    await fetchMoreProducts(nextPage)
+    await fetchProducts(nextPage, true)
   }
 
-  if (error && products.length === 0) {
+  useEffect(() => {
+    const handleProductImagesUpdated = () => {
+      setProducts([])
+      setPage(1)
+      setTimeout(() => {
+        fetchProducts(1, false)
+      }, 300)
+    }
+
+    window.addEventListener("productImagesUpdated", handleProductImagesUpdated as EventListener)
+    return () => {
+      window.removeEventListener("productImagesUpdated", handleProductImagesUpdated as EventListener)
+    }
+  }, [fetchProducts])
+
+  if (error) {
     return (
       <div className="bg-red-50 p-4 rounded-md text-[#8B1538] text-center">
         <ShoppingBag className="h-8 w-8 mx-auto mb-2 text-[#8B1538]" />
         <p className="mb-2">{error}</p>
+        <button
+          onClick={() => fetchProducts()}
+          className="px-4 py-2 bg-[#8B1538] text-white rounded-md hover:bg-[#6d1029] transition-colors text-sm"
+        >
+          Try Again
+        </button>
       </div>
     )
   }
@@ -183,14 +308,7 @@ export function ProductGrid({ initialProducts = [], initialHasMore = true, limit
     <div className="flex flex-col">
       <div className="grid grid-cols-3 gap-[1px] bg-gray-100 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
         {products.map((product, index) => (
-          <ProductCard
-            key={`${product.id}-${index}`}
-            product={product}
-            index={
-              newlyLoadedStartIndex !== null && index >= newlyLoadedStartIndex ? index - newlyLoadedStartIndex : index
-            }
-            isNewlyLoaded={newlyLoadedStartIndex !== null && index >= newlyLoadedStartIndex}
-          />
+          <ProductCard key={`${product.id}-${index}`} product={product} index={index} />
         ))}
       </div>
 

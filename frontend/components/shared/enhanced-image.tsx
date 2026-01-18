@@ -29,7 +29,7 @@ export function EnhancedImage({
   height = 500,
   className,
   priority = false,
-  quality = 85,
+  quality = 75,
   objectFit = "cover",
   placeholder = "empty",
   blurDataURL,
@@ -51,10 +51,7 @@ export function EnhancedImage({
   const isBlobUrl = src && src.startsWith("blob:")
 
   const handleError = () => {
-    console.log(`[v0] Image load error for: ${safeSrc}`)
-
     if (isBlobUrl) {
-      console.warn(`[v0] Blob URL failed to load: ${safeSrc}`)
       setError(true)
       if (onError) onError()
       return
@@ -63,13 +60,11 @@ export function EnhancedImage({
     // For regular URLs, implement retry logic
     if (retryCount < 3) {
       const timeout = Math.pow(2, retryCount) * 1000
-      console.warn(`[v0] Image load error, retrying in ${timeout}ms: ${safeSrc}`)
 
       setTimeout(() => {
         setRetryCount(retryCount + 1)
       }, timeout)
     } else {
-      console.error(`[v0] Failed to load image after ${retryCount} retries: ${safeSrc}`)
       setError(true)
       if (onError) onError()
     }
