@@ -50,25 +50,20 @@ export function usePullToRefresh({
     const container = containerRef.current
     if (!container) return
 
-    let isAtTop = false
-
     const handleTouchStart = (e: TouchEvent) => {
-      const scrollableElement = container
-      isAtTop = scrollableElement.scrollTop === 0
-      
-      if (isAtTop) {
-        startY.current = e.touches[0].pageY
-      }
+      // Allow pull to refresh from anywhere on the page
+      startY.current = e.touches[0].pageY
     }
 
     const handleTouchMove = (e: TouchEvent) => {
-      if (!isAtTop || isRefreshing) return
+      if (isRefreshing) return
 
       const currentY = e.touches[0].pageY
       const distance = currentY - startY.current
 
+      // Only trigger when pulling down (positive distance)
       if (distance > 0) {
-        // Prevent default scrolling when pulling down at the top
+        // Prevent default scrolling when pulling down
         e.preventDefault()
         
         setIsPulling(true)
