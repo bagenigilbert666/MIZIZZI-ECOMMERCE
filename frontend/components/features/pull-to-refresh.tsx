@@ -16,15 +16,10 @@ export function PullToRefresh({
   threshold = 80,
   className = "",
 }: PullToRefreshProps) {
-  const router = useRouter()
-
   const handleRefresh = useCallback(async () => {
-    // Refresh the page data
-    router.refresh()
-    
-    // Wait for the refresh to complete
-    await new Promise((resolve) => setTimeout(resolve, 500))
-  }, [router])
+    // Reload the entire page
+    window.location.reload()
+  }, [])
 
   const { isPulling, isRefreshing, pullDistance, shouldTriggerRefresh } = usePullToRefresh({
     onRefresh: handleRefresh,
@@ -51,29 +46,41 @@ export function PullToRefresh({
       }}
     >
       <div
-        className="flex items-center justify-center w-12 h-12 rounded-full bg-white shadow-lg"
+        className="relative flex items-center justify-center w-14 h-14 rounded-full shadow-lg"
         style={{
+          background: "linear-gradient(135deg, #DC143C 0%, #8B1538 100%)",
           opacity,
           transform: `scale(${scale})`,
           transition: isPulling ? "none" : "all 0.3s cubic-bezier(0.4, 0, 0.2, 1)",
+          boxShadow: "0 4px 12px rgba(220, 20, 60, 0.3), 0 2px 4px rgba(0, 0, 0, 0.1)",
         }}
       >
+        {/* Inner glow effect */}
+        <div 
+          className="absolute inset-0 rounded-full"
+          style={{
+            background: "radial-gradient(circle at center, rgba(255, 255, 255, 0.3) 0%, transparent 70%)",
+          }}
+        />
+        
         {isRefreshing ? (
-          <Loader2 className="w-6 h-6 text-[#8B1538] animate-spin" />
+          <Loader2 className="w-7 h-7 text-white animate-spin relative z-10" />
         ) : shouldTriggerRefresh ? (
           <RefreshCw 
-            className="w-6 h-6 text-[#8B1538]"
+            className="w-7 h-7 text-white relative z-10"
             style={{
               transform: `rotate(${rotation}deg)`,
               transition: "transform 0.1s linear",
+              filter: "drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2))",
             }}
           />
         ) : (
           <ArrowDown
-            className="w-6 h-6 text-[#8B1538]"
+            className="w-7 h-7 text-white relative z-10"
             style={{
               transform: `translateY(${progress * 4}px)`,
               transition: "transform 0.1s linear",
+              filter: "drop-shadow(0 1px 2px rgba(0, 0, 0, 0.2))",
             }}
           />
         )}
