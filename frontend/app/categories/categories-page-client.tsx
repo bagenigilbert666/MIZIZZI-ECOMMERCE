@@ -1,4 +1,4 @@
- "use client"
+"use client"
 import { useState, useMemo, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Search, X, Grid3X3 } from "lucide-react"
@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input"
 import { Loader } from "@/components/ui/loader"
 import { categoryService, type Category } from "@/services/category"
 import { websocketService } from "@/services/websocket"
-import { CategoryBanner } from "@/components/categories/category-banner"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import useSWR from "swr"
 
@@ -218,6 +217,40 @@ export default function CategoriesPageClient({ allCategories: initialCategories 
     )
   }
 
+  // New: single improved hero banner placed inside the component so it can use local state
+  const HeroBanner = () => (
+    <div className="w-full rounded-2xl overflow-hidden bg-gradient-to-r from-white via-neutral-50 to-neutral-100 shadow-sm">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-5 sm:p-6">
+        <div className="flex items-center gap-4">
+          <div className="flex-shrink-0 h-12 w-12 rounded-lg bg-neutral-900 text-white flex items-center justify-center">
+            <Grid3X3 className="h-6 w-6" />
+          </div>
+          <div>
+            <h2 className="text-lg sm:text-xl font-semibold text-neutral-900">Shop by category</h2>
+            <p className="text-sm text-neutral-500">Explore curated categories to find products you’ll love.</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => {
+              setSearchQuery("")
+              // smooth scroll to categories grid for better UX
+              if (typeof window !== "undefined") {
+                const el = document.querySelector("[data-categories-grid]")
+                if (el) el.scrollIntoView({ behavior: "smooth", block: "start" })
+              }
+            }}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-neutral-900 text-white text-sm font-medium hover:opacity-95 transition"
+          >
+            Browse all
+          </button>
+          <span className="hidden sm:inline text-sm text-neutral-500">{/* optional small note */}</span>
+        </div>
+      </div>
+    </div>
+  )
+
   return (
     <div className="min-h-screen bg-neutral-50">
       <div className="container py-6 px-4 sm:px-6 lg:px-8">
@@ -251,8 +284,9 @@ export default function CategoriesPageClient({ allCategories: initialCategories 
           </div>
         </div>
 
+        {/* Replaced old CategoryBanner with new single HeroBanner */}
         <div className="mb-8">
-          <CategoryBanner />
+          <HeroBanner />
         </div>
 
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
@@ -288,7 +322,7 @@ export default function CategoriesPageClient({ allCategories: initialCategories 
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-3 gap-1 sm:gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7">
+          <div data-categories-grid className="grid grid-cols-3 gap-1 sm:gap-2 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 xl:grid-cols-7">
             <AnimatePresence mode="popLayout">
               {filteredCategories.map((category, index) => (
                 <motion.div
