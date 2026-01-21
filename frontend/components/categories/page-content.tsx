@@ -1,42 +1,17 @@
 "use client"
+
 import { useState, useMemo, useCallback, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Search, X, Grid3X3 } from "lucide-react"
 import { motion, AnimatePresence } from "framer-motion"
 import Image from "next/image"
 import { Input } from "@/components/ui/input"
-import { Loader } from "@/components/ui/loader"
-import { categoryService, type Category } from "@/services/category"
-import { websocketService } from "@/services/websocket"
+import type { Category } from "@/services/category"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import useSWR from "swr"
+import { CategoriesBannerCarousel } from "@/components/categories/banner-carousel"
 
-const CATEGORIES_STORAGE_KEY = "mizizzi_all_categories_cache"
-
-const getCachedCategories = (): Category[] => {
-  if (typeof window === "undefined") return []
-  try {
-    const cached = localStorage.getItem(CATEGORIES_STORAGE_KEY)
-    if (cached) return JSON.parse(cached)
-  } catch (e) {}
-  return []
-}
-
-const setCachedCategories = (categories: Category[]) => {
-  if (typeof window === "undefined") return
-  try {
-    localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(categories))
-  } catch (e) {}
-}
-
-const categoriesFetcher = async (): Promise<Category[]> => {
-  const data = await categoryService.getCategories()
-  setCachedCategories(data)
-  return data
-}
-
-interface CategoriesPageClientProps {
-  allCategories: Category[]
+interface CategoriesPageContentProps {
+  categories: Category[]
 }
 
 const LogoPlaceholder = () => (
@@ -71,22 +46,18 @@ const CategoryImage = ({
   const [imageError, setImageError] = useState(false)
   const [showPlaceholder, setShowPlaceholder] = useState(true)
 
-  // Handle image load success
   const handleImageLoad = () => {
     setImageLoaded(true)
-    // Add a small delay to show the smooth transition
     setTimeout(() => {
       setShowPlaceholder(false)
     }, 300)
   }
 
-  // Handle image load error
   const handleImageError = () => {
     setImageError(true)
     setImageLoaded(false)
   }
 
-  // Reset states when src changes
   useEffect(() => {
     setImageLoaded(false)
     setImageError(false)
@@ -103,7 +74,6 @@ const CategoryImage = ({
 
   return (
     <div className="w-full h-full relative bg-white">
-      {/* Logo placeholder shown while loading - same as flash sales */}
       <AnimatePresence>
         {(showPlaceholder || imageError) && (
           <motion.div
@@ -120,7 +90,6 @@ const CategoryImage = ({
         )}
       </AnimatePresence>
 
-      {/* Actual image with fade-in effect */}
       <motion.div
         initial={{ opacity: 0, scale: 1.1 }}
         animate={{
@@ -145,98 +114,28 @@ const CategoryImage = ({
   )
 }
 
-// New single banner component
-const ShopByCategoriesBanner = () => {
-  return (
-    <div className="w-full rounded-2xl overflow-hidden bg-gradient-to-r from-sky-50 via-white to-rose-50 border border-neutral-100 shadow-sm">
-      <div className="container px-4 py-8 sm:py-10 lg:py-12 flex flex-col sm:flex-row items-center gap-6">
-        <div className="flex-1 min-w-0">
-          <h2 className="text-2xl sm:text-3xl font-semibold text-neutral-900">
-            Shop by Categories
-          </h2>
-          <p className="mt-2 text-sm text-neutral-600 max-w-xl">
-            Find the perfect product faster — browse curated categories to discover top items, latest arrivals, and staff picks.
-          </p>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <button
-              onClick={() => {
-                // lightweight client navigation hint; real behavior remains unchanged
-                if (typeof window !== "undefined") window.scrollTo({ top: document.body.scrollHeight / 6, behavior: "smooth" })
-              }}
-              className="inline-flex items-center gap-2 px-4 py-2 bg-neutral-900 text-white text-sm rounded-full shadow-sm hover:bg-neutral-800 transition"
-            >
-              Browse categories
-            </button>
-            <button
-              onClick={() => {
-                if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" })
-              }}
-              className="inline-flex items-center gap-2 px-4 py-2 border border-neutral-200 text-sm rounded-full text-neutral-700 bg-white hover:bg-neutral-50 transition"
-            >
-              Back to top
-            </button>
-          </div>
-        </div>
-
-        <div className="w-36 h-36 sm:w-44 sm:h-44 relative flex-shrink-0">
-          <Image
-            src="/images/categories-hero.png"
-            alt="Shop by categories"
-            fill
-            className="object-contain"
-            priority
-          />
-        </div>
-      </div>
-    </div>
-  )
-}
-
-export default function CategoriesPageClient({ allCategories: initialCategories }: CategoriesPageClientProps) {
+export function CategoriesPageContent({ categories: initialCategories }: CategoriesPageContentProps) {
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
   const [sortBy, setSortBy] = useState("name")
 
-  const { data: categories = [], isLoading } = useSWR<Category[]>("all-categories-page", categoriesFetcher, {
-    fallbackData: initialCategories.length > 0 ? initialCategories : getCachedCategories(),
-    revalidateOnFocus: false,
-    dedupingInterval: 60000,
-    keepPreviousData: true,
-    revalidateIfStale: true,
-  })
-
   useEffect(() => {
-    if (categories.length > 0) {
-      const imagesToPreload = categories.slice(0, 14)
+    if (initialCategories.length > 0) {
+      const imagesToPreload = initialCategories.slice(0, 14)
       imagesToPreload.forEach((cat) => {
         if (cat.image_url) {
-          if (typeof window !== "undefined") {
-            const img = new window.Image()
-            img.src = cat.image_url
-          }
+          const img =
+            typeof window !== "undefined" && window.Image
+              ? new window.Image()
+              : ({ src: cat.image_url } as HTMLImageElement)
+          img.src = cat.image_url
         }
       })
     }
-  }, [categories])
-
-  // Subscribe to websocket events
-  useEffect(() => {
-    const handleCategoryUpdate = async () => {
-      categoryService.clearCache()
-      localStorage.removeItem(CATEGORIES_STORAGE_KEY)
-    }
-
-    const unsub1 = websocketService.on("category_updated", handleCategoryUpdate)
-    const unsub2 = websocketService.on("category_created", handleCategoryUpdate)
-
-    return () => {
-      unsub1()
-      unsub2()
-    }
-  }, [])
+  }, [initialCategories])
 
   const filteredCategories = useMemo(() => {
-    return categories
+    return initialCategories
       .filter(
         (category) =>
           category.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -247,7 +146,7 @@ export default function CategoriesPageClient({ allCategories: initialCategories 
         if (sortBy === "products") return (b.products_count || 0) - (a.products_count || 0)
         return 0
       })
-  }, [categories, searchQuery, sortBy])
+  }, [initialCategories, searchQuery, sortBy])
 
   const handleCategoryClick = useCallback(
     (category: Category) => {
@@ -256,18 +155,16 @@ export default function CategoriesPageClient({ allCategories: initialCategories 
     [router],
   )
 
-  if (isLoading && categories.length === 0) {
-    return (
-      <div className="flex justify-center py-32">
-        <Loader />
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-neutral-50">
       <div className="container py-6 px-4 sm:px-6 lg:px-8">
-        <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        {/* Page Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4"
+        >
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
               <h1 className="text-2xl sm:text-3xl font-semibold text-neutral-900 tracking-tight">Categories</h1>
@@ -295,13 +192,12 @@ export default function CategoriesPageClient({ allCategories: initialCategories 
               </button>
             )}
           </div>
-        </div>
+        </motion.div>
 
-        <div className="mb-8">
-          {/* Replaced previous banner with a single improved banner */}
-          <ShopByCategoriesBanner />
-        </div>
+        {/* Premium Banner Carousel */}
+        <CategoriesBannerCarousel />
 
+        {/* Filters */}
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-neutral-500">
             <span className="font-medium text-neutral-900">{filteredCategories.length}</span> categories available
@@ -317,6 +213,7 @@ export default function CategoriesPageClient({ allCategories: initialCategories 
           </Select>
         </div>
 
+        {/* Categories Grid */}
         {filteredCategories.length === 0 ? (
           <div className="bg-white rounded-2xl p-10 text-center shadow-sm">
             <div className="w-16 h-16 bg-neutral-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -344,7 +241,7 @@ export default function CategoriesPageClient({ allCategories: initialCategories 
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10 }}
-                  transition={{ duration: 0.15, delay: Math.min(index * 0.005, 0.1) }} // Even faster animations
+                  transition={{ duration: 0.15, delay: Math.min(index * 0.005, 0.1) }}
                 >
                   <div
                     onClick={() => handleCategoryClick(category)}

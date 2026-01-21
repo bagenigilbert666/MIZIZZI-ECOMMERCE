@@ -134,7 +134,11 @@ export async function getFlashSaleProducts(limit = 50): Promise<FlashSaleProduct
     console.log("[v0] getFlashSaleProducts: Trying dedicated endpoint:", flashSaleEndpoint)
 
     try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+
       const response = await fetch(flashSaleEndpoint, {
+        signal: controller.signal,
         next: {
           revalidate: 60,
           tags: ["flash-sales"],
@@ -143,6 +147,8 @@ export async function getFlashSaleProducts(limit = 50): Promise<FlashSaleProduct
           "Content-Type": "application/json",
         },
       })
+
+      clearTimeout(timeoutId)
 
       console.log("[v0] getFlashSaleProducts: Dedicated endpoint status:", response.status)
 
@@ -231,7 +237,11 @@ export async function getFlashSaleProducts(limit = 50): Promise<FlashSaleProduct
     console.log("[v0] getFlashSaleProducts: Trying featured endpoint:", featuredEndpoint)
 
     try {
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+
       const response = await fetch(featuredEndpoint, {
+        signal: controller.signal,
         next: {
           revalidate: 60,
           tags: ["flash-sales"],
@@ -240,6 +250,8 @@ export async function getFlashSaleProducts(limit = 50): Promise<FlashSaleProduct
           "Content-Type": "application/json",
         },
       })
+
+      clearTimeout(timeoutId)
 
       console.log("[v0] getFlashSaleProducts: Featured endpoint status:", response.status)
 
@@ -328,7 +340,11 @@ export async function getFlashSaleProducts(limit = 50): Promise<FlashSaleProduct
     for (const url of urls) {
       console.log("[v0] getFlashSaleProducts: Trying fallback URL:", url)
       try {
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+
         const response = await fetch(url, {
+          signal: controller.signal,
           next: {
             revalidate: 60,
             tags: ["flash-sales"],
@@ -337,6 +353,8 @@ export async function getFlashSaleProducts(limit = 50): Promise<FlashSaleProduct
             "Content-Type": "application/json",
           },
         })
+
+        clearTimeout(timeoutId)
 
         if (response.ok) {
           const data = await response.json()
@@ -426,7 +444,11 @@ export async function getFlashSaleEvent(): Promise<FlashSaleEvent> {
   console.log("[v0] getFlashSaleEvent: Fetching event data")
 
   try {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+
     const response = await fetch(`${API_BASE_URL}/api/flash-sale/event`, {
+      signal: controller.signal,
       next: {
         revalidate: 30,
         tags: ["flash-sale-event"],
@@ -435,6 +457,8 @@ export async function getFlashSaleEvent(): Promise<FlashSaleEvent> {
         "Content-Type": "application/json",
       },
     })
+
+    clearTimeout(timeoutId)
 
     console.log("[v0] getFlashSaleEvent: Response status:", response.status)
 

@@ -57,7 +57,11 @@ export async function getLuxuryProducts(limit = 12): Promise<Product[]> {
     // Try fetching from both endpoints
     for (const url of urls) {
       try {
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+
         const response = await fetch(url, {
+          signal: controller.signal,
           next: {
             revalidate: 60, // Cache for 60 seconds on the server
             tags: ["luxury-deals"], // Tag for on-demand revalidation
@@ -66,6 +70,8 @@ export async function getLuxuryProducts(limit = 12): Promise<Product[]> {
             "Content-Type": "application/json",
           },
         })
+
+        clearTimeout(timeoutId)
 
         if (response.ok) {
           const data = await response.json()
@@ -78,8 +84,8 @@ export async function getLuxuryProducts(limit = 12): Promise<Product[]> {
     }
 
     const luxuryProducts = allProducts.filter((p) => {
-      const o = p as any
-      return o.is_luxury === true || o.is_luxury_deal === true || o.isLuxury === true
+      const anyP = p as any
+      return anyP.is_luxury === true || anyP.is_luxury_deal === true || anyP.isLuxury === true
     })
 
     // Remove duplicates by ID
