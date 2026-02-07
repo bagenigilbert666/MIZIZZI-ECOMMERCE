@@ -3,7 +3,7 @@
 import type React from "react"
 import { useState, useEffect } from "react"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { ChevronLeft, ChevronRight } from "lucide-react"
+import { X, ChevronLeft, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import type { Product } from "@/types"
 import { cloudinaryService } from "@/services/cloudinary-service"
@@ -145,6 +145,13 @@ export function ImageZoomModal({ product, isOpen, onClose, selectedImageIndex }:
         <DialogTitle className="sr-only">Product Images - {productName}</DialogTitle>
         <div className="flex items-center justify-between px-4 py-2 border-b shrink-0">
           <h2 className="font-medium text-base text-gray-900">Product Images</h2>
+          <button
+            onClick={onClose}
+            className="h-8 w-8 flex items-center justify-center hover:bg-gray-100 rounded-full transition-colors"
+            aria-label="Close"
+          >
+            <X className="h-5 w-5 text-gray-500" />
+          </button>
         </div>
 
         <div className="flex-1 relative bg-white flex items-center justify-center min-h-0 overflow-hidden">
@@ -225,11 +232,15 @@ export function ImageZoomModal({ product, isOpen, onClose, selectedImageIndex }:
                   aria-label={`View image ${index + 1}`}
                 >
                   <img
-                    src={image || "/placeholder.svg"}
+                    src={image || "/generic-product-display.png"}
                     alt={`Thumbnail ${index + 1}`}
                     className="w-full h-full object-cover"
                     onError={(e) => {
-                      ;(e.target as HTMLImageElement).src = "/generic-product-display.png"
+                      const target = e.target as HTMLImageElement
+                      // Only set fallback if not already set to prevent infinite loop
+                      if (!target.src.includes("generic-product-display")) {
+                        target.src = "/generic-product-display.png"
+                      }
                     }}
                   />
                 </button>

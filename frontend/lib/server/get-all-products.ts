@@ -46,18 +46,15 @@ function normalizeProductPrices(product: Product): Product {
  * Uses caching with ISR (Incremental Static Regeneration)
  */
 export async function getAllProducts(limit = 12, page = 1): Promise<Product[]> {
-  console.log("[v0] getAllProducts: Starting fetch from", API_BASE_URL, "limit:", limit, "page:", page)
-
   try {
-    // Try the main products endpoint
-    const productsEndpoint = `${API_BASE_URL}/api/products/?per_page=${limit}&page=${page}`
-    console.log("[v0] getAllProducts: Trying endpoint:", productsEndpoint)
+    // Try the local API endpoint first (running on the same Next.js server)
+    const localEndpoint = `/api/products?per_page=${limit}&page=${page}`
 
     try {
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
 
-      const response = await fetch(productsEndpoint, {
+      const response = await fetch(`${process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000'}${localEndpoint}`, {
         signal: controller.signal,
         next: {
           revalidate: 60, // Cache for 60 seconds on the server
@@ -70,73 +67,78 @@ export async function getAllProducts(limit = 12, page = 1): Promise<Product[]> {
 
       clearTimeout(timeoutId)
 
-      console.log("[v0] getAllProducts: Response status:", response.status)
-
       if (response.ok) {
         const data = await response.json()
-        console.log("[v0] getAllProducts: Got data:", {
-          hasItems: !!data.items,
-          itemCount: data.items?.length || 0,
-          hasProducts: !!data.products,
-          productCount: data.products?.length || 0,
-          sampleItem: data.items?.[0]?.name || data.products?.[0]?.name,
-        })
-
         let products = extractProducts(data)
 
         if (products.length > 0) {
-          // Normalize and enhance products with images
-          const enhancedProducts: Product[] = await Promise.all(
-            products.map(async (product: any) => {
+          // Normalize products - NO image fetching here, just normalize prices
+          const normalizedProducts: Product[] = products.map((product: any) => {
+            const p = normalizeProductPrices(product)
+            return {
+              ...p,
+              seller: p.seller || defaultSeller,
+              product_type: (p.product_type ?? "regular") as Product["product_type"],
+            } as Product
+          })
+
+          // Non-blocking: Prefetch images in background without waiting
+          setImmediate(() => {
+            productService.prefetchProductImages(normalizedProducts.map((p) => p.id.toString()))
+          })
+
+          return normalizedProducts
+        }
+      }
+    } catch (err) {
+      console.error("[v0] getAllProducts: Local API failed:", err)
+      
+      // Fallback to external API
+      try {
+        const productsEndpoint = `${API_BASE_URL}/api/products/?per_page=${limit}&page=${page}`
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 5000)
+
+        const response = await fetch(productsEndpoint, {
+          signal: controller.signal,
+          next: {
+            revalidate: 60,
+            tags: ["all-products"],
+          },
+          headers: {
+            "Content-Type": "application/json",
+          },
+        })
+
+        clearTimeout(timeoutId)
+
+        if (response.ok) {
+          const data = await response.json()
+          let products = extractProducts(data)
+
+          if (products.length > 0) {
+            const normalizedProducts: Product[] = products.map((product: any) => {
               const p = normalizeProductPrices(product)
-
-              console.log(`[v0] getAllProducts: Processing product ${p.id}, has image_urls: ${!!p.image_urls?.length}`)
-
-              // Fetch product images if they're not already included
-              if ((!p.image_urls || p.image_urls.length === 0) && p.id) {
-                try {
-                  const images = await productService.getProductImages(p.id.toString())
-                  console.log(`[v0] getAllProducts: Product ${p.id} fetched ${images?.length || 0} images`)
-                  
-                  if (images && images.length > 0) {
-                    p.image_urls = images.map((img) => img.url)
-
-                    // Set thumbnail_url to the primary image if it exists
-                    const primaryImage = images.find((img) => img.is_primary)
-                    if (primaryImage) {
-                      p.thumbnail_url = primaryImage.url
-                    } else if (images[0]) {
-                      p.thumbnail_url = images[0].url
-                    }
-                    
-                    console.log(`[v0] getAllProducts: Product ${p.id} now has ${p.image_urls.length} image urls, thumbnail: ${p.thumbnail_url}`)
-                  }
-                } catch (error) {
-                  console.error(`[v0] Error fetching images for product ${p.id}:`, error)
-                }
-              }
-
               return {
                 ...p,
                 seller: p.seller || defaultSeller,
                 product_type: (p.product_type ?? "regular") as Product["product_type"],
               } as Product
-            }),
-          )
+            })
 
-          // Prefetch images for remaining products in the background
-          productService.prefetchProductImages(enhancedProducts.slice(5).map((p) => p.id.toString()))
+            setImmediate(() => {
+              productService.prefetchProductImages(normalizedProducts.map((p) => p.id.toString()))
+            })
 
-          console.log("[v0] getAllProducts: Returning", enhancedProducts.length, "enhanced products")
-          return enhancedProducts
+            return normalizedProducts
+          }
         }
+      } catch (fallbackErr) {
+        console.error("[v0] getAllProducts: External API also failed:", fallbackErr)
       }
-    } catch (err) {
-      console.error("[v0] getAllProducts: Endpoint failed:", err)
     }
 
     // Fallback to empty array
-    console.log("[v0] getAllProducts: Returning empty array - fetch failed")
     return []
   } catch (error) {
     console.error("[v0] getAllProducts: Critical error:", error)

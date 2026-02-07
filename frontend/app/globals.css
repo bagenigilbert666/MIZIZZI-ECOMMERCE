@@ -178,6 +178,11 @@
     -moz-osx-font-smoothing: grayscale;
     scroll-behavior: smooth;
     text-rendering: optimizeLegibility;
+    /* GPU acceleration for smooth scrolling */
+    will-change: auto;
+    transform: translate3d(0, 0, 0);
+    -webkit-font-feature-settings: "kern" 1;
+    font-feature-settings: "kern" 1;
     /* Removed overflow-x: hidden to fix sticky header behavior */
     max-width: 100vw;
   }
@@ -185,6 +190,15 @@
   /* Removed global overflow prevention on html to fix sticky header behavior */
   html {
     max-width: 100vw;
+    /* Enable GPU acceleration for smooth scrolling */
+    transform: translate3d(0, 0, 0);
+    -webkit-transform: translate3d(0, 0, 0);
+  }
+
+  /* Optimize scrollable containers */
+  main, section, [role="region"] {
+    -webkit-overflow-scrolling: touch;
+    contain: layout style paint;
   }
 }
 
@@ -531,6 +545,60 @@
     }
   }
 
+  /* Ultra-fast product grid animations - no Framer Motion overhead */
+  @keyframes slideInFast {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .product-card {
+    animation: slideInFast 0.15s ease-out;
+    transform: translateZ(0);
+    will-change: transform, opacity;
+  }
+
+  .product-card:hover {
+    transform: translateY(-4px) translateZ(0);
+    transition: transform 0.15s ease-out, box-shadow 0.15s ease-out;
+  }
+
+  @keyframes fadeInFast {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  /* Native CSS for button states - instant response */
+  button {
+    transition: all 0.15s ease-out;
+    transform: translateZ(0);
+  }
+
+  button:active {
+    transform: scale(0.98) translateZ(0);
+    transition-duration: 0.05s;
+  }
+
+  /* Image optimization for fast loading */
+  img {
+    contain: strict;
+    loading: lazy;
+  }
+
+  /* GPU acceleration for smooth scrolling */
+  .grid, [class*="grid-cols-"] {
+    transform: translateZ(0);
+  }
+
   /* Apple-inspired admin profile components */
   .apple-profile-card {
     @apply bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800;
@@ -828,38 +896,208 @@
     transform: scale(1.1);
   }
 
-  /* Added page-level scroll/touch optimizations from page.tsx */
-  /* Page-level scroll / touch optimizations */
-  .page-root {
-    touch-action: pan-y;
-    -webkit-overflow-scrolling: touch;
-    scroll-behavior: smooth;
+  /* ── Jumia-style product card animations ── */
+  .jumia-card {
+    position: relative;
+    overflow: hidden;
+    background: white;
+    border: 1px solid #f0f0f0;
+    border-radius: 0.5rem;
+    transition: all 0.32s cubic-bezier(0.22, 1, 0.36, 1);
+    transform: translateZ(0);
+    will-change: transform, box-shadow;
   }
 
-  /* Small, hardware-accelerated arrow animation using transform only */
-  .arrow-animate {
+  .jumia-card:hover {
+    border-color: #e0e0e0;
+    box-shadow:
+      0 8px 30px rgba(0, 0, 0, 0.08),
+      0 2px 8px rgba(139, 21, 56, 0.06);
+    transform: translateY(-6px) translateZ(0);
+  }
+
+  /* Shimmer sweep on hover */
+  .jumia-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      105deg,
+      transparent 40%,
+      rgba(255, 255, 255, 0.5) 50%,
+      transparent 60%
+    );
+    transform: translateX(-100%);
+    transition: none;
+    z-index: 5;
+    pointer-events: none;
+  }
+
+  .jumia-card:hover::after {
+    transform: translateX(100%);
+    transition: transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* Image zoom container */
+  .jumia-img-wrap {
+    position: relative;
+    overflow: hidden;
+    background: #fafafa;
+  }
+
+  .jumia-img-wrap img {
+    transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .jumia-card:hover .jumia-img-wrap img {
+    transform: scale(1.08);
+  }
+
+  /* Overlay that slides up on hover */
+  .jumia-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.55) 0%, transparent 60%);
+    opacity: 0;
+    transition: opacity 0.35s ease;
+    z-index: 3;
+    pointer-events: none;
+  }
+
+  .jumia-card:hover .jumia-overlay {
+    opacity: 1;
+  }
+
+  /* Quick action buttons that float up on hover */
+  .jumia-actions {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.75rem;
+    transform: translateY(100%);
+    transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1);
+    z-index: 4;
+  }
+
+  .jumia-card:hover .jumia-actions {
+    transform: translateY(0);
+  }
+
+  /* Discount badge animation */
+  .jumia-badge {
+    animation: jumia-badge-pop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    transform-origin: top left;
+  }
+
+  /* Wishlist heart */
+  .jumia-wish {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    z-index: 6;
+    opacity: 0;
+    transform: scale(0.8);
+    transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .jumia-card:hover .jumia-wish {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  .jumia-wish:active {
+    animation: jumia-heart-beat 0.4s ease-in-out;
+  }
+
+  /* Price section hover accent */
+  .jumia-price-current {
+    position: relative;
     display: inline-block;
-    will-change: transform;
-    animation: arrowMove 1.5s ease-in-out infinite;
   }
 
-  @keyframes arrowMove {
-    0% {
-      transform: translateX(0);
-    }
-    50% {
-      transform: translateX(4px);
-    }
-    100% {
-      transform: translateX(0);
-    }
+  .jumia-price-current::after {
+    content: "";
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: #8B1538;
+    border-radius: 1px;
+    transition: width 0.3s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
-  /* Optionally hint compositing for carousel / heavy visual components if present */
-  .page-root .carousel,
-  .page-root .category-grid,
-  .page-root .ProductGrid {
-    will-change: transform, opacity;
+  .jumia-card:hover .jumia-price-current::after {
+    width: 100%;
+  }
+
+  /* Staggered reveal for grid items (via IntersectionObserver) */
+  .jumia-reveal-item {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  .jumia-reveal-item.revealed {
+    animation: jumia-reveal 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  }
+
+  /* "NEW" tag pulse */
+  .jumia-new-tag {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .jumia-new-tag::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.35) 50%,
+      transparent 100%
+    );
+    animation: jumia-shimmer 2.5s infinite;
+  }
+
+  /* Add to cart button micro-interaction */
+  .jumia-add-btn {
+    position: relative;
+    overflow: hidden;
+    transition: all 0.25s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  .jumia-add-btn::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      90deg,
+      transparent 0%,
+      rgba(255, 255, 255, 0.2) 50%,
+      transparent 100%
+    );
+    transform: translateX(-100%);
+    transition: none;
+  }
+
+  .jumia-add-btn:hover::before {
+    transform: translateX(100%);
+    transition: transform 0.5s ease;
+  }
+
+  .jumia-add-btn:active {
+    transform: scale(0.95);
+  }
+
+  /* Product count badge pulse */
+  .jumia-count-badge {
+    animation: jumia-count-pulse 1.5s ease-in-out infinite;
   }
 }
 

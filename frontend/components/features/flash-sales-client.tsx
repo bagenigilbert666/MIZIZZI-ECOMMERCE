@@ -61,11 +61,9 @@ const StockIndicator = ({
         {isSoldOut ? <span className="text-red-600 font-semibold">Sold Out</span> : <span>{itemsLeft} items left</span>}
       </p>
       <div className="h-1.5 w-full bg-gray-200 rounded-full overflow-hidden">
-        <motion.div
-          className="h-full bg-[#8B1538] rounded-full"
-          initial={{ width: 0 }}
-          animate={{ width: isSoldOut ? "0%" : `${Math.max(progressPercentage, 5)}%` }}
-          transition={{ duration: 0.5, ease: "easeOut" }}
+        <div
+          className="h-full bg-[#8B1538] rounded-full transition-all duration-200"
+          style={{ width: isSoldOut ? "0%" : `${Math.max(progressPercentage, 5)}%`, willChange: "width" }}
         />
       </div>
     </div>
@@ -121,7 +119,6 @@ const getProductImageUrl = (product: Product): string => {
 const ProductCard = memo(({ product, isMobile }: { product: FlashSaleProduct | Product; isMobile: boolean }) => {
   const [imageLoaded, setImageLoaded] = useState(false)
   const [imageError, setImageError] = useState(false)
-  const [showPlaceholder, setShowPlaceholder] = useState(true)
 
   const discountPercentage = product.sale_price
     ? Math.round(((product.price - product.sale_price) / product.price) * 100)
@@ -135,81 +132,55 @@ const ProductCard = memo(({ product, isMobile }: { product: FlashSaleProduct | P
 
   const rating = product.rating || 3 + Math.random() * 2
 
-  const handleImageLoad = () => {
+  const handleImageLoad = useCallback(() => {
     setImageLoaded(true)
-    setTimeout(() => setShowPlaceholder(false), 300)
-  }
+  }, [])
 
-  const handleImageError = () => {
+  const handleImageError = useCallback(() => {
     setImageError(true)
-    setImageLoaded(false)
-  }
-
-  useEffect(() => {
-    setImageLoaded(false)
-    setImageError(false)
-    setShowPlaceholder(true)
-  }, [product.id])
+  }, [])
 
   const imageUrl = getProductImageUrl(product)
   const hasValidImage = imageUrl && imageUrl.length > 0
 
   return (
     <Link href={`/product/${product.slug || product.id}`} prefetch={false}>
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.3 }}
-        whileHover={{ y: -2 }}
-        className="h-full"
-      >
+      <div className="h-full">
         <div
           className={`group h-full overflow-hidden bg-white border-r border-gray-100 transition-all duration-200 hover:shadow-sm ${isSoldOut ? "opacity-75" : ""}`}
         >
           <div className="relative aspect-square overflow-hidden bg-[#f8f8f8]">
-            <AnimatePresence>
-              {(showPlaceholder || imageError || !hasValidImage) && (
-                <motion.div
-                  initial={{ opacity: 1 }}
-                  exit={{ opacity: 0, transition: { duration: 0.3 } }}
-                  className="absolute inset-0 z-10"
-                >
-                  <LogoPlaceholder />
-                </motion.div>
-              )}
-            </AnimatePresence>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: imageLoaded ? 1 : 0 }}
-              transition={{ duration: 0.3 }}
-              className="absolute inset-0"
-            >
-              {hasValidImage && (
-                <Image
-                  src={imageUrl || "/placeholder.svg"}
-                  alt={product.name}
-                  fill
-                  sizes={isMobile ? "25vw" : "16vw"}
-                  className="object-cover transition-transform duration-300 group-hover:scale-105"
-                  loading="lazy"
-                  onLoad={handleImageLoad}
-                  onError={handleImageError}
-                  crossOrigin="anonymous"
-                />
-              )}
-            </motion.div>
+            {(imageError || !hasValidImage) && <LogoPlaceholder />}
+            {hasValidImage && (
+              <Image
+                src={imageUrl || "/placeholder.svg"}
+                alt={product.name}
+                fill
+                sizes={isMobile ? "25vw" : "16vw"}
+                className={`object-cover transition-transform will-change-transform ${
+                  imageLoaded ? "opacity-100 group-hover:scale-105" : "opacity-0"
+                }`}
+                style={{ willChange: "transform", transformOrigin: "center" }}
+                loading="lazy"
+                priority={false}
+                onLoad={handleImageLoad}
+                onError={handleImageError}
+                crossOrigin="anonymous"
+                decoding="async"
+              />
+            )}
             {product.sale_price && discountPercentage > 0 && (
-              <div className="absolute top-1 left-1 bg-[#8B1538] text-white text-[10px] sm:text-xs font-medium px-1.5 py-0.5 rounded-sm z-20">
+              <div className="absolute top-1 left-1 bg-[#8B1538] text-white text-[10px] sm:text-xs font-medium px-1.5 py-0.5 rounded-sm z-20 pointer-events-none">
                 -{discountPercentage}%
               </div>
             )}
             {isAlmostGone && !isSoldOut && (
-              <div className="absolute bottom-1.5 left-1.5 bg-red-500 text-white text-[9px] sm:text-[10px] font-semibold px-1.5 py-0.5 rounded-sm z-20 animate-pulse">
+              <div className="absolute bottom-1.5 left-1.5 bg-red-500 text-white text-[9px] sm:text-[10px] font-semibold px-1.5 py-0.5 rounded-sm z-20 animate-pulse pointer-events-none">
                 Almost Gone!
               </div>
             )}
             {isSoldOut && (
-              <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-20">
+              <div className="absolute inset-0 bg-black/40 flex items-center justify-center z-20 pointer-events-none">
                 <span className="bg-red-600 text-white text-xs sm:text-sm font-bold px-3 py-1 rounded">SOLD OUT</span>
               </div>
             )}
@@ -234,7 +205,7 @@ const ProductCard = memo(({ product, isMobile }: { product: FlashSaleProduct | P
             <StockIndicator itemsLeft={itemsLeft} progressPercentage={progressPercentage} isSoldOut={isSoldOut} />
           </div>
         </div>
-      </motion.div>
+      </div>
     </Link>
   )
 })
@@ -284,7 +255,9 @@ export function FlashSalesClient({ initialProducts, initialEvent }: FlashSalesCl
   const [hoverSide, setHoverSide] = useState<"left" | "right" | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const carouselRef = useRef<HTMLDivElement>(null)
+  const motionDivRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
+  const dragVelocityRef = useRef(0)
 
   const isMobile = useMediaQuery("(max-width: 640px)")
   const isSmallMobile = useMediaQuery("(max-width: 480px)")
@@ -333,11 +306,14 @@ export function FlashSalesClient({ initialProducts, initialEvent }: FlashSalesCl
     (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
       if (isMobile) return
       setIsDragging(false)
-      const threshold = 50
+      
       const velocity = info.velocity.x
       const offset = info.offset.x
+      dragVelocityRef.current = velocity
 
-      if (Math.abs(offset) > threshold || Math.abs(velocity) > 300) {
+      // Ultra-aggressive momentum detection for Jumia-speed response
+      // Lower threshold + higher velocity detection = faster transitions
+      if (Math.abs(offset) > 20 || Math.abs(velocity) > 150) {
         if (offset > 0 || velocity > 0) {
           if (currentIndex > 0) goToPrevious()
         } else {
@@ -471,10 +447,12 @@ export function FlashSalesClient({ initialProducts, initialEvent }: FlashSalesCl
               </div>
             ) : (
               <motion.div
+                ref={motionDivRef}
                 className="flex gap-[1px]"
                 drag="x"
                 dragConstraints={{ left: 0, right: 0 }}
-                dragElastic={0.1}
+                dragElastic={0}
+                dragTransition={{ power: 0.1, timeConstant: 80 }}
                 onDragStart={handleDragStart}
                 onDragEnd={handleDragEnd}
                 animate={{
@@ -482,22 +460,32 @@ export function FlashSalesClient({ initialProducts, initialEvent }: FlashSalesCl
                 }}
                 transition={{
                   type: "spring",
-                  stiffness: 300,
-                  damping: 30,
-                  mass: 0.8,
+                  stiffness: 350,
+                  damping: 35,
+                  mass: 1,
+                  velocity: dragVelocityRef.current,
                 }}
                 style={{
                   cursor: isDragging ? "grabbing" : "grab",
+                  willChange: "transform",
+                  transform: "translateZ(0)",
+                  backfaceVisibility: "hidden",
+                  perspective: 1000,
+                  WebkitFontSmoothing: "antialiased",
+                  WebkitBackfaceVisibility: "hidden",
                 }}
               >
                 {products.map((product, index) => (
                   <motion.div
                     key={product.id}
                     className="flex-shrink-0 pointer-events-auto"
-                    style={{ width: `${isTablet ? 20 : 16.666}%` }}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.3, delay: index * 0.05 }}
+                    style={{ 
+                      width: `${isTablet ? 20 : 16.666}%`,
+                      willChange: "opacity",
+                    }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.15, delay: index * 0.02 }}
                   >
                     <ProductCard product={product as FlashSaleProduct} isMobile={false} />
                   </motion.div>
@@ -508,12 +496,13 @@ export function FlashSalesClient({ initialProducts, initialEvent }: FlashSalesCl
             <AnimatePresence>
               {!isMobile && isHovering && !isDragging && hoverSide === "left" && currentIndex > 0 && (
                 <motion.button
-                  initial={{ opacity: 0, x: -20, scale: 0.8 }}
-                  animate={{ opacity: 1, x: 0, scale: 1 }}
-                  exit={{ opacity: 0, x: -20, scale: 0.8 }}
-                  transition={{ duration: 0.2 }}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.1 }}
                   onClick={goToPrevious}
-                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/95 backdrop-blur-sm rounded-full p-2 shadow-lg hover:bg-white hover:scale-110 transition-all z-20"
+                  className="absolute left-2 top-1/2 -translate-y-1/2 bg-white/95 backdrop-blur-sm rounded-full p-2 shadow-lg hover:bg-white transition-colors z-20"
+                  style={{ willChange: "opacity, transform" }}
                 >
                   <ChevronLeft className="w-5 h-5 text-gray-700" />
                 </motion.button>
@@ -522,12 +511,13 @@ export function FlashSalesClient({ initialProducts, initialEvent }: FlashSalesCl
             <AnimatePresence>
               {!isMobile && isHovering && !isDragging && hoverSide === "right" && currentIndex < maxIndex && (
                 <motion.button
-                  initial={{ opacity: 0, x: 20, scale: 0.8 }}
-                  animate={{ opacity: 1, x: 0, scale: 1 }}
-                  exit={{ opacity: 0, x: 20, scale: 0.8 }}
-                  transition={{ duration: 0.2 }}
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.1 }}
                   onClick={goToNext}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/95 backdrop-blur-sm rounded-full p-2 shadow-lg hover:bg-white hover:scale-110 transition-all z-20"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 bg-white/95 backdrop-blur-sm rounded-full p-2 shadow-lg hover:bg-white transition-colors z-20"
+                  style={{ willChange: "opacity, transform" }}
                 >
                   <ChevronRight className="w-5 h-5 text-gray-700" />
                 </motion.button>

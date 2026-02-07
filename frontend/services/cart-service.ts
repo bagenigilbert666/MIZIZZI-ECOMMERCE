@@ -867,7 +867,7 @@ class CartService {
     let variantId: number | null = null
 
     // Try to get product info from current cart to check stock
-      try {
+    try {
       const currentCart = await this.getCart()
       const cartItem = currentCart.items?.find((item) => item.id === itemId)
       if (cartItem) {
@@ -876,7 +876,7 @@ class CartService {
 
         // Check current stock availability
         const { inventoryService } = await import("@/services/inventory-service")
-        const inventorySummary = await inventoryService.getProductInventorySummary(productId!, variantId ?? undefined)
+        const inventorySummary = await inventoryService.getProductInventorySummary(productId, variantId ?? undefined)
 
         if (inventorySummary) {
           stockLimit = Math.min(inventorySummary.total_available_quantity + cartItem.quantity, 999) // Add current quantity back to available
@@ -1340,6 +1340,63 @@ class CartService {
       }
 
       return false
+    }
+  }
+
+  async migrateGuestCart(): Promise<{ success: boolean; migratedItems: number; errors: string[] }> {
+    const errors: string[] = []
+    let migratedItems = 0
+
+    try {
+      // Get items from local storage (guest cart)
+      const guestItems = getLocalCartItems()
+
+      if (!guestItems || guestItems.length === 0) {
+        return { success: true, migratedItems: 0, errors: [] }
+      }
+
+      console.log(`[v0] Migrating ${guestItems.length} guest cart items to authenticated user`)
+
+      // Try to add each guest cart item to the authenticated user's cart
+      for (const item of guestItems) {
+        try {
+          // Use the addToCart method which now handles authenticated requests
+          const result = await this.addToCart(
+            item.product_id,
+            item.quantity,
+            item.variant_id || undefined,
+          )
+
+          if (result.success) {
+            migratedItems++
+          } else {
+            errors.push(`Failed to migrate product ${item.product_id}: ${result.message}`)
+          }
+        } catch (error: any) {
+          const errorMsg = error?.message || `Unknown error migrating product ${item.product_id}`
+          errors.push(errorMsg)
+          console.error(`[v0] Error migrating item ${item.product_id}:`, error)
+        }
+      }
+
+      // Clear the guest cart from localStorage after successful migration
+      if (migratedItems > 0) {
+        saveLocalCartItems([])
+        console.log(`[v0] Successfully migrated ${migratedItems} items. Cleared guest cart.`)
+      }
+
+      return {
+        success: migratedItems > 0 || guestItems.length === 0,
+        migratedItems,
+        errors,
+      }
+    } catch (error: any) {
+      console.error("[v0] Error during cart migration:", error)
+      return {
+        success: false,
+        migratedItems,
+        errors: [error?.message || "Failed to migrate cart"],
+      }
     }
   }
 
@@ -2209,6 +2266,68 @@ export const cartService = {
         }
       }
 
+      // Handle 401 errors by falling back to local storage for unauthenticated users
+            if (typeof error === "object" && error !== null && "response" in error && (error as any).response?.status === 401) {
+              console.log("User not authenticated, saving item to cart locally")
+      
+              // Get existing cart items from local storage
+              const existingItems = getLocalCartItems()
+      
+              // Check if item already exists
+              const existingItemIndex = existingItems.findIndex(
+                (item) => item.product_id === productId && (variantId ? item.variant_id === variantId : !item.variant_id),
+              )
+      
+              if (existingItemIndex >= 0) {
+                // Update quantity if item exists
+                existingItems[existingItemIndex].quantity += quantity
+              } else {
+                // Add new item
+                existingItems.push({
+                  id: Date.now(),
+                  product_id: productId,
+                  variant_id: variantId || null,
+                  quantity,
+                  price: 0, // Will be updated when product data is fetched
+                  total: 0,
+                  product: {
+                    id: productId,
+                    name: `Product ${productId}`,
+                    slug: `product-${productId}`,
+                    thumbnail_url: "",
+                    image_urls: [],
+                    price: 0,
+                    sale_price: null,
+                  },
+                })
+              }
+      
+              // Save to local storage
+              saveLocalCartItems(existingItems)
+      
+              // Return a mock successful response
+              return {
+                success: true,
+                cart: {
+                  id: 0,
+                  user_id: 0,
+                  is_active: true,
+                  subtotal: calculateSubtotal(existingItems),
+                  tax: 0,
+                  shipping: 0,
+                  discount: 0,
+                  total: 0,
+                  currency: "USD",
+                  same_as_shipping: true,
+                  requires_shipping: true,
+                  created_at: new Date().toISOString(),
+                  updated_at: new Date().toISOString(),
+                },
+                items: existingItems,
+                message: "Item added to cart (guest mode - log in to complete checkout)",
+              }
+            }
+
       throw error
     }
   },
@@ -2526,6 +2645,11 @@ export const cartService = {
   async clearCart() {
     const service = new CartService()
     return service.clearCart()
+  },
+
+  async migrateGuestCart() {
+    const service = new CartService()
+    return service.migrateGuestCart()
   },
 }
 

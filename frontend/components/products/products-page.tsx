@@ -34,8 +34,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { FlashSaleBannerCarousel } from "@/components/flash-sales/banner-carousel"
-import type { FlashSaleProduct, FlashSaleEvent } from "@/lib/server/get-flash-sale-products"
+import { ProductsBannerCarousel } from "./banner-carousel"
 import { cloudinaryService } from "@/services/cloudinary-service"
 import { cn } from "@/lib/utils"
 import { useCart } from "@/contexts/cart/cart-context"
@@ -43,20 +42,21 @@ import { useToast } from "@/components/ui/use-toast"
 
 /* ─── Types ─── */
 interface Product {
-  id: string | number
+  id: number
   name: string
   price: number
-  sale_price?: number | null
-  thumbnail_url?: string | null
-  image_urls?: string[] | null
+  sale_price: number | null
+  thumbnail_url: string | null
+  image_urls: string[] | null
   category?: string
   slug?: string
   rating?: number
+  images?: string[]
+  image?: string
 }
 
-interface FlashSalesPageContentProps {
-  products: FlashSaleProduct[]
-  event?: FlashSaleEvent | null
+interface ProductsPageContentProps {
+  initialProducts: Product[]
 }
 
 /* ─── Intersection Observer hook for reveal-on-scroll ─── */
@@ -127,8 +127,8 @@ function getSecondImageUrl(product: Product): string | null {
 }
 
 /* ─── Discount helper ─── */
-function calculateDiscount(price: number, salePrice?: number | null): number {
-  if (salePrice == null || salePrice >= price) return 0
+function calculateDiscount(price: number, salePrice: number | null): number {
+  if (!salePrice || salePrice >= price) return 0
   return Math.round(((price - salePrice) / price) * 100)
 }
 
@@ -156,7 +156,7 @@ const JumiaProductCard = memo(function JumiaProductCard({
     e.stopPropagation()
     setIsAddingToCart(true)
     try {
-      const result = await addToCart(Number(product.id), 1)
+      const result = await addToCart(product.id, 1)
       if (result?.success) {
         toast({
           title: "Added to Cart",
@@ -190,7 +190,7 @@ const JumiaProductCard = memo(function JumiaProductCard({
       >
         {/* Image Section */}
         <Link
-          href={`/product/${product.id}`}
+          href={`/product/${product.slug || product.id}`}
           prefetch={false}
           className="block"
         >
@@ -294,7 +294,7 @@ const JumiaProductCard = memo(function JumiaProductCard({
 
         {/* Content Section */}
         <Link
-          href={`/product/${product.id}`}
+          href={`/product/${product.slug || product.id}`}
           prefetch={false}
           className="flex flex-col flex-grow p-2 sm:p-2.5 md:p-3"
         >
@@ -378,17 +378,18 @@ function FilterChip({
   )
 }
 
-/* ─── Main Flash Sales Page ─── */
-export function FlashSalesPageContent({
-  products: initialProducts,
-  event,
-}: FlashSalesPageContentProps) {
+/* ─── Main Products Page ─── */
+export function ProductsPageContent({
+  initialProducts,
+}: ProductsPageContentProps) {
   const [sortBy, setSortBy] = useState("discount")
   const [searchQuery, setSearchQuery] = useState("")
   const [displayCount, setDisplayCount] = useState(18)
   const [loading, setLoading] = useState(false)
   const [gridCols, setGridCols] = useState<"compact" | "regular">("compact")
-  const [activeFilter, setActiveFilter] = useState("deals")
+  const [activeFilter, setActiveFilter] = useState("all")
+  const [quickViewOpen, setQuickViewOpen] = useState(false)
+  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
 
   // Reveal ref
   const gridRef = useRevealOnScroll()
@@ -425,6 +426,12 @@ export function FlashSalesPageContent({
     }, 500)
   }
 
+  // Handle quick view
+  const handleQuickView = (product: Product) => {
+    setSelectedProduct(product)
+    setQuickViewOpen(true)
+  }
+
   // Filter and sort products
   const filteredProducts = useMemo(() => {
     let result = [...initialProducts]
@@ -436,10 +443,16 @@ export function FlashSalesPageContent({
       )
     }
 
-    // Category filter - flash sales are always deals by default
-    if (activeFilter === "trending") {
+    // Category filter
+    if (activeFilter === "deals") {
       result = result.filter(
-        (p) => (p.rating || 3) >= 4 || (p.sale_price != null && p.sale_price < p.price)
+        (p) =>
+          p.sale_price !== null &&
+          calculateDiscount(p.price, p.sale_price) >= 10
+      )
+    } else if (activeFilter === "trending") {
+      result = result.filter(
+        (p) => (p.rating || 3) >= 4 || (p.sale_price !== null && p.sale_price < p.price)
       )
     } else if (activeFilter === "new") {
       result = result.slice(0, Math.ceil(result.length * 0.3))
@@ -467,7 +480,7 @@ export function FlashSalesPageContent({
 
   // Stats
   const dealsCount = initialProducts.filter(
-    (p) => p.sale_price != null && calculateDiscount(p.price, p.sale_price) >= 10
+    (p) => p.sale_price !== null && calculateDiscount(p.price, p.sale_price) >= 10
   ).length
 
   if (!initialProducts || initialProducts.length === 0) {
@@ -476,14 +489,14 @@ export function FlashSalesPageContent({
         <div className="container py-8 px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-2 mb-8">
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
-              Flash Sales
+              All Products
             </h1>
-            <Zap className="h-6 w-6 text-[#8B1538]" />
+            <ShoppingBag className="h-6 w-6 text-[#8B1538]" />
           </div>
           <div className="bg-white rounded-2xl p-12 text-center shadow-sm border border-gray-100">
-            <Zap className="h-12 w-12 mx-auto mb-3 text-gray-300" />
+            <ShoppingBag className="h-12 w-12 mx-auto mb-3 text-gray-300" />
             <p className="text-gray-500 text-sm">
-              No flash sale products available at the moment.
+              No products available at the moment.
             </p>
           </div>
         </div>
@@ -499,7 +512,7 @@ export function FlashSalesPageContent({
           <div>
             <div className="flex items-center gap-2 mb-1">
               <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 tracking-tight text-balance">
-                Flash Sales
+                All Products
               </h1>
               <div className="jumia-count-badge flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#8B1538] text-white text-xs sm:text-sm font-bold">
                 {filteredProducts.length > 99
@@ -508,7 +521,7 @@ export function FlashSalesPageContent({
               </div>
             </div>
             <p className="text-xs sm:text-sm text-gray-500">
-              Discover amazing lightning deals on premium products
+              Discover amazing deals on premium products
             </p>
           </div>
 
@@ -517,7 +530,7 @@ export function FlashSalesPageContent({
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
             <Input
               type="text"
-              placeholder="Search flash sales..."
+              placeholder="Search products..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="h-10 pl-10 pr-10 w-full rounded-xl border-gray-200 bg-white shadow-sm focus:ring-2 focus:ring-[#8B1538]/20 focus:border-[#8B1538] transition-all"
@@ -533,19 +546,26 @@ export function FlashSalesPageContent({
           </div>
         </div>
 
-        {/* ── Flash Sale Banner ── */}
-        <FlashSaleBannerCarousel event={event} />
+        {/* ── Premium Banner ── */}
+        <ProductsBannerCarousel />
 
         {/* ── Filter Chips + Sort Bar ── */}
         <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
           {/* Filter chips */}
           <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
             <FilterChip
-              label="All Deals"
+              label="All"
+              active={activeFilter === "all"}
+              onClick={() => setActiveFilter("all")}
+              icon={<LayoutGrid className="h-3.5 w-3.5" />}
+              count={initialProducts.length}
+            />
+            <FilterChip
+              label="Deals"
               active={activeFilter === "deals"}
               onClick={() => setActiveFilter("deals")}
               icon={<Zap className="h-3.5 w-3.5" />}
-              count={initialProducts.length}
+              count={dealsCount}
             />
             <FilterChip
               label="Trending"
@@ -561,22 +581,69 @@ export function FlashSalesPageContent({
             />
           </div>
 
-          {/* Sort dropdown */}
-          <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="h-9 w-[170px] text-xs sm:text-sm rounded-xl border-gray-200 bg-white shadow-sm">
-              <div className="flex items-center gap-1.5">
-                <ArrowUpDown className="h-3.5 w-3.5 text-gray-400" />
-                <SelectValue placeholder="Sort by" />
-              </div>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="discount">Highest Discount</SelectItem>
-              <SelectItem value="price-asc">Price: Low to High</SelectItem>
-              <SelectItem value="price-desc">Price: High to Low</SelectItem>
-              <SelectItem value="rating">Highest Rated</SelectItem>
-            </SelectContent>
-          </Select>
+          {/* Sort + Grid toggle */}
+          <div className="flex items-center gap-2">
+            <Select value={sortBy} onValueChange={setSortBy}>
+              <SelectTrigger className="h-9 w-[170px] text-xs sm:text-sm rounded-xl border-gray-200 bg-white shadow-sm">
+                <div className="flex items-center gap-1.5">
+                  <ArrowUpDown className="h-3.5 w-3.5 text-gray-400" />
+                  <SelectValue placeholder="Sort by" />
+                </div>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="discount">Highest Discount</SelectItem>
+                <SelectItem value="price-asc">Price: Low to High</SelectItem>
+                <SelectItem value="price-desc">Price: High to Low</SelectItem>
+                <SelectItem value="rating">Top Rated</SelectItem>
+              </SelectContent>
+            </Select>
+
+            {/* Grid toggle - hidden on mobile */}
+            <div className="hidden sm:flex items-center border border-gray-200 rounded-xl overflow-hidden bg-white shadow-sm">
+              <button
+                onClick={() => setGridCols("compact")}
+                className={cn(
+                  "p-2 transition-colors",
+                  gridCols === "compact"
+                    ? "bg-[#8B1538] text-white"
+                    : "text-gray-400 hover:text-gray-600"
+                )}
+                aria-label="Compact grid view"
+              >
+                <Grid3X3 className="h-4 w-4" />
+              </button>
+              <button
+                onClick={() => setGridCols("regular")}
+                className={cn(
+                  "p-2 transition-colors",
+                  gridCols === "regular"
+                    ? "bg-[#8B1538] text-white"
+                    : "text-gray-400 hover:text-gray-600"
+                )}
+                aria-label="Regular grid view"
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
         </div>
+
+        {/* ── Results summary ── */}
+        {searchQuery && (
+          <div className="mb-3 flex items-center gap-2 text-sm text-gray-500">
+            <Search className="h-3.5 w-3.5" />
+            <span>
+              Showing{" "}
+              <span className="font-semibold text-gray-800">
+                {filteredProducts.length}
+              </span>{" "}
+              results for{" "}
+              <span className="font-semibold text-[#8B1538]">
+                &quot;{searchQuery}&quot;
+              </span>
+            </span>
+          </div>
+        )}
 
         {/* ── Product Grid ── */}
         <div
@@ -586,11 +653,11 @@ export function FlashSalesPageContent({
           {filteredProducts.length === 0 ? (
             <div className="py-16 text-center">
               <Search className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-              <p className="text-gray-500 text-sm mb-2">No flash sale products found</p>
+              <p className="text-gray-500 text-sm mb-2">No products found</p>
               <button
                 onClick={() => {
                   setSearchQuery("")
-                  setActiveFilter("deals")
+                  setActiveFilter("all")
                 }}
                 className="text-[#8B1538] text-sm font-medium hover:underline"
               >
@@ -621,7 +688,7 @@ export function FlashSalesPageContent({
             <div className="flex flex-col items-center gap-2 py-6 sm:py-8 bg-white border-t border-gray-100">
               <p className="text-xs text-gray-400">
                 Showing {Math.min(displayCount, filteredProducts.length)} of{" "}
-                {filteredProducts.length} deals
+                {filteredProducts.length} products
               </p>
               <button
                 onClick={handleShowMore}
@@ -639,13 +706,14 @@ export function FlashSalesPageContent({
                 ) : (
                   <div className="flex items-center gap-2 relative z-10">
                     <ChevronDown className="h-4 w-4 group-hover:animate-bounce" />
-                    <span>Show More Deals</span>
+                    <span>Show More Products</span>
                   </div>
                 )}
               </button>
             </div>
           )}
         </div>
+
       </div>
     </div>
   )

@@ -713,13 +713,46 @@ export default function ProductDetailsEnhanced({
         })
         setShowCartNotification(true)
         setTimeout(() => setShowCartNotification(false), 4500)
+
+        // Check if this is guest mode and show appropriate message
+        if (result.message && result.message.includes("guest")) {
+          toast({
+            title: "Added to Cart",
+            description: "Item added to your cart. Log in to proceed to checkout.",
+            variant: "default",
+          })
+        }
+
         return true
       } else {
-        toast({ title: "Error", description: result.message || "Failed to add item to cart", variant: "destructive" })
-        return false
+        // Check if it's an auth error and provide helpful message
+        const message = result.message || "Failed to add item to cart"
+        const isAuthError = message.toLowerCase().includes("log in") || message.toLowerCase().includes("auth")
+
+        toast({
+          title: isAuthError ? "Cart Ready" : "Error",
+          description: isAuthError ? "Item added to your cart. Log in to complete your purchase." : message,
+          variant: isAuthError ? "default" : "destructive",
+        })
+        return !isAuthError // Treat auth cases as success since item was added to guest cart
       }
     } catch (error: any) {
-      toast({ title: "Error", description: error?.message || "Failed to add to cart", variant: "destructive" })
+      const errorMsg = error?.message || "Failed to add to cart"
+      const isAuthError =
+        errorMsg.toLowerCase().includes("401") ||
+        errorMsg.toLowerCase().includes("unauthorized") ||
+        errorMsg.toLowerCase().includes("log in")
+
+      if (isAuthError) {
+        toast({
+          title: "Added to Cart",
+          description: "Item added to your cart as a guest. Log in to checkout and see all your items.",
+          variant: "default",
+        })
+        return true
+      }
+
+      toast({ title: "Error", description: errorMsg, variant: "destructive" })
       return false
     } finally {
       setTimeout(() => {
