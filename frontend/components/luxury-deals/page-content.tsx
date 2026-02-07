@@ -109,9 +109,12 @@ function getSecondImageUrl(product: Product): string | null {
 }
 
 /* ─── Discount helper ─── */
-function calculateDiscount(price: number, salePrice: number | null | undefined): number {
-  if (salePrice == null || salePrice >= price) return 0
-  return Math.round(((price - salePrice) / price) * 100)
+function calculateDiscount(price: number | string, salePrice: number | null | undefined): number {
+  const numPrice = typeof price === "string" ? parseFloat(price) : price
+  const numSalePrice = typeof salePrice === "number" ? salePrice : null
+  
+  if (!numPrice || !numSalePrice || numSalePrice >= numPrice) return 0
+  return Math.round(((numPrice - numSalePrice) / numPrice) * 100)
 }
 
 /* ─── Jumia-style Product Card ─── */
@@ -138,7 +141,9 @@ const JumiaProductCard = memo(function JumiaProductCard({
     e.stopPropagation()
     setIsAddingToCart(true)
     try {
-      const result = await addToCart(Number(product.id), 1)
+      const prodId =
+        typeof product.id === "number" ? product.id : Number(product.id)
+      const result = await addToCart(prodId, 1)
       if (result?.success) {
         toast({
           title: "Added to Cart",
@@ -216,13 +221,13 @@ const JumiaProductCard = memo(function JumiaProductCard({
             {/* Badges */}
             <div className="absolute top-1.5 left-1.5 flex flex-col gap-1 z-10">
               {discount > 0 && (
-                <span className="jumia-badge inline-flex items-center gap-0.5 bg-amber-600 text-white text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded">
+                <span className="jumia-badge inline-flex items-center gap-0.5 bg-[#8B1538] text-white text-[9px] sm:text-[10px] font-bold px-1.5 py-0.5 rounded">
                   <Crown className="h-2.5 w-2.5" />
                   -{discount}%
                 </span>
               )}
               {discount >= 30 && (
-                <span className="jumia-badge jumia-new-tag inline-block bg-amber-500 text-white text-[8px] sm:text-[9px] font-bold px-1.5 py-0.5 rounded">
+                <span className="jumia-badge jumia-new-tag inline-block bg-[#8B1538] text-white text-[8px] sm:text-[9px] font-bold px-1.5 py-0.5 rounded">
                   LUXURY DEAL
                 </span>
               )}
@@ -238,8 +243,8 @@ const JumiaProductCard = memo(function JumiaProductCard({
               className={cn(
                 "jumia-wish flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/90 backdrop-blur-sm shadow-md transition-colors",
                 wished
-                  ? "text-amber-600 opacity-100 transform scale-100"
-                  : "text-gray-400 hover:text-amber-600"
+                  ? "text-[#8B1538] opacity-100 transform scale-100"
+                  : "text-gray-400 hover:text-[#8B1538]"
               )}
               aria-label={wished ? "Remove from wishlist" : "Add to wishlist"}
             >
@@ -253,7 +258,7 @@ const JumiaProductCard = memo(function JumiaProductCard({
               <button
                 onClick={handleAddToCart}
                 disabled={isAddingToCart}
-                className="jumia-add-btn flex items-center gap-1.5 px-4 py-2 sm:px-5 sm:py-2.5 bg-amber-600 text-white text-[10px] sm:text-xs font-semibold rounded-full shadow-lg hover:bg-amber-700 disabled:opacity-70"
+                className="jumia-add-btn flex items-center gap-1.5 px-4 py-2 sm:px-5 sm:py-2.5 bg-[#8B1538] text-white text-[10px] sm:text-xs font-semibold rounded-full shadow-lg hover:bg-[#A01D47] disabled:opacity-70"
                 aria-label="Add to cart"
               >
                 {isAddingToCart ? (
@@ -268,7 +273,7 @@ const JumiaProductCard = memo(function JumiaProductCard({
             {/* Loading skeleton */}
             {!imgLoaded && (
               <div className="absolute inset-0 bg-gray-100 flex items-center justify-center z-[1]">
-                <div className="w-8 h-8 rounded-full border-2 border-gray-200 border-t-amber-600 animate-spin" />
+                <div className="w-8 h-8 rounded-full border-2 border-gray-200 border-t-[#8B1538] animate-spin" />
               </div>
             )}
           </div>
@@ -288,13 +293,13 @@ const JumiaProductCard = memo(function JumiaProductCard({
           )}
 
           {/* Product name */}
-          <h3 className="text-gray-800 text-[10px] sm:text-xs md:text-sm font-medium line-clamp-2 leading-snug mb-1.5 min-h-[28px] sm:min-h-[34px] md:min-h-[40px] group-hover:text-amber-600 transition-colors duration-200">
+          <h3 className="text-gray-800 text-[10px] sm:text-xs md:text-sm font-medium line-clamp-2 leading-snug mb-1.5 min-h-[28px] sm:min-h-[34px] md:min-h-[40px] group-hover:text-[#8B1538] transition-colors duration-200">
             {product.name}
           </h3>
 
           {/* Price */}
           <div className="mt-auto flex items-baseline gap-1.5 flex-wrap">
-            <span className="jumia-price-current font-bold text-amber-600 text-xs sm:text-sm md:text-base leading-none">
+            <span className="jumia-price-current font-bold text-[#8B1538] text-xs sm:text-sm md:text-base leading-none">
               KSh {(product.sale_price || product.price).toLocaleString()}
             </span>
             {product.sale_price && (
@@ -340,7 +345,7 @@ function FilterChip({
       className={cn(
         "inline-flex items-center gap-1.5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-full text-xs sm:text-sm font-medium whitespace-nowrap transition-all duration-200",
         active
-          ? "bg-amber-600 text-white shadow-md shadow-amber-600/20"
+          ? "bg-[#8B1538] text-white shadow-md shadow-[#8B1538]/20"
           : "bg-white text-gray-600 border border-gray-200 hover:border-gray-300 hover:bg-gray-50"
       )}
     >
@@ -456,7 +461,7 @@ export function LuxuryDealsPageContent({
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
               Luxury Deals
             </h1>
-            <Crown className="h-6 w-6 text-amber-600" />
+            <Crown className="h-6 w-6 text-[#8B1538]" />
           </div>
           <div className="bg-white rounded-2xl p-12 text-center shadow-sm border border-gray-100">
             <Crown className="h-12 w-12 mx-auto mb-3 text-gray-300" />
@@ -479,7 +484,7 @@ export function LuxuryDealsPageContent({
               <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 tracking-tight text-balance">
                 Luxury Deals
               </h1>
-              <div className="jumia-count-badge flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-amber-600 text-white text-xs sm:text-sm font-bold">
+              <div className="jumia-count-badge flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#8B1538] text-white text-xs sm:text-sm font-bold">
                 {filteredProducts.length > 99
                   ? "99+"
                   : filteredProducts.length}
@@ -498,7 +503,7 @@ export function LuxuryDealsPageContent({
               placeholder="Search luxury deals..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-10 pl-10 pr-10 w-full rounded-xl border-gray-200 bg-white shadow-sm focus:ring-2 focus:ring-amber-600/20 focus:border-amber-600 transition-all"
+              className="h-10 pl-10 pr-10 w-full rounded-xl border-gray-200 bg-white shadow-sm focus:ring-2 focus:ring-[#8B1538]/20 focus:border-[#8B1538] transition-all"
             />
             {searchQuery && (
               <button
@@ -570,7 +575,7 @@ export function LuxuryDealsPageContent({
                   setSearchQuery("")
                   setActiveFilter("deals")
                 }}
-                className="text-amber-600 text-sm font-medium hover:underline"
+                className="text-[#8B1538] text-sm font-medium hover:underline"
               >
                 Clear all filters
               </button>
@@ -604,14 +609,14 @@ export function LuxuryDealsPageContent({
               <button
                 onClick={handleShowMore}
                 disabled={loading}
-                className="group relative flex items-center justify-center px-10 sm:px-14 py-2.5 sm:py-3 bg-white text-gray-700 font-semibold rounded-full border-2 border-gray-200 hover:border-amber-600 hover:text-amber-600 transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed min-w-[180px] sm:min-w-[220px] text-xs sm:text-sm overflow-hidden"
+                className="group relative flex items-center justify-center px-10 sm:px-14 py-2.5 sm:py-3 bg-white text-gray-700 font-semibold rounded-full border-2 border-gray-200 hover:border-amber-600 hover:text-[#8B1538] transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed min-w-[180px] sm:min-w-[220px] text-xs sm:text-sm overflow-hidden"
               >
                 {/* Hover background fill */}
-                <span className="absolute inset-0 bg-amber-600/5 scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left rounded-full" />
+                <span className="absolute inset-0 bg-[#8B1538]/5 scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left rounded-full" />
 
                 {loading ? (
                   <div className="flex items-center gap-2 relative z-10">
-                    <div className="w-4 h-4 rounded-full border-2 border-gray-300 border-t-amber-600 animate-spin" />
+                    <div className="w-4 h-4 rounded-full border-2 border-gray-300 border-t-[#8B1538] animate-spin" />
                     <span>Loading...</span>
                   </div>
                 ) : (
