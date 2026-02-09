@@ -1,9 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-
 import { useRef } from "react"
-
 import type React from "react"
 import { useState, useEffect, memo } from "react"
 import Link from "next/link"
@@ -38,13 +36,9 @@ import {
 } from "@/components/ui/select"
 import { Input } from "@/components/ui/input"
 
-interface CategoryPageClientProps {
-  initialCategory: Category
-  initialAllCategories: Category[]
-  initialProducts: Product[]
-  initialSubcategories: Category[]
-  initialRecommendedCategories: Category[]
-  slug: string
+interface FlashSalesPageContentProps {
+  products: Product[]
+  event: any
 }
 
 /* ─── Intersection Observer hook for reveal-on-scroll ─── */
@@ -375,14 +369,10 @@ function FilterChip({
   )
 }
 
-function CategoryPageClient({
-  initialCategory,
-  initialAllCategories,
-  initialProducts,
-  initialSubcategories,
-  initialRecommendedCategories,
-  slug,
-}: CategoryPageClientProps) {
+export function FlashSalesPageContent({
+  products: initialProducts,
+  event,
+}: FlashSalesPageContentProps) {
   const router = useRouter()
   const [showBackToTop, setShowBackToTop] = useState(false)
   const [sortBy, setSortBy] = useState("discount")
@@ -390,6 +380,8 @@ function CategoryPageClient({
   const [displayCount, setDisplayCount] = useState(24)
 
   // Use initial server-fetched data for instant display
+  const initialCategory = event.category
+  const initialRecommendedCategories = event.recommendedCategories
   const category = initialCategory
   const products = initialProducts
   const relatedCategories = initialRecommendedCategories
@@ -540,7 +532,11 @@ function CategoryPageClient({
         </motion.div>
 
         {/* ── Recommended Categories Section ── */}
-
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5 sm:gap-3 mb-8">
+          {relatedCategories.map((cat) => (
+            <RecommendedCategoryCard key={cat.id} category={cat} />
+          ))}
+        </div>
 
         {/* ── Flash Sale Products Grid ── */}
         <motion.div
@@ -619,4 +615,4 @@ function CategoryPageClient({
   )
 }
 
-export default CategoryPageClient
+export default FlashSalesPageContent

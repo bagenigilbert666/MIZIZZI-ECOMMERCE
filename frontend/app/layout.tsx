@@ -1,14 +1,11 @@
 import { Inter } from "next/font/google"
 import "./globals.css"
-import "@/styles/categories-animations.css"
 import { Providers as AppProviders } from "./providers"
 import { Providers as StateProviders } from "@/components/providers/index"
 import type React from "react"
 import { defaultMetadata } from "@/lib/metadata-utils"
 import { LayoutRenderer } from "@/components/layout/layout-renderer"
-import { NotificationProvider } from "@/contexts/notification/notification-context"
 import { PageTransitionWrapper } from "@/components/transitions/page-transition-wrapper"
-import { VerificationHandler } from "@/components/auth/verification-handler"
 import Script from "next/script"
 import { ThemeProvider } from "@/contexts/theme-context"
 import type { Viewport } from "next"
@@ -50,6 +47,12 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className="fixed inset-0 overflow-hidden">
       <head>
+        {/* Preload critical fonts */}
+        <link
+          rel="preload"
+          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+          as="style"
+        />
         {/* Suppress React DevTools warning in development */}
         {process.env.NODE_ENV === "development" && (
           <script
@@ -73,20 +76,15 @@ export default async function RootLayout({
         )}
       </head>
       <body className={`${inter.className} ${inter.variable} fixed inset-0 overflow-hidden`} suppressHydrationWarning>
-        <Script src="https://accounts.google.com/gsi/client" strategy="beforeInteractive" />
+        <Script src="https://accounts.google.com/gsi/client" strategy="beforeInteractive" async defer />
 
         <ThemeProvider>
           <StateProviders>
             <AppProviders>
-              <NotificationProvider>
-                <PageTransitionWrapper />
-                {/* Add the VerificationHandler to handle auth state persistence */}
-                <VerificationHandler />
-                <div className="h-full w-full overflow-y-auto overflow-x-hidden overscroll-none">
-                  {layoutRenderer}
-                </div>
-                {/* Add the cart notification component */}
-              </NotificationProvider>
+              <PageTransitionWrapper />
+              <div className="h-full w-full overflow-y-auto overflow-x-hidden overscroll-none">
+                {layoutRenderer}
+              </div>
             </AppProviders>
           </StateProviders>
         </ThemeProvider>
