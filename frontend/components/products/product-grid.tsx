@@ -292,11 +292,13 @@ export function ProductGrid({ limit = 12, category, initialProducts = [], initia
         }
         setError(null)
 
-        const data = await productService.getProducts({
-          limit,
-          category_slug: category,
-          page: pageNum,
-        })
+      // Use the dedicated category method if category is specified
+      const data = category
+        ? await productService.getProductsByCategory(category)
+        : await productService.getProducts({
+            limit,
+            page: pageNum,
+          })
 
         if (append) {
           setProducts((prev) => {

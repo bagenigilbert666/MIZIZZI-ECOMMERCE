@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import { categoryService } from "@/services/category"
+import { getCategories } from "@/lib/server/get-categories"
 import { CategoriesPageContent } from "@/components/categories/page-content"
 import { defaultViewport } from "@/lib/metadata-utils"
 
@@ -17,7 +17,8 @@ export const metadata: Metadata = {
 }
 
 export default async function CategoriesPage() {
-  const categories = await categoryService.getCategories()
+  // Use server-side getCategories with React cache for instant data delivery
+  const categories = await getCategories(100)
 
   return <CategoriesPageContent categories={categories} />
 }

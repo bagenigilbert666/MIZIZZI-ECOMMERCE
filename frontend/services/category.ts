@@ -161,14 +161,20 @@ export const categoryService = {
     return this.getCategories({ featured: true })
   },
 
-  async getCategoryBySlug(slug: string): Promise<Category | null> {
+  async getCategoryBySlug(slug: string, forceRefresh = false): Promise<Category | null> {
     if (!slug) return null
     try {
       const cacheKey = `category-${slug}`
-      if (isCacheValid(cacheKey)) return cache.get(cacheKey)!.data
+      if (!forceRefresh && isCacheValid(cacheKey)) {
+        console.log("[v0] getCategoryBySlug - Using cached data for slug:", slug)
+        return cache.get(cacheKey)!.data
+      }
 
-      const response = await api.get(`${getBaseUrl()}${CATEGORIES_BASE}/slug/${encodeURIComponent(slug)}`)
+      const url = `${getBaseUrl()}${CATEGORIES_BASE}/slug/${encodeURIComponent(slug)}`
+      console.log("[v0] getCategoryBySlug - Fetching from URL:", url, { slug, forceRefresh })
+      const response = await api.get(url)
       const data = response.data ?? null
+      console.log("[v0] getCategoryBySlug - Response data:", { slug, dataId: data?.id, dataName: data?.name })
 
       const normalizedData = data ? normalizeCategoryImages(data) : null
 
@@ -201,9 +207,18 @@ export const categoryService = {
 
       data = data.map(normalizeCategoryImages)
 
-      cache.set(cacheKey, { data, timestamp: Date.now() })
+      // Remove duplicates by ID
+      const uniqueMap = new Map<number, Category>()
+      data.forEach((cat: Category) => {
+        if (!uniqueMap.has(cat.id)) {
+          uniqueMap.set(cat.id, cat)
+        }
+      })
+      const uniqueData = Array.from(uniqueMap.values())
+
+      cache.set(cacheKey, { data: uniqueData, timestamp: Date.now() })
       saveCacheToStorage()
-      return data
+      return uniqueData
     } catch (error) {
       console.error(`[v0] Error fetching subcategories for parent ${parentId}:`, error)
       return []
@@ -221,8 +236,18 @@ export const categoryService = {
     for (const url of tryEndpoints.slice(0, 2)) {
       try {
         const res = await api.get(`${getBaseUrl()}${url}`)
-        const items = res.data?.items ?? res.data ?? []
-        if (Array.isArray(items)) return items.map(normalizeCategoryImages)
+        let items = res.data?.items ?? res.data ?? []
+        if (Array.isArray(items)) {
+          const normalized = items.map(normalizeCategoryImages)
+          // Remove duplicates by ID
+          const uniqueMap = new Map<number, Category>()
+          normalized.forEach((cat) => {
+            if (!uniqueMap.has(cat.id)) {
+              uniqueMap.set(cat.id, cat)
+            }
+          })
+          return Array.from(uniqueMap.values())
+        }
       } catch {
         // continue to next pattern
       }
@@ -230,11 +255,94 @@ export const categoryService = {
 
     try {
       const res = await api.get(`${getBaseUrl()}${tryEndpoints[2]}`, { params: { category_id: categoryId } })
-      const items = res.data?.items ?? res.data ?? []
-      return Array.isArray(items) ? items.map(normalizeCategoryImages) : []
+      let items = res.data?.items ?? res.data ?? []
+      if (Array.isArray(items)) {
+        const normalized = items.map(normalizeCategoryImages)
+        // Remove duplicates by ID
+        const uniqueMap = new Map<number, Category>()
+        normalized.forEach((cat) => {
+          if (!uniqueMap.has(cat.id)) {
+            uniqueMap.set(cat.id, cat)
+          }
+        })
+        return Array.from(uniqueMap.values())
+      }
+      return []
     } catch (error) {
       return []
     }
+  },
+
+  async getRecommendedCategories(
+    currentCategoryId: number,
+    currentCategoryName: string,
+    allCategories: Category[]
+  ): Promise<Category[]> {
+    // Define category relationships based on common e-commerce patterns
+    const categoryKeywords: Record<string, string[]> = {
+      fashion: ["clothing", "apparel", "dress", "shirt", "pants", "shoes", "jacket", "coat", "sweater", "skirt"],
+      shoes: ["footwear", "sneakers", "boots", "sandals", "heels", "slippers", "loafers"],
+      bags: ["handbags", "backpacks", "luggage", "wallets", "purse", "satchel", "clutch"],
+      electronics: ["gadgets", "phones", "computers", "laptop", "camera", "headphones", "audio", "tech"],
+      home: ["furniture", "decor", "kitchen", "bedding", "lighting", "rugs", "curtains"],
+      beauty: ["cosmetics", "makeup", "skincare", "haircare", "fragrance", "perfume", "wellness"],
+      sports: ["athletic", "fitness", "outdoor", "gym", "running", "yoga", "sports"],
+      books: ["reading", "literature", "educational", "learning"],
+      toys: ["games", "children", "kids", "baby", "dolls", "puzzles"],
+      jewelry: ["accessories", "rings", "necklaces", "bracelets", "earrings", "watches"],
+    }
+
+    // Find matching categories based on keyword similarity
+    const currentNameLower = currentCategoryName.toLowerCase()
+    
+    // Find the best matching keyword group for current category
+    let matchedKeywords: string[] = []
+    for (const [_key, keywords] of Object.entries(categoryKeywords)) {
+      if (keywords.some(kw => currentNameLower.includes(kw) || kw.includes(currentNameLower.split(' ')[0]))) {
+        matchedKeywords = keywords
+        break
+      }
+    }
+
+    // If no keywords found, use the first word of category name
+    if (matchedKeywords.length === 0) {
+      const firstWord = currentNameLower.split(' ')[0]
+      matchedKeywords = [firstWord]
+    }
+
+    // Score and filter categories
+    const scoredCategories = allCategories
+      .filter(cat => cat.id !== currentCategoryId) // Exclude current category
+      .map(cat => {
+        const catNameLower = cat.name.toLowerCase()
+        let score = 0
+
+        // Check for keyword matches
+        matchedKeywords.forEach(keyword => {
+          if (catNameLower.includes(keyword)) {
+            score += 10
+          }
+        })
+
+        // Check for word overlap
+        const currentWords = currentNameLower.split(/\s+/)
+        const catWords = catNameLower.split(/\s+/)
+        const overlap = currentWords.filter(word => catWords.some(cw => cw.includes(word) || word.includes(cw)))
+        score += overlap.length * 5
+
+        // Boost categories with products
+        if ((cat.products_count || 0) > 0) {
+          score += 2
+        }
+
+        return { category: cat, score }
+      })
+      .sort((a, b) => b.score - a.score)
+      .filter(item => item.score > 0) // Only include categories with positive score
+      .slice(0, 12) // Limit to 12 recommendations
+      .map(item => item.category)
+
+    return scoredCategories
   },
 
   clearCache() {

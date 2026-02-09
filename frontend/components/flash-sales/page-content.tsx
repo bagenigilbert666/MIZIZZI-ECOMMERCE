@@ -1,32 +1,34 @@
 "use client"
 
-import React, {
-  useState,
-  useCallback,
-  useMemo,
-  memo,
-  useEffect,
-  useRef,
-} from "react"
+import { useRouter } from "next/navigation"
+
+import { useRef } from "react"
+
+import type React from "react"
+import { useState, useEffect, memo } from "react"
 import Link from "next/link"
+import { motion, AnimatePresence } from "framer-motion"
+import Image from "next/image"
 import {
-  Search,
-  X,
-  ShoppingBag,
+  ChevronUp,
+  ChevronRight,
+  Home,
+  Sparkles,
+  Zap,
+  Grid3X3,
   Heart,
   ShoppingCart,
-  ChevronDown,
-  Grid3X3,
-  LayoutGrid,
-  Tag,
-  TrendingUp,
-  Sparkles,
-  ArrowUpDown,
-  Zap,
   Loader2,
+  Tag,
+  ArrowUpDown,
+  Search,
+  X,
 } from "lucide-react"
-import Image from "next/image"
-import { Input } from "@/components/ui/input"
+import type { Category } from "@/services/category"
+import { cn } from "@/lib/utils"
+import type { Product } from "@/types"
+import { useCart } from "@/contexts/cart/cart-context"
+import { useToast } from "@/components/ui/use-toast"
 import {
   Select,
   SelectContent,
@@ -34,29 +36,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { FlashSaleBannerCarousel } from "@/components/flash-sales/banner-carousel"
-import type { FlashSaleProduct, FlashSaleEvent } from "@/lib/server/get-flash-sale-products"
-import { cloudinaryService } from "@/services/cloudinary-service"
-import { cn } from "@/lib/utils"
-import { useCart } from "@/contexts/cart/cart-context"
-import { useToast } from "@/components/ui/use-toast"
+import { Input } from "@/components/ui/input"
 
-/* ─── Types ─── */
-interface Product {
-  id: string | number
-  name: string
-  price: number
-  sale_price?: number | null
-  thumbnail_url?: string | null
-  image_urls?: string[] | null
-  category?: string
-  slug?: string
-  rating?: number
-}
-
-interface FlashSalesPageContentProps {
-  products: FlashSaleProduct[]
-  event?: FlashSaleEvent | null
+interface CategoryPageClientProps {
+  initialCategory: Category
+  initialAllCategories: Category[]
+  initialProducts: Product[]
+  initialSubcategories: Category[]
+  initialRecommendedCategories: Category[]
+  slug: string
 }
 
 /* ─── Intersection Observer hook for reveal-on-scroll ─── */
@@ -88,52 +76,8 @@ function useRevealOnScroll() {
   return ref
 }
 
-/* ─── Image URL helper ─── */
-function getProductImageUrl(product: Product): string {
-  if (product.thumbnail_url && product.thumbnail_url.startsWith("http")) {
-    return product.thumbnail_url
-  }
-  if (
-    product.image_urls &&
-    Array.isArray(product.image_urls) &&
-    product.image_urls.length > 0
-  ) {
-    const firstImage = product.image_urls[0]
-    if (typeof firstImage === "string") {
-      if (firstImage.startsWith("http")) return firstImage
-      if (firstImage.trim() !== "" && !firstImage.startsWith("blob:")) {
-        return cloudinaryService.generateOptimizedUrl(firstImage)
-      }
-    }
-  }
-  if (product.thumbnail_url && !product.thumbnail_url.startsWith("blob:")) {
-    return product.thumbnail_url
-  }
-  return "/generic-product-display.png"
-}
-
-function getSecondImageUrl(product: Product): string | null {
-  if (
-    product.image_urls &&
-    Array.isArray(product.image_urls) &&
-    product.image_urls.length > 1
-  ) {
-    const secondImage = product.image_urls[1]
-    if (typeof secondImage === "string" && secondImage.startsWith("http")) {
-      return secondImage
-    }
-  }
-  return null
-}
-
-/* ─── Discount helper ─── */
-function calculateDiscount(price: number, salePrice?: number | null): number {
-  if (salePrice == null || salePrice >= price) return 0
-  return Math.round(((price - salePrice) / price) * 100)
-}
-
 /* ─── Jumia-style Product Card ─── */
-const JumiaProductCard = memo(function JumiaProductCard({
+const PremiumProductCard = memo(function PremiumProductCard({
   product,
   index,
 }: {
@@ -147,9 +91,11 @@ const JumiaProductCard = memo(function JumiaProductCard({
   const { addToCart } = useCart()
   const { toast } = useToast()
 
-  const primaryImg = getProductImageUrl(product)
-  const secondImg = getSecondImageUrl(product)
-  const discount = calculateDiscount(product.price, product.sale_price)
+  const primaryImg = product.image_urls?.[0] || product.thumbnail_url || "/generic-product-display.png"
+  const secondImg = product.image_urls?.[1] || null
+  const discount = product.sale_price
+    ? Math.max(0, Math.round(((product.price - product.sale_price) / product.price) * 100))
+    : 0
 
   const handleAddToCart = async (e: React.MouseEvent) => {
     e.preventDefault()
@@ -254,7 +200,7 @@ const JumiaProductCard = memo(function JumiaProductCard({
                 setWished(!wished)
               }}
               className={cn(
-                "jumia-wish flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/90 backdrop-blur-sm shadow-md transition-colors",
+                "jumia-wish flex items-center justify-center w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-white/90 backdrop-blur-sm shadow-md transition-colors absolute top-1.5 right-1.5 z-10",
                 wished
                   ? "text-[#8B1538] opacity-100 transform scale-100"
                   : "text-gray-400 hover:text-[#8B1538]"
@@ -298,13 +244,6 @@ const JumiaProductCard = memo(function JumiaProductCard({
           prefetch={false}
           className="flex flex-col flex-grow p-2 sm:p-2.5 md:p-3"
         >
-          {/* Category tag */}
-          {product.category && (
-            <span className="text-[8px] sm:text-[9px] text-gray-400 uppercase tracking-wider font-medium mb-0.5 line-clamp-1">
-              {product.category}
-            </span>
-          )}
-
           {/* Product name */}
           <h3 className="text-gray-800 text-[10px] sm:text-xs md:text-sm font-medium line-clamp-2 leading-snug mb-1.5 min-h-[28px] sm:min-h-[34px] md:min-h-[40px] group-hover:text-[#8B1538] transition-colors duration-200">
             {product.name}
@@ -337,6 +276,64 @@ const JumiaProductCard = memo(function JumiaProductCard({
     </div>
   )
 })
+
+/* ─── Recommended Category Card ─── */
+function RecommendedCategoryCard({ category: cat }: { category: Category }) {
+  const [imageLoaded, setImageLoaded] = useState(false)
+
+  return (
+    <Link href={`/category/${cat.slug}`} prefetch={false} className="block h-full">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.9 }}
+        whileInView={{ opacity: 1, scale: 1 }}
+        viewport={{ once: true }}
+        transition={{ duration: 0.3 }}
+        className="group h-full overflow-hidden rounded-xl bg-white border border-gray-100 transition-all duration-300 hover:shadow-lg hover:border-[#8B1538]/30 hover:scale-105"
+      >
+        {/* Image Section */}
+        <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100">
+          {cat.image_url ? (
+            <Image
+              src={cat.image_url || "/placeholder.svg"}
+              alt={cat.name}
+              fill
+              sizes="(max-width: 640px) 33vw, (max-width: 1024px) 25vw, 20vw"
+              className={`w-full h-full object-cover transition-all duration-400 ${
+                imageLoaded ? "opacity-100" : "opacity-0"
+              } group-hover:scale-110`}
+              loading="lazy"
+              onLoad={() => setImageLoaded(true)}
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <Grid3X3 className="h-5 w-5 text-gray-300" />
+            </div>
+          )}
+          {!imageLoaded && cat.image_url && (
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
+              <div className="h-3 w-3 rounded-full border-2 border-gray-200 border-t-gray-400 animate-spin" />
+            </div>
+          )}
+        </div>
+
+        {/* Content Section */}
+        <div className="p-3 space-y-2">
+          <h3 className="line-clamp-1 text-xs font-semibold leading-tight text-gray-900 tracking-tight group-hover:text-[#8B1538] transition-colors">
+            {cat.name}
+          </h3>
+
+          {/* Product count */}
+          {cat.products_count && cat.products_count > 0 && (
+            <div className="text-xs text-gray-500 font-medium flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#8B1538]" />
+              {cat.products_count} {cat.products_count === 1 ? "item" : "items"}
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </Link>
+  )
+}
 
 /* ─── Filter Chip ─── */
 function FilterChip({
@@ -378,75 +375,35 @@ function FilterChip({
   )
 }
 
-/* ─── Main Flash Sales Page ─── */
-export function FlashSalesPageContent({
-  products: initialProducts,
-  event,
-}: FlashSalesPageContentProps) {
+function CategoryPageClient({
+  initialCategory,
+  initialAllCategories,
+  initialProducts,
+  initialSubcategories,
+  initialRecommendedCategories,
+  slug,
+}: CategoryPageClientProps) {
+  const router = useRouter()
+  const [showBackToTop, setShowBackToTop] = useState(false)
   const [sortBy, setSortBy] = useState("discount")
   const [searchQuery, setSearchQuery] = useState("")
-  const [displayCount, setDisplayCount] = useState(18)
-  const [loading, setLoading] = useState(false)
-  const [gridCols, setGridCols] = useState<"compact" | "regular">("compact")
-  const [activeFilter, setActiveFilter] = useState("deals")
+  const [displayCount, setDisplayCount] = useState(24)
 
-  // Reveal ref
+  // Use initial server-fetched data for instant display
+  const category = initialCategory
+  const products = initialProducts
+  const relatedCategories = initialRecommendedCategories
   const gridRef = useRevealOnScroll()
 
-  const INITIAL_DISPLAY = 18
-  const INCREMENT = 18
-
-  // Handle show more
-  const handleShowMore = () => {
-    setLoading(true)
-    setTimeout(() => {
-      setDisplayCount((prev) => prev + INCREMENT)
-      setLoading(false)
-      // Re-trigger reveal observer for new items
-      setTimeout(() => {
-        if (gridRef.current) {
-          const observer = new IntersectionObserver(
-            (entries) => {
-              entries.forEach((entry) => {
-                if (entry.isIntersecting) {
-                  entry.target.classList.add("revealed")
-                  observer.unobserve(entry.target)
-                }
-              })
-            },
-            { threshold: 0.08, rootMargin: "0px 0px -40px 0px" }
-          )
-          const items = gridRef.current.querySelectorAll(
-            ".jumia-reveal-item:not(.revealed)"
-          )
-          items.forEach((item) => observer.observe(item))
-        }
-      }, 50)
-    }, 500)
-  }
+  const INITIAL_DISPLAY = 24
+  const INCREMENT = 24
 
   // Filter and sort products
-  const filteredProducts = useMemo(() => {
-    let result = [...initialProducts]
-
-    // Search filter
-    if (searchQuery) {
-      result = result.filter((p) =>
-        p.name.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    }
-
-    // Category filter - flash sales are always deals by default
-    if (activeFilter === "trending") {
-      result = result.filter(
-        (p) => (p.rating || 3) >= 4 || (p.sale_price != null && p.sale_price < p.price)
-      )
-    } else if (activeFilter === "new") {
-      result = result.slice(0, Math.ceil(result.length * 0.3))
-    }
-
-    // Sort
-    result.sort((a, b) => {
+  const filteredProducts = products
+    .filter((p) =>
+      p.name.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+    .sort((a, b) => {
       if (sortBy === "price-asc")
         return (a.sale_price || a.price) - (b.sale_price || b.price)
       if (sortBy === "price-desc")
@@ -456,197 +413,210 @@ export function FlashSalesPageContent({
         const dB = b.sale_price ? (b.price - b.sale_price) / b.price : 0
         return dB - dA
       }
-      if (sortBy === "rating") {
-        return (b.rating || 3) - (a.rating || 3)
-      }
       return 0
     })
 
-    return result
-  }, [initialProducts, searchQuery, sortBy, activeFilter])
+  const displayedProducts = filteredProducts.slice(0, displayCount)
+  const hasMore = filteredProducts.length > displayCount
 
-  // Stats
-  const dealsCount = initialProducts.filter(
-    (p) => p.sale_price != null && calculateDiscount(p.price, p.sale_price) >= 10
-  ).length
+  // Monitor scroll position for back-to-top button
+  const handleScroll = () => {
+    setShowBackToTop(window.scrollY > 400)
+  }
 
-  if (!initialProducts || initialProducts.length === 0) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="container py-8 px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-2 mb-8">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">
-              Flash Sales
-            </h1>
-            <Zap className="h-6 w-6 text-[#8B1538]" />
-          </div>
-          <div className="bg-white rounded-2xl p-12 text-center shadow-sm border border-gray-100">
-            <Zap className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-            <p className="text-gray-500 text-sm">
-              No flash sale products available at the moment.
-            </p>
-          </div>
-        </div>
-      </div>
-    )
+  useEffect(() => {
+    window.addEventListener("scroll", handleScroll)
+    return () => window.removeEventListener("scroll", handleScroll)
+  }, [])
+
+  const scrollToTop = () => {
+    window.scrollTo({ top: 0, behavior: "smooth" })
+  }
+
+  const handleShowMore = () => {
+    setDisplayCount((prev) => prev + INCREMENT)
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 via-white to-gray-50">
-      <div className="container py-4 sm:py-6 px-3 sm:px-4 lg:px-8">
-        {/* ── Page Header ── */}
-        <div className="mb-5 sm:mb-6 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 tracking-tight text-balance">
-                Flash Sales
-              </h1>
-              <div className="jumia-count-badge flex items-center justify-center w-8 h-8 sm:w-9 sm:h-9 rounded-full bg-[#8B1538] text-white text-xs sm:text-sm font-bold">
-                {filteredProducts.length > 99
-                  ? "99+"
-                  : filteredProducts.length}
-              </div>
-            </div>
-            <p className="text-xs sm:text-sm text-gray-500">
-              Discover amazing lightning deals on premium products
-            </p>
-          </div>
-
-          {/* Search */}
-          <div className="relative w-full sm:w-auto sm:min-w-[280px] lg:min-w-[320px]">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-            <Input
-              type="text"
-              placeholder="Search flash sales..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="h-10 pl-10 pr-10 w-full rounded-xl border-gray-200 bg-white shadow-sm focus:ring-2 focus:ring-[#8B1538]/20 focus:border-[#8B1538] transition-all"
-            />
-            {searchQuery && (
-              <button
-                className="absolute right-3 top-1/2 -translate-y-1/2"
-                onClick={() => setSearchQuery("")}
-              >
-                <X className="h-4 w-4 text-gray-400 hover:text-gray-600 transition-colors" />
-              </button>
-            )}
-          </div>
+    <div className="min-h-screen bg-white">
+      {/* Breadcrumb navigation */}
+      <motion.div
+        className="bg-white border-b border-gray-200 sticky top-0 z-40"
+        initial={{ y: -10, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+      >
+        <div className="container mx-auto px-3 sm:px-4 lg:px-8">
+          <nav className="flex items-center text-xs sm:text-sm text-gray-600 py-3 overflow-x-auto">
+            <Link
+              href="/"
+              className="flex items-center hover:text-gray-900 transition-colors whitespace-nowrap"
+            >
+              <Home className="h-3.5 w-3.5 mr-1" />
+              <span>Home</span>
+            </Link>
+            <ChevronRight className="h-3.5 w-3.5 mx-2 text-gray-400 flex-shrink-0" />
+            <Link
+              href="/categories"
+              className="hover:text-gray-900 transition-colors whitespace-nowrap"
+            >
+              Categories
+            </Link>
+            <ChevronRight className="h-3.5 w-3.5 mx-2 text-gray-400 flex-shrink-0" />
+            <span className="font-medium text-gray-900 whitespace-nowrap">{category.name}</span>
+          </nav>
         </div>
+      </motion.div>
 
-        {/* ── Flash Sale Banner ── */}
-        <FlashSaleBannerCarousel event={event} />
-
-        {/* ── Filter Chips + Sort Bar ── */}
-        <div className="mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          {/* Filter chips */}
-          <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-            <FilterChip
-              label="All Deals"
-              active={activeFilter === "deals"}
-              onClick={() => setActiveFilter("deals")}
-              icon={<Zap className="h-3.5 w-3.5" />}
-              count={initialProducts.length}
-            />
-            <FilterChip
-              label="Trending"
-              active={activeFilter === "trending"}
-              onClick={() => setActiveFilter("trending")}
-              icon={<TrendingUp className="h-3.5 w-3.5" />}
-            />
-            <FilterChip
-              label="New"
-              active={activeFilter === "new"}
-              onClick={() => setActiveFilter("new")}
-              icon={<Sparkles className="h-3.5 w-3.5" />}
-            />
-          </div>
-
-          {/* Sort dropdown */}
-          <Select value={sortBy} onValueChange={setSortBy}>
-            <SelectTrigger className="h-9 w-[170px] text-xs sm:text-sm rounded-xl border-gray-200 bg-white shadow-sm">
-              <div className="flex items-center gap-1.5">
-                <ArrowUpDown className="h-3.5 w-3.5 text-gray-400" />
-                <SelectValue placeholder="Sort by" />
-              </div>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="discount">Highest Discount</SelectItem>
-              <SelectItem value="price-asc">Price: Low to High</SelectItem>
-              <SelectItem value="price-desc">Price: High to Low</SelectItem>
-              <SelectItem value="rating">Highest Rated</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        {/* ── Product Grid ── */}
-        <div
-          ref={gridRef}
-          className="rounded-xl overflow-hidden bg-white border border-gray-100 shadow-sm"
+      <div className="container py-6 sm:py-8 px-3 sm:px-4 lg:px-8">
+        {/* ── Flash Sale Header ── */}
+        <motion.div
+          className="mb-8"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
         >
-          {filteredProducts.length === 0 ? (
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <motion.div
+                  initial={{ rotate: -10, scale: 0.8 }}
+                  animate={{ rotate: 0, scale: 1 }}
+                  transition={{ duration: 0.4 }}
+                >
+                  <Zap className="h-7 w-7 sm:h-8 sm:w-8 text-[#8B1538] fill-[#8B1538]" />
+                </motion.div>
+                <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 tracking-tight text-balance">
+                  {category.name}
+                </h1>
+              </div>
+              <motion.div
+                initial={{ scale: 0, rotate: -180 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ type: "spring", stiffness: 260, damping: 20 }}
+                className="flex items-center justify-center px-4 py-2 rounded-full bg-[#8B1538] text-white font-bold shadow-lg"
+              >
+                <span className="text-sm sm:text-base">{filteredProducts.length} Items</span>
+              </motion.div>
+            </div>
+
+            {/* Search & Sort Bar - Compact */}
+            <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+              <div className="relative flex-1 sm:max-w-xs">
+                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  type="text"
+                  placeholder="Search..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-10 pl-10 pr-10 w-full rounded-lg border-gray-200 bg-white shadow-sm focus:ring-2 focus:ring-[#8B1538]/20 focus:border-[#8B1538] transition-all text-sm"
+                />
+                {searchQuery && (
+                  <motion.button
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3 top-1/2 -translate-y-1/2"
+                  >
+                    <X className="h-4 w-4 text-gray-400 hover:text-gray-600 transition-colors" />
+                  </motion.button>
+                )}
+              </div>
+
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="h-10 w-full sm:w-auto sm:min-w-[160px] text-xs sm:text-sm rounded-lg border-gray-200 bg-white shadow-sm">
+                  <div className="flex items-center gap-1.5">
+                    <ArrowUpDown className="h-3.5 w-3.5 text-gray-400" />
+                    <SelectValue placeholder="Sort" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="discount">Highest Discount</SelectItem>
+                  <SelectItem value="price-asc">Price: Low to High</SelectItem>
+                  <SelectItem value="price-desc">Price: High to Low</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* ── Recommended Categories Section ── */}
+
+
+        {/* ── Flash Sale Products Grid ── */}
+        <motion.div
+          className="mt-8"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.2 }}
+        >
+          {displayedProducts.length === 0 ? (
             <div className="py-16 text-center">
               <Search className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-              <p className="text-gray-500 text-sm mb-2">No flash sale products found</p>
-              <button
-                onClick={() => {
-                  setSearchQuery("")
-                  setActiveFilter("deals")
-                }}
-                className="text-[#8B1538] text-sm font-medium hover:underline"
-              >
-                Clear all filters
-              </button>
+              <p className="text-gray-500 text-sm">
+                {searchQuery
+                  ? `No products found matching "${searchQuery}"`
+                  : "No products available in this category"}
+              </p>
             </div>
           ) : (
-            <div
-              className={cn(
-                "grid gap-[1px] bg-gray-100",
-                gridCols === "compact"
-                  ? "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6"
-                  : "grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4"
-              )}
-            >
-              {filteredProducts.slice(0, displayCount).map((product, idx) => (
-                <JumiaProductCard
-                  key={product.id}
-                  product={product}
-                  index={idx}
-                />
-              ))}
-            </div>
-          )}
-
-          {/* Show More Button */}
-          {filteredProducts.length > displayCount && (
-            <div className="flex flex-col items-center gap-2 py-6 sm:py-8 bg-white border-t border-gray-100">
-              <p className="text-xs text-gray-400">
-                Showing {Math.min(displayCount, filteredProducts.length)} of{" "}
-                {filteredProducts.length} deals
-              </p>
-              <button
-                onClick={handleShowMore}
-                disabled={loading}
-                className="group relative flex items-center justify-center px-10 sm:px-14 py-2.5 sm:py-3 bg-white text-gray-700 font-semibold rounded-full border-2 border-gray-200 hover:border-[#8B1538] hover:text-[#8B1538] transition-all duration-300 disabled:opacity-60 disabled:cursor-not-allowed min-w-[180px] sm:min-w-[220px] text-xs sm:text-sm overflow-hidden"
+            <>
+              <div
+                ref={gridRef}
+                className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5 sm:gap-3"
               >
-                {/* Hover background fill */}
-                <span className="absolute inset-0 bg-[#8B1538]/5 scale-x-0 group-hover:scale-x-100 transition-transform duration-300 origin-left rounded-full" />
+                <AnimatePresence>
+                  {displayedProducts.map((product, idx) => (
+                    <PremiumProductCard
+                      key={`${product.id}-${idx}`}
+                      product={product}
+                      index={idx}
+                    />
+                  ))}
+                </AnimatePresence>
+              </div>
 
-                {loading ? (
-                  <div className="flex items-center gap-2 relative z-10">
-                    <div className="w-4 h-4 rounded-full border-2 border-gray-300 border-t-[#8B1538] animate-spin" />
-                    <span>Loading...</span>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-2 relative z-10">
-                    <ChevronDown className="h-4 w-4 group-hover:animate-bounce" />
-                    <span>Show More Deals</span>
-                  </div>
-                )}
-              </button>
-            </div>
+              {/* Load More Button */}
+              {hasMore && (
+                <motion.div
+                  className="mt-8 flex justify-center"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.3 }}
+                >
+                  <motion.button
+                    onClick={handleShowMore}
+                    whileHover={{ scale: 1.05, boxShadow: "0 20px 25px -5px rgba(139, 21, 56, 0.3)" }}
+                    whileTap={{ scale: 0.95 }}
+                    className="px-8 py-3 bg-[#8B1538] text-white font-semibold rounded-full shadow-lg hover:bg-[#6B1028] transition-colors"
+                  >
+                    Load More ({filteredProducts.length - displayCount})
+                  </motion.button>
+                </motion.div>
+              )}
+            </>
           )}
-        </div>
+        </motion.div>
       </div>
+
+      {/* Back to top button */}
+      <AnimatePresence>
+        {showBackToTop && (
+          <motion.button
+            initial={{ opacity: 0, scale: 0.8, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.8, y: 20 }}
+            whileHover={{ scale: 1.1 }}
+            whileTap={{ scale: 0.95 }}
+            className="fixed bottom-8 right-8 z-40 h-12 w-12 rounded-full bg-gradient-to-r from-[#8B1538] to-[#6B1028] text-white shadow-xl flex items-center justify-center hover:shadow-2xl transition-all"
+            onClick={scrollToTop}
+            aria-label="Back to top"
+          >
+            <ChevronUp className="h-6 w-6" />
+          </motion.button>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
+
+export default CategoryPageClient

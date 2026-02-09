@@ -21,31 +21,46 @@ export interface CategoryWithSubcategories extends Category {
 const BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "https://mizizzi-ecommerce-1.onrender.com"
 
-// Normalize image URLs to ensure they're valid
+// Fast image URL normalization - same pattern as flash-sales
+// Returns valid URLs immediately without additional transformation
 function normalizeImageUrl(url: string | undefined | null): string | undefined {
   if (!url || url === "null" || url === "undefined" || url.trim() === "") {
     return undefined
   }
+  // Already a full URL - return immediately
   if (url.startsWith("http") || url.startsWith("data:")) {
     return url
   }
+  // Relative URL - prepend base URL
   if (url.startsWith("/")) {
     return `${BASE_URL}${url}`
   }
+  // Return as-is - will be optimized by Cloudinary service on client
   return url
 }
 
 // Server-side category fetcher with React cache for deduplication
+// Fast caching pattern same as flash-sales (60s revalidate + real-time product counts)
 export const getCategories = cache(async (limit = 20): Promise<Category[]> => {
   try {
-    const response = await fetch(`${BASE_URL}/api/categories?parent_id=null&per_page=${limit}`, {
-      next: { revalidate: 300, tags: ["categories"] },
+    console.log("[v0] getCategories: Fetching from", `${BASE_URL}/api/categories?parent_id=null&per_page=${limit}`)
+    
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 8000) // 8 second timeout
+
+    // Fetch with include_product_count to get real-time item counts
+    const response = await fetch(`${BASE_URL}/api/categories?parent_id=null&per_page=${limit}&include_product_count=true`, {
+      signal: controller.signal,
+      next: { revalidate: 30, tags: ["categories"] }, // Even faster cache + real-time counts
       headers: {
         "Content-Type": "application/json",
       },
     })
 
+    clearTimeout(timeoutId)
+
     if (!response.ok) {
+      console.warn("[v0] getCategories: Failed to fetch, status:", response.status)
       return []
     }
 
@@ -53,20 +68,30 @@ export const getCategories = cache(async (limit = 20): Promise<Category[]> => {
     let categories = data?.items ?? data ?? []
 
     if (!Array.isArray(categories)) {
+      console.warn("[v0] getCategories: Response is not an array")
       return []
     }
 
-    // Normalize image URLs and filter active categories
+    console.log("[v0] getCategories: Raw API response (first item):", JSON.stringify(categories[0], null, 2))
+
+    // Normalize image URLs, filter active categories, and map products_count from API
     categories = categories
       .filter((cat: any) => cat.is_active !== false)
-      .map((cat: any) => ({
-        ...cat,
-        image_url: normalizeImageUrl(cat.image_url),
-        banner_url: normalizeImageUrl(cat.banner_url),
-      }))
+      .map((cat: any) => {
+        const mapped = {
+          ...cat,
+          image_url: normalizeImageUrl(cat.image_url),
+          banner_url: normalizeImageUrl(cat.banner_url),
+          product_count: cat.products_count ?? cat.product_count ?? 0,
+        }
+        console.log(`[v0] getCategories: ${cat.name} - API products_count=${cat.products_count}, mapped product_count=${mapped.product_count}`)
+        return mapped
+      })
 
+    console.log("[v0] getCategories: Fetched", categories.length, "categories with real product counts")
     return categories
   } catch (error) {
+    console.error("[v0] getCategories: Error:", error)
     return []
   }
 })

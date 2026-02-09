@@ -1,5 +1,6 @@
 import { Inter } from "next/font/google"
 import "./globals.css"
+import "@/styles/categories-animations.css"
 import { Providers as AppProviders } from "./providers"
 import { Providers as StateProviders } from "@/components/providers/index"
 import type React from "react"

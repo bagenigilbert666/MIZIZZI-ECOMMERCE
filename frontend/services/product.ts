@@ -307,7 +307,7 @@ export const productService = {
       const cachedItem = productCache.get(cacheKey)
 
       if (cachedItem && now - cachedItem.timestamp < CACHE_DURATION) {
-        console.log(`[v0] Using cached products for category ${categorySlug}`)
+        console.log(`[v0] Using cached products for category ${categorySlug} - count: ${cachedItem.data.length}`)
         return cachedItem.data
       }
 
@@ -343,8 +343,11 @@ export const productService = {
 
       // Now fetch products using the category ID
       const url = `${API_BASE_URL}/api/products/`
+      const mappedParams = mapFrontendParamsToBackend({ category_id: categoryId })
+      console.log(`[v0] Fetching products with params:`, { categoryId, mappedParams })
+      
       const response = await api.get(url, {
-        params: mapFrontendParamsToBackend({ category_id: categoryId }),
+        params: mappedParams,
       })
       console.log(`[v0] API response for category products (ID: ${categoryId}):`, (response as any)?.data ?? response)
       const products: Product[] = extractProducts(response)
@@ -356,6 +359,9 @@ export const productService = {
         products.map(async (product) => {
           // Normalize price data
           product = this.normalizeProductPrices(product)
+
+          // Normalize/repair image_urls into a consistent, display-ready array
+          product = normalizeProductImages(product)
 
           // Fetch product images if they're not already included
           if ((!product.image_urls || product.image_urls.length === 0) && product.id) {
@@ -376,6 +382,9 @@ export const productService = {
               console.error(`Error fetching images for product ${product.id}:`, error)
             }
           }
+
+          // Re-normalize after image fetch (handles relative paths, etc.)
+          product = normalizeProductImages(product)
 
           return {
             ...product,

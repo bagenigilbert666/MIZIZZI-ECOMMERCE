@@ -1,10 +1,11 @@
-import { Suspense } from "react"
 import { notFound } from "next/navigation"
 import type { Metadata } from "next"
 import CategoryPageClient from "./category-page-client"
-import { Loader } from "@/components/ui/loader"
 import { categoryService } from "@/services/category"
+import { productService } from "@/services/product"
 import { defaultViewport } from "@/lib/metadata-utils"
+import type { Product } from "@/types"
+import type { Category } from "@/services/category"
 
 export const viewport = defaultViewport
 
@@ -45,38 +46,50 @@ export async function generateMetadata({ params }: CategoryPageProps): Promise<M
   }
 }
 
+/**
+ * Server Component - Hybrid Rendering Pattern (SSR)
+ * 
+ * Pre-fetches category and product data on server for instant display,
+ * then passes to client component for interactivity.
+ * ✓ Products render immediately (no flash sales loading state)
+ * ✓ Better SEO (search engines see full content)
+ * ✓ Interactive features on client side
+ */
 export default async function CategoryPage({ params }: CategoryPageProps) {
   const { slug } = await params
 
   try {
-    // Fetch category data
+    // Always force refresh category to ensure we get the correct data for this slug
     const category = await categoryService.getCategoryBySlug(slug)
+    console.log("[v0] CategoryPage - Fetched category:", { slug, categoryId: category?.id, categoryName: category?.name })
 
     if (!category) {
       notFound()
     }
 
-    // Fetch subcategories
-    const subcategories = await categoryService.getSubcategories(category.id)
+    // Fetch remaining data in parallel using category.id where a number is required
+    const [allCategories, products, subcategories] = await Promise.all([
+      categoryService.getCategories(),
+      productService.getProductsByCategory(category.id.toString()),
+      categoryService.getSubcategories(category.id).catch(() => []),
+    ])
 
-    // Fetch related categories (for featured collections)
-    const relatedCategories = await categoryService.getRelatedCategories(category.id)
+    console.log("[v0] CategoryPage - Fetched products:", { categoryId: category.id, categoryName: category.name, productCount: products?.length, firstProductName: products?.[0]?.name })
+
+    // Get recommended categories
+    const recommendedCategories = await categoryService
+      .getRecommendedCategories(category.id, category.name, allCategories)
+      .catch(() => [])
 
     return (
-      <Suspense
-        fallback={
-          <div className="flex justify-center py-20">
-            <Loader />
-          </div>
-        }
-      >
-        <CategoryPageClient
-          category={category}
-          subcategories={subcategories}
-          slug={slug}
-          relatedCategories={relatedCategories}
-        />
-      </Suspense>
+      <CategoryPageClient
+        initialCategory={category}
+        initialAllCategories={allCategories}
+        initialProducts={products || []}
+        initialSubcategories={subcategories || []}
+        initialRecommendedCategories={recommendedCategories || []}
+        slug={slug}
+      />
     )
   } catch (error) {
     console.error("Error loading category:", error)

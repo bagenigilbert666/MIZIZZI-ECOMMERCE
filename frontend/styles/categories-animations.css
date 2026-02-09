@@ -1,0 +1,253 @@
+/**
+ * Optimized animations for 60fps performance
+ * Uses GPU-accelerated properties: transform, opacity, and filter
+ */
+
+/* ─── Reveal Animation (Intersection Observer based) ─── */
+.jumia-reveal-item {
+  opacity: 0;
+  transform: translateY(8px);
+  animation: none;
+}
+
+.jumia-reveal-item.is-visible {
+  animation: revealItem 0.4s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes revealItem {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ─── Card Animations ─── */
+.jumia-card {
+  will-change: transform, box-shadow;
+  backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.jumia-card:hover {
+  animation: cardHover 0.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+.jumia-card:active {
+  animation: cardActive 0.15s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes cardHover {
+  from {
+    transform: translateY(0) scale(1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  }
+
+  to {
+    transform: translateY(-2px) scale(1.01);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  }
+}
+
+@keyframes cardActive {
+  from {
+    transform: translateY(-2px) scale(1.01);
+  }
+
+  to {
+    transform: translateY(0) scale(0.99);
+  }
+}
+
+/* ─── Image Placeholder Animation ─── */
+.jumia-img-wrap {
+  will-change: opacity;
+  backface-visibility: hidden;
+}
+
+/* Fade-out placeholder on image load */
+.jumia-img-wrap img {
+  will-change: opacity;
+  backface-visibility: hidden;
+}
+
+/* ─── Overlay Gradient (GPU accelerated) ─── */
+.jumia-overlay {
+  will-change: background-color;
+  backface-visibility: hidden;
+  transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ─── Badge Animation ─── */
+.jumia-badge {
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  animation: badgePulse 2s ease-in-out infinite;
+}
+
+@keyframes badgePulse {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+
+  50% {
+    transform: scale(1.05);
+    opacity: 0.95;
+  }
+}
+
+/* ─── Actions Button Animation ─── */
+.jumia-actions {
+  will-change: opacity, transform;
+  backface-visibility: hidden;
+  perspective: 1000px;
+}
+
+.jumia-actions button {
+  will-change: transform, background-color;
+  backface-visibility: hidden;
+  transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.jumia-actions button:active {
+  transform: scale(0.95);
+}
+
+/* ─── Count Badge Animation ─── */
+.jumia-count-badge {
+  will-change: contents;
+  backface-visibility: hidden;
+}
+
+/* ─── Skeleton Loading Animation ─── */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
+}
+
+/* ─── Scroll Performance Optimizations ─── */
+.grid {
+  will-change: contents;
+  contain: layout style paint;
+}
+
+/* Optimize scrollbar visibility */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* ─── Prevent layout shifts ─── */
+img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+/* ─── Optimize text rendering ─── */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ─── Input focus optimization ─── */
+input:focus {
+  outline: none;
+}
+
+/* ─── GPU layer optimization ─── */
+.will-change-opacity {
+  will-change: opacity;
+}
+
+.will-change-transform {
+  will-change: transform;
+}
+
+.will-change-contents {
+  will-change: contents;
+}
+
+/* ─── Reduced motion support ─── */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .jumia-reveal-item {
+    opacity: 1 !important;
+    transform: translateY(0) !important;
+  }
+}
+
+/* ─── High DPI screen optimizations ─── */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+  /* Reduce animations on high-performance displays */
+  .jumia-card {
+    backface-visibility: hidden;
+  }
+}
+
+/* ─── Dark mode support ─── */
+@media (prefers-color-scheme: dark) {
+  .jumia-overlay {
+    background-color: rgba(0, 0, 0, 0.2);
+  }
+}
+
+/* ─── Touch interaction optimization ─── */
+@media (hover: none) and (pointer: coarse) {
+  .jumia-card:hover {
+    animation: none;
+    transform: none;
+  }
+
+  .jumia-card:active {
+    animation: cardActive 0.15s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  }
+
+  /* Increase touch target size */
+  button {
+    min-height: 44px;
+    min-width: 44px;
+  }
+}
+
+/* ─── Container Queries for modern layouts ─── */
+@supports (container-type: inline-size) {
+  .grid {
+    container-type: inline-size;
+  }
+}
