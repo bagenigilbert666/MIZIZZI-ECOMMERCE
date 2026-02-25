@@ -103,15 +103,12 @@ export function ProductsBannerCarousel() {
             className="relative w-full h-full"
           >
             <Image
-              src="https://images.pexels.com/photos/1640777/pexels-photo-1640777.jpeg?w=1200&q=80&auto=format"
+              src="https://images.pexels.com/photos/1640777/pexels-photo-1640777.jpeg"
               alt="Premium products"
               fill
               sizes="(max-width: 768px) 100vw, 66vw"
               className="object-cover"
               priority
-              quality={82}
-              loading="eager"
-              decoding="async"
             />
             {/* Subtle overlay */}
             <div className="absolute inset-0 bg-gradient-to-r from-cherry-900/10 to-transparent" />

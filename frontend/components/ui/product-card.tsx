@@ -3,7 +3,6 @@ import { Heart } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import Image from "next/image"
 import { cn } from "@/lib/utils"
-import { getOptimizedImageUrl } from "@/lib/image-optimization"
 
 interface Product {
   id: number
@@ -22,12 +21,6 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product, className }: ProductCardProps) {
-  const optimizedImageUrl = getOptimizedImageUrl(product.image, {
-    width: 400,
-    quality: 80,
-    format: "auto",
-  })
-
   return (
     <Link href={`/product/${product.id}`}>
       <div
@@ -38,14 +31,12 @@ export function ProductCard({ product, className }: ProductCardProps) {
       >
         <div className="relative aspect-square overflow-hidden bg-gray-50">
           <Image
-            src={optimizedImageUrl || "/placeholder.svg"}
+            src={product.image || "/placeholder.svg"}
             alt={product.name}
             fill
             className="object-cover transition-transform duration-300 group-hover:scale-105"
             sizes="(max-width: 768px) 50vw, (max-width: 1200px) 33vw, 25vw"
-            quality={80}
-            loading="lazy"
-            decoding="async"
+          />
           {product.originalPrice && (
             <div className="absolute left-3 top-3 rounded-full bg-cherry-800 px-2.5 py-1 text-[10px] font-bold text-white shadow-sm">
               -{Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)}% OFF

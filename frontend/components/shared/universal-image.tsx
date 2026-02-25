@@ -152,7 +152,6 @@ export function UniversalImage({
           priority={priority}
           loading={priority ? "eager" : "lazy"}
           sizes={sizes}
-          decoding="async"
           className={cn(
             "w-full h-full transition-all duration-300",
             isLoading ? "scale-105 blur-md" : "scale-100 blur-0",
