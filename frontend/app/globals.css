@@ -1,3 +1,22 @@
+/* Critical CSS for above-the-fold content - optimizes LCP */
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background-color: #f7f7f7;
+  color: #212121;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Prevent layout shift during font loading */
+@font-face {
+  font-family: system-ui;
+  src: local('.SFNSText-Regular'), local('Helvetica Neue'), local('Segoe UI'), local('Roboto'), local('Oxygen'), local('Ubuntu'), local('Cantarell'), sans-serif;
+}
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
