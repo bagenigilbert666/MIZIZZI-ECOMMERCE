@@ -6,8 +6,6 @@ const nextConfig = {
     NEXT_PUBLIC_WEBSOCKET_URL: process.env.NEXT_PUBLIC_WEBSOCKET_URL || 'wss://mizizzi-ecommerce-1.onrender.com',
     NEXT_PUBLIC_ENABLE_WEBSOCKET: process.env.NEXT_PUBLIC_ENABLE_WEBSOCKET || 'true',
   },
-  // Performance: Enable SWC for faster compilation
-  swcMinify: true,
   // Performance: Aggressively optimize production builds
   productionBrowserSourceMaps: false,
   // Performance: Compress HTML
@@ -18,6 +16,8 @@ const nextConfig = {
   poweredByHeader: false,
   // Performance: React strict mode OFF to reduce overhead (for performance, not best practice)
   reactStrictMode: false,
+  // Performance: Enable cache components (replaces PPR in Next.js 16)
+  cacheComponents: true,
   // Performance: Parallel exports for faster builds
   experimental: {
     optimizePackageImports: [
@@ -28,8 +28,6 @@ const nextConfig = {
       '@radix-ui/react-popover',
       'lucide-react',
     ],
-    // Experimental: faster rendering during builds
-    ppr: true,
   },
   images: {
     // Enable Next.js image optimization for proper serving, AVIF/WebP generation, and responsive sizing
