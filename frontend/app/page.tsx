@@ -1,5 +1,5 @@
 import { Suspense } from "react"
-import { getCarouselItems, getPremiumExperiences } from "@/lib/server/get-carousel-data"
+import { getCarouselItems, getPremiumExperiences, getProductShowcase } from "@/lib/server/get-carousel-data"
 import { getCategories } from "@/lib/server/get-categories"
 import { HomeContent } from "@/components/home/home-content"
 import { HomeLoader } from "@/components/home/home-loader"
@@ -16,15 +16,16 @@ export const revalidate = 60
 // CRITICAL PATH: Only the absolute essentials needed for visible viewport
 async function CriticalPath() {
   try {
-    const [categories, carouselItems, premiumExperiences] = await Promise.all([
+    const [categories, carouselItems, premiumExperiences, productShowcase] = await Promise.all([
       getCategories(8), // Reduced from 20 - only show 8 categories above fold
       getCarouselItems(),
       getPremiumExperiences(),
+      getProductShowcase(), // Product showcase visible on homepage
     ])
-    return { categories, carouselItems, premiumExperiences }
+    return { categories, carouselItems, premiumExperiences, productShowcase }
   } catch (error) {
     console.error("[v0] Critical path error:", error)
-    return { categories: [], carouselItems: [], premiumExperiences: [] }
+    return { categories: [], carouselItems: [], premiumExperiences: [], productShowcase: [] }
   }
 }
 
@@ -62,6 +63,7 @@ export default async function Home() {
         categories={critical.categories}
         carouselItems={critical.carouselItems}
         premiumExperiences={critical.premiumExperiences}
+        productShowcase={critical.productShowcase}
         // Required product arrays - start with empty, will be populated by deferred content
         flashSaleProducts={[]}
         luxuryProducts={[]}
