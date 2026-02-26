@@ -57,24 +57,25 @@ export default async function Home() {
   const critical = await CriticalPath()
 
   return (
-    <HomeContent
-      categories={critical.categories}
-      carouselItems={critical.carouselItems}
-      premiumExperiences={critical.premiumExperiences}
-      // Required product arrays - start with empty, will be populated by deferred content
-      flashSaleProducts={[]}
-      luxuryProducts={[]}
-      newArrivals={[]}
-      topPicks={[]}
-      trendingProducts={[]}
-      dailyFinds={[]}
-      allProducts={[]}
-      allProductsHasMore={false}
-    >
+    <>
+      <HomeContent
+        categories={critical.categories}
+        carouselItems={critical.carouselItems}
+        premiumExperiences={critical.premiumExperiences}
+        // Required product arrays - start with empty, will be populated by deferred content
+        flashSaleProducts={[]}
+        luxuryProducts={[]}
+        newArrivals={[]}
+        topPicks={[]}
+        trendingProducts={[]}
+        dailyFinds={[]}
+        allProducts={[]}
+        allProductsHasMore={false}
+      />
       <Suspense fallback={null}>
         <DeferredContentStreamer />
       </Suspense>
-    </HomeContent>
+    </>
   )
 }
 
