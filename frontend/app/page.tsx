@@ -23,20 +23,15 @@ export const revalidate = 60
 
 // CRITICAL PATH: Fast with 3-second timeout - shows page instantly
 async function CriticalContent() {
-  const timeout = <T,>(promise: Promise<T>, ms: number = 3000): Promise<T | []> =>
-    Promise.race([
-      promise,
+  const timeout = <T extends any[] = any>(promise: Promise<T>, ms: number = 3000): Promise<T | []> => {
+    return Promise.race([
+      promise as Promise<T | []>,
       new Promise<[]>(resolve => setTimeout(() => resolve([]), ms))
-    ]).catch(() => [])
+    ]).catch(() => [] as unknown as T)
+  }
 
   try {
-    const [
-      categories,
-      carouselItems,
-      premiumExperiences,
-      productShowcase,
-      contactCTASlides,
-    ] = await Promise.all([
+    const results = await Promise.all([
       timeout(getCategories(20)),
       timeout(getCarouselItems()),
       timeout(getPremiumExperiences()),
@@ -45,20 +40,20 @@ async function CriticalContent() {
     ])
 
     return {
-      categories: (Array.isArray(categories) ? categories : []) as any[],
-      carouselItems: (Array.isArray(carouselItems) ? carouselItems : []) as any[],
-      premiumExperiences: (Array.isArray(premiumExperiences) ? premiumExperiences : []) as any[],
-      productShowcase: (Array.isArray(productShowcase) ? productShowcase : []) as any[],
-      contactCTASlides: (Array.isArray(contactCTASlides) ? contactCTASlides : []) as any[],
+      categories: Array.isArray(results[0]) ? results[0] : [],
+      carouselItems: Array.isArray(results[1]) ? results[1] : [],
+      premiumExperiences: Array.isArray(results[2]) ? results[2] : [],
+      productShowcase: Array.isArray(results[3]) ? results[3] : [],
+      contactCTASlides: Array.isArray(results[4]) ? results[4] : [],
     }
   } catch (error) {
     console.error("[v0] Critical content error:", error)
     return {
-      categories: [] as any[],
-      carouselItems: [] as any[],
-      premiumExperiences: [] as any[],
-      productShowcase: [] as any[],
-      contactCTASlides: [] as any[],
+      categories: [],
+      carouselItems: [],
+      premiumExperiences: [],
+      productShowcase: [],
+      contactCTASlides: [],
     }
   }
 }
