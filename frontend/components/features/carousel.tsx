@@ -42,10 +42,41 @@ export const Carousel = memo(function Carousel({
   featureCards = [],
   productShowcase = [],
 }: CarouselProps) {
+  // Use server items or fallback to feature cards or minimal placeholder
+  // This ensures carousel always displays something
+  const displayItems = useMemo(() => {
+    if (serverCarouselItems && serverCarouselItems.length > 0) {
+      return serverCarouselItems;
+    }
+    // Show feature cards as fallback if carousel is empty
+    if (featureCards && featureCards.length > 0) {
+      return featureCards.map(card => ({
+        image: card.image || "/placeholder.svg",
+        title: card.title,
+        description: card.description,
+        buttonText: card.button_text || "Learn More",
+        href: card.link_url || "/products",
+        badge: card.badge_text
+      }));
+    }
+    // Show contact CTA as last resort
+    if (contactCTASlides && contactCTASlides.length > 0) {
+      return contactCTASlides.map(slide => ({
+        image: slide.image || "/placeholder.svg",
+        title: slide.title,
+        description: slide.description,
+        buttonText: slide.button_text || "Contact Us",
+        href: slide.link_url || "/contact",
+      }));
+    }
+    // Return empty to let component return null
+    return [];
+  }, [serverCarouselItems, featureCards, contactCTASlides]);
+
   const { sidePanelsVisible, isDesktop } = useResponsiveLayout()
 
   // Memoize carousel items to prevent unnecessary re-renders
-  const carouselItems = useMemo(() => serverCarouselItems, [serverCarouselItems])
+  const carouselItems = useMemo(() => displayItems, [displayItems])
 
   const { currentSlide, direction, isPaused, nextSlide, prevSlide, pause, resume } = useCarousel({
     itemsLength: carouselItems.length || 1,
