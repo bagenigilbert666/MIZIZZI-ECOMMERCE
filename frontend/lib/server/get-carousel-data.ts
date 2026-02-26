@@ -182,8 +182,7 @@ export const getCarouselItems = cache(async (): Promise<CarouselItem[]> => {
 
     if (data.success && data.items && data.items.length > 0) {
       return data.items.map((item: any) => ({
-        // Always use external URL, never data URLs for performance
-        image: (item.image_url && !item.image_url.startsWith("data:")) ? item.image_url : "/placeholder.svg",
+        image: item.image_url,
         title: item.title,
         description: item.description,
         buttonText: item.button_text || "Shop Now",
