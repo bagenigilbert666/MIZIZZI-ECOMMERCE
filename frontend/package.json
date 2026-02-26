@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "dev": "next dev",
-    "dev:turbo": "npm run dev:turbo",
+    "dev:turbo": "next dev --turbo",
     "build": "next build --webpack",
     "start": "next start",
     "lint": "next lint",
