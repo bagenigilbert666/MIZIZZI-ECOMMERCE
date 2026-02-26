@@ -16,12 +16,17 @@ export const revalidate = 60
 // INSTANT LOAD: Render immediately with critical data, stream rest
 export default async function Home() {
   // Fast critical path - render instantly with just 4 essential fetches
-  const [categories, carousel, premium, showcase] = await Promise.allSettled([
+  const settled = await Promise.allSettled([
     getCategories(20),
     getCarouselItems(),
     getPremiumExperiences(),
     getProductShowcase(),
-  ]).then(results => results.map(r => r.status === 'fulfilled' ? r.value : []))
+  ])
+
+  const categories = settled[0].status === 'fulfilled' ? settled[0].value as Awaited<ReturnType<typeof getCategories>> : []
+  const carousel = settled[1].status === 'fulfilled' ? settled[1].value as Awaited<ReturnType<typeof getCarouselItems>> : []
+  const premium = settled[2].status === 'fulfilled' ? settled[2].value as Awaited<ReturnType<typeof getPremiumExperiences>> : []
+  const showcase = settled[3].status === 'fulfilled' ? settled[3].value as Awaited<ReturnType<typeof getProductShowcase>> : []
 
   return (
     <>
@@ -42,7 +47,7 @@ export default async function Home() {
         allProducts={[]}
         allProductsHasMore={false}
       />
-      
+
       {/* Stream secondary content - loads in background without blocking */}
       <Suspense fallback={null}>
         <SecondaryContent />
@@ -65,7 +70,7 @@ async function SecondaryContent() {
     getAllProductsForHome(12),
   ])
 
-  const [cta, features, flash, luxury, arrivals, picks, trending, daily, allProducts] = results.map(r => 
+  const [cta, features, flash, luxury, arrivals, picks, trending, daily, allProducts] = results.map(r =>
     r.status === 'fulfilled' ? r.value : []
   )
 
