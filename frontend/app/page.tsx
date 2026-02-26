@@ -61,10 +61,15 @@ export default async function Home() {
       categories={critical.categories}
       carouselItems={critical.carouselItems}
       premiumExperiences={critical.premiumExperiences}
-      // Load deferred content with streaming
-      flashSaleProducts={undefined}
-      topPicks={undefined}
-      newArrivals={undefined}
+      // Required product arrays - start with empty, will be populated by deferred content
+      flashSaleProducts={[]}
+      luxuryProducts={[]}
+      newArrivals={[]}
+      topPicks={[]}
+      trendingProducts={[]}
+      dailyFinds={[]}
+      allProducts={[]}
+      allProductsHasMore={false}
     >
       <Suspense fallback={null}>
         <DeferredContentStreamer />
