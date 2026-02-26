@@ -2,6 +2,7 @@
 
 import type React from "react"
 
+import { useEffect, useState } from "react"
 import { Toaster } from "@/components/ui/toaster"
 import { AuthProvider } from "@/contexts/auth/auth-context"
 import { SocketProvider } from "@/contexts/socket-context"
@@ -16,7 +17,16 @@ import AnimationErrorBoundary from "@/components/animation/animation-error-bound
 import DisableAnimations from "@/components/animation/disable-animations"
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  // Render immediately without hydration check - SSR/SSG already handles sync
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) {
+    return null
+  }
+
   return (
     <>
       <DisableAnimations />
