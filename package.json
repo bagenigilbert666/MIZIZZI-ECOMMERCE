@@ -1,4 +1,19 @@
 {
+  "name": "mizizzi-ecommerce",
+  "version": "1.0.0",
+  "description": "Mizizzi E-commerce Platform - Monorepo",
+  "private": true,
+  "workspaces": [
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "cd frontend && npm run dev",
+    "dev:turbo": "cd frontend && npm run dev:turbo",
+    "build": "cd frontend && npm run build",
+    "start": "cd frontend && npm run start",
+    "lint": "cd frontend && npm run lint",
+    "test": "cd frontend && npm run test"
+  },
   "dependencies": {
     "axios": "^1.13.2",
     "canvas-confetti": "^1.9.4",
@@ -9,10 +24,5 @@
     "react": "^19.2.4",
     "swr": "^2.4.0",
     "web-vitals": "^5.1.0"
-  },
-  "scripts": {
-    "dev": "next dev",
-    "dev:turbo": "next dev --turbo",
-    "build": "next build --webpack"
   }
 }
