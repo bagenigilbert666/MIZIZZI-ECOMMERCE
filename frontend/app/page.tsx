@@ -2,7 +2,6 @@ import { Suspense } from "react"
 import { getCarouselItems, getPremiumExperiences, getProductShowcase, getContactCTASlides, getFeatureCards } from "@/lib/server/get-carousel-data"
 import { getCategories } from "@/lib/server/get-categories"
 import { HomeContent } from "@/components/home/home-content"
-import { HomeLoader } from "@/components/home/home-loader"
 
 // ISR revalidation - revalidate every 60 seconds for fresh content
 export const revalidate = 60
@@ -11,18 +10,17 @@ export const revalidate = 60
  * OPTIMIZED HOMEPAGE: Hybrid critical/deferred approach
  * Critical: Carousel, categories, premium experiences, product showcase, CTA slides (visible immediately)
  * Deferred: Feature cards, flash sales, luxury, new arrivals, top picks, trending, daily finds
- * All data fetched in parallel, but deferred content streams in after first paint
  */
 
-// CRITICAL PATH: Essential data needed for initial viewport (LCP optimization)
+// CRITICAL PATH: Essential data needed for initial viewport
 async function CriticalPath() {
   try {
     const [categories, carouselItems, premiumExperiences, productShowcase, contactCTASlides] = await Promise.all([
-      getCategories(20), // Full category list for header/sidebar
+      getCategories(20),
       getCarouselItems(),
       getPremiumExperiences(),
       getProductShowcase(),
-      getContactCTASlides(), // CTA slides for user engagement
+      getContactCTASlides(),
     ])
     return { categories, carouselItems, premiumExperiences, productShowcase, contactCTASlides }
   } catch (error) {
@@ -31,8 +29,8 @@ async function CriticalPath() {
   }
 }
 
-// DEFERRED PATH: Below-the-fold sections that load after first paint
-async function DeferredPath() {
+// DEFERRED DATA LOADER: Loads deferred content separately
+async function DeferredDataLoader() {
   try {
     const [
       featureCards,
@@ -77,6 +75,7 @@ async function DeferredPath() {
         return getAllProductsForHome(12)
       })(),
     ])
+    
     return {
       featureCards,
       flashSaleProducts,
@@ -85,10 +84,11 @@ async function DeferredPath() {
       topPicks,
       trendingProducts,
       dailyFinds,
-      allProductsData,
+      allProducts: allProductsData.products,
+      allProductsHasMore: allProductsData.hasMore,
     }
   } catch (error) {
-    console.error("[v0] Deferred path error:", error)
+    console.error("[v0] Deferred data error:", error)
     return {
       featureCards: [],
       flashSaleProducts: [],
@@ -97,54 +97,39 @@ async function DeferredPath() {
       topPicks: [],
       trendingProducts: [],
       dailyFinds: [],
-      allProductsData: { products: [], hasMore: false },
+      allProducts: [],
+      allProductsHasMore: false,
     }
   }
 }
 
-export default async function Home() {
-  // Load critical content immediately
-  const critical = await CriticalPath()
+async function DeferredContent() {
+  const deferred = await DeferredDataLoader()
+  return deferred
+}
 
+export default async function Home() {
+  const critical = await CriticalPath()
+  
   return (
     <>
-      <HomeContent
-        categories={critical.categories}
-        carouselItems={critical.carouselItems}
-        premiumExperiences={critical.premiumExperiences}
-        productShowcase={critical.productShowcase}
-        contactCTASlides={critical.contactCTASlides}
-        // Deferred product data - initial empty, populated by streaming
-        featureCards={[]}
-        flashSaleProducts={[]}
-        luxuryProducts={[]}
-        newArrivals={[]}
-        topPicks={[]}
-        trendingProducts={[]}
-        dailyFinds={[]}
-        allProducts={[]}
-        allProductsHasMore={false}
-      />
-      {/* Stream deferred content after initial render */}
       <Suspense fallback={null}>
-        <DeferredContentStreamer />
+        <HomePageContent critical={critical} />
       </Suspense>
     </>
   )
 }
 
-async function DeferredContentStreamer() {
-  const deferred = await DeferredPath()
-  // Re-render HomeContent with all deferred data populated
-  // This will trigger a re-render with full content without blocking initial paint
+async function HomePageContent({ critical }: { critical: Awaited<ReturnType<typeof CriticalPath>> }) {
+  const deferred = await DeferredContent()
+
   return (
     <HomeContent
-      categories={[]} // Don't re-fetch critical data
-      carouselItems={[]}
-      premiumExperiences={[]}
-      productShowcase={[]}
-      contactCTASlides={[]} // CTA already in critical path
-      // All deferred data now available
+      categories={critical.categories}
+      carouselItems={critical.carouselItems}
+      premiumExperiences={critical.premiumExperiences}
+      productShowcase={critical.productShowcase}
+      contactCTASlides={critical.contactCTASlides}
       featureCards={deferred.featureCards}
       flashSaleProducts={deferred.flashSaleProducts}
       luxuryProducts={deferred.luxuryProducts}
@@ -152,8 +137,8 @@ async function DeferredContentStreamer() {
       topPicks={deferred.topPicks}
       trendingProducts={deferred.trendingProducts}
       dailyFinds={deferred.dailyFinds}
-      allProducts={deferred.allProductsData.products}
-      allProductsHasMore={deferred.allProductsData.hasMore}
+      allProducts={deferred.allProducts}
+      allProductsHasMore={deferred.allProductsHasMore}
     />
   )
 }
