@@ -23,35 +23,43 @@ export const revalidate = 60
 
 // CRITICAL PATH: Fast with 3-second timeout - shows page instantly
 async function CriticalContent() {
-  const results = await Promise.all([
+  const timeout = <T,>(promise: Promise<T>, ms: number = 3000): Promise<T | []> =>
     Promise.race([
-      getCategories(20),
-      new Promise(resolve => setTimeout(() => resolve([]), 3000))
-    ]),
-    Promise.race([
-      getCarouselItems(),
-      new Promise(resolve => setTimeout(() => resolve([]), 3000))
-    ]),
-    Promise.race([
-      getPremiumExperiences(),
-      new Promise(resolve => setTimeout(() => resolve([]), 3000))
-    ]),
-    Promise.race([
-      getProductShowcase(),
-      new Promise(resolve => setTimeout(() => resolve([]), 3000))
-    ]),
-    Promise.race([
-      getContactCTASlides(),
-      new Promise(resolve => setTimeout(() => resolve([]), 3000))
-    ]),
-  ])
+      promise,
+      new Promise<[]>(resolve => setTimeout(() => resolve([]), ms))
+    ]).catch(() => [])
 
-  return {
-    categories: results[0] || [],
-    carouselItems: results[1] || [],
-    premiumExperiences: results[2] || [],
-    productShowcase: results[3] || [],
-    contactCTASlides: results[4] || [],
+  try {
+    const [
+      categories,
+      carouselItems,
+      premiumExperiences,
+      productShowcase,
+      contactCTASlides,
+    ] = await Promise.all([
+      timeout(getCategories(20)),
+      timeout(getCarouselItems()),
+      timeout(getPremiumExperiences()),
+      timeout(getProductShowcase()),
+      timeout(getContactCTASlides()),
+    ])
+
+    return {
+      categories: (Array.isArray(categories) ? categories : []) as any[],
+      carouselItems: (Array.isArray(carouselItems) ? carouselItems : []) as any[],
+      premiumExperiences: (Array.isArray(premiumExperiences) ? premiumExperiences : []) as any[],
+      productShowcase: (Array.isArray(productShowcase) ? productShowcase : []) as any[],
+      contactCTASlides: (Array.isArray(contactCTASlides) ? contactCTASlides : []) as any[],
+    }
+  } catch (error) {
+    console.error("[v0] Critical content error:", error)
+    return {
+      categories: [] as any[],
+      carouselItems: [] as any[],
+      premiumExperiences: [] as any[],
+      productShowcase: [] as any[],
+      contactCTASlides: [] as any[],
+    }
   }
 }
 
