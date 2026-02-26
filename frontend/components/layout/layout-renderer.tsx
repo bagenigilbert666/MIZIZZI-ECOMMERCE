@@ -8,26 +8,22 @@ import ScrollToTop from "@/components/shared/scroll-to-top"
 import { LayoutRendererClient } from "@/components/layout/layout-renderer-client"
 import { getCategoriesWithSubcategories } from "@/lib/server/get-categories"
 
-// Separate component that accesses headers() - must be awaited within Suspense
-async function RouteDetector({ children }: { children: React.ReactNode }) {
+async function LayoutContent() {
+  // Check if this is an admin or auth route
+  let isAdminRoute = false
   try {
     const headersList = await headers()
     const pathname = headersList.get("x-pathname") || ""
-    const isAdminRoute = pathname?.startsWith("/admin")
-
-    // Don't render standard layout components for admin routes
-    if (isAdminRoute) {
-      return children
-    }
+    isAdminRoute = pathname?.startsWith("/admin") || pathname?.startsWith("/auth") || false
   } catch (error) {
-    // Silently handle errors
+    // Silently handle errors - default to non-admin
   }
 
-  // Default to showing layout
-  return null
-}
+  // Don't render store layout for admin routes
+  if (isAdminRoute) {
+    return null
+  }
 
-async function LayoutContent() {
   // Fetch categories server-side to pass to Header
   let categories: Awaited<ReturnType<typeof getCategoriesWithSubcategories>> = []
   try {
@@ -44,13 +40,36 @@ async function LayoutContent() {
   )
 }
 
+async function FooterContent() {
+  // Check if this is an admin or auth route
+  let isAdminRoute = false
+  try {
+    const headersList = await headers()
+    const pathname = headersList.get("x-pathname") || ""
+    isAdminRoute = pathname?.startsWith("/admin") || pathname?.startsWith("/auth") || false
+  } catch (error) {
+    // Silently handle errors - default to non-admin
+  }
+
+  // Don't render footer for admin routes
+  if (isAdminRoute) {
+    return null
+  }
+
+  return (
+    <>
+      <ScrollToTop />
+      <FooterWithSettings />
+    </>
+  )
+}
+
 export async function LayoutRenderer({ children }: { children: React.ReactNode }) {
   return (
     <Suspense fallback={null}>
       <LayoutContent />
       <LayoutRendererClient>{children}</LayoutRendererClient>
-      <ScrollToTop />
-      <FooterWithSettings />
+      <FooterContent />
     </Suspense>
   )
 }
