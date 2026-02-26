@@ -84,7 +84,7 @@ export default async function RootLayout({
             <AppProviders>
               <PageTransitionWrapper />
               <div className="h-full w-full overflow-y-auto overflow-x-hidden overscroll-none">
-                {layoutRenderer}
+                <RootLayoutContent>{layoutRenderer}</RootLayoutContent>
               </div>
             </AppProviders>
           </StateProviders>
@@ -92,4 +92,8 @@ export default async function RootLayout({
       </body>
     </html>
   )
+}
+
+function RootLayoutContent({ children }: { children: React.ReactNode }) {
+  return <>{children}</>
 }
