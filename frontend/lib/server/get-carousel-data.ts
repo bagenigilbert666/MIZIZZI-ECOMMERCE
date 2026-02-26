@@ -2,6 +2,17 @@ import { cache } from "react";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "https://mizizzi-ecommerce-1.onrender.com";
 
+// ISR configuration for optimal performance
+// 60-second revalidation window ensures instant first load with fresh data on page rebuild
+const ISR_REVALIDATE_TIME = 60;
+const ISR_TAGS = {
+  carousel: ["carousel-items"],
+  premium: ["premium-experiences"],
+  contact: ["contact-cta"],
+  features: ["feature-cards"],
+  showcase: ["product-showcase"]
+};
+
 export interface CarouselItem {
   image: string;
   title: string;
@@ -113,7 +124,7 @@ const DEFAULT_PREMIUM_EXPERIENCES: PremiumExperience[] = [
     metric: "98.7%",
     description: "Satisfaction",
     icon_name: "Crown",
-    image: "/images/premium-bg.jpg",
+    image: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Crect fill='%23F59E0B' width='400' height='300'/%3E%3Ccircle cx='200' cy='150' r='80' fill='%23FCD34D'/%3E%3C/svg%3E",
     gradient: "from-amber-500 to-orange-600",
     features: ["Priority support", "Exclusive deals", "Free shipping", "Early access"],
     is_active: true,
@@ -125,24 +136,39 @@ const DEFAULT_CONTACT_SLIDES: ContactCTASlide[] = [
   {
     id: 1,
     subtitle: "Best Deals Await!",
-    image: "/images/contact-cta.jpg",
+    image: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 400'%3E%3Crect fill='%238B1538' width='600' height='400'/%3E%3Ctext x='50%25' y='50%25' font-size='32' fill='white' text-anchor='middle' dominant-baseline='middle'%3EExclusive Offers%3C/text%3E%3C/svg%3E",
     gradient: "from-cherry-600 to-cherry-800",
     accent_color: "text-yellow-300",
   },
 ];
 
-// Default carousel items for instant display - empty array, only show backend data
-const DEFAULT_CAROUSEL_ITEMS: CarouselItem[] = [];
+// Default carousel items - shows fallback banner when API has no items
+const DEFAULT_CAROUSEL_ITEMS: CarouselItem[] = [
+  {
+    image: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 600'%3E%3Crect fill='%238B1538' width='1200' height='600'/%3E%3Ctext x='50%25' y='50%25' font-size='48' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='middle'%3EWelcome to Mizizzi Store%3C/text%3E%3C/svg%3E",
+    title: "Welcome to Mizizzi Store",
+    description: "Discover premium products and exclusive deals",
+    buttonText: "Shop Now",
+    href: "/products",
+    badge: "WELCOME"
+  }
+];
 
-// Server-side fetcher for carousel items
+// Server-side fetcher for carousel items with ISR support
+// Uses /items endpoint that returns carousel banners for homepage
 export const getCarouselItems = cache(async (): Promise<CarouselItem[]> => {
   try {
     const response = await fetch(`${API_BASE_URL}/api/carousel/items?position=homepage`, {
-      next: { revalidate: 300, tags: ["carousel-items"] }, // Cache for 5 minutes
+      next: { 
+        revalidate: ISR_REVALIDATE_TIME,
+        tags: ISR_TAGS.carousel
+      },
       headers: { "Content-Type": "application/json" },
     });
 
-    if (!response.ok) return DEFAULT_CAROUSEL_ITEMS;
+    if (!response.ok) {
+      return DEFAULT_CAROUSEL_ITEMS;
+    }
 
     const data = await response.json();
 
@@ -164,11 +190,14 @@ export const getCarouselItems = cache(async (): Promise<CarouselItem[]> => {
   }
 });
 
-// Server-side fetcher for premium experience
+// Server-side fetcher for premium experience with ISR
 export const getPremiumExperiences = cache(async (): Promise<PremiumExperience[]> => {
   try {
     const response = await fetch(`${API_BASE_URL}/api/panels/items?panel_type=premium_experience&position=right`, {
-      next: { revalidate: 300, tags: ["premium-experiences"] },
+      next: { 
+        revalidate: ISR_REVALIDATE_TIME,
+        tags: ISR_TAGS.premium
+      },
       headers: { "Content-Type": "application/json" },
     });
 
@@ -196,11 +225,14 @@ export const getPremiumExperiences = cache(async (): Promise<PremiumExperience[]
   }
 });
 
-// Server-side fetcher for contact CTA slides
+// Server-side fetcher for contact CTA slides with ISR
 export const getContactCTASlides = cache(async (): Promise<ContactCTASlide[]> => {
   try {
     const response = await fetch(`${API_BASE_URL}/api/contact-cta/slides`, {
-      next: { revalidate: 300, tags: ["contact-cta"] },
+      next: { 
+        revalidate: ISR_REVALIDATE_TIME,
+        tags: ISR_TAGS.contact
+      },
       headers: { "Content-Type": "application/json" },
     });
 
@@ -218,11 +250,14 @@ export const getContactCTASlides = cache(async (): Promise<ContactCTASlide[]> =>
   }
 });
 
-// Server-side fetcher for feature cards
+// Server-side fetcher for feature cards with ISR
 export const getFeatureCards = cache(async (): Promise<FeatureCard[]> => {
   try {
     const response = await fetch(`${API_BASE_URL}/api/feature-cards`, {
-      next: { revalidate: 300, tags: ["feature-cards"] },
+      next: { 
+        revalidate: ISR_REVALIDATE_TIME,
+        tags: ISR_TAGS.features
+      },
       headers: { "Content-Type": "application/json" },
     });
 
@@ -280,7 +315,10 @@ const DEFAULT_PRODUCT_SHOWCASE: ProductShowcaseCategory[] = [
 export const getProductShowcase = cache(async (): Promise<ProductShowcaseCategory[]> => {
   try {
     const response = await fetch(`${API_BASE_URL}/api/panels/items?panel_type=product_showcase&position=left`, {
-      next: { revalidate: 300, tags: ["product-showcase"] },
+      next: { 
+        revalidate: ISR_REVALIDATE_TIME,
+        tags: ISR_TAGS.showcase
+      },
       headers: { "Content-Type": "application/json" },
     });
 

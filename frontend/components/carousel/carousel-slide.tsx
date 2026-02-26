@@ -56,16 +56,16 @@ export const CarouselSlide = React.memo<CarouselSlideProps>(({ item, isActive, i
       {/* Background Image with optimized loading */}
       <div className="relative h-full w-full bg-gray-100">
         {isDataUrl ? (
-          // Use native img for data URLs (already optimized)
+          // Use native img for data URLs (don't use Next.js Image for data: URLs)
           <img
-            src={imageSrc || "/placeholder.svg"}
+            src={imageSrc}
             alt={item.title}
             className="absolute inset-0 h-full w-full object-cover"
           />
         ) : (
-          // Use UniversalImage for network images with priority for first slide
+          // Use Next.js Image for network URLs
           <Image
-            src={imageSrc || "/placeholder.svg"}
+            src={imageSrc}
             alt={item.title}
             fill
             className="object-cover"

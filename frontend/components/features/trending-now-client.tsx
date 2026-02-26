@@ -24,6 +24,7 @@ const LogoPlaceholder = () => (
         src="/images/screenshot-20from-202025-02-18-2013-30-22.png"
         alt="Loading"
         fill
+        sizes="48px"
         className="object-contain"
       />
     </motion.div>

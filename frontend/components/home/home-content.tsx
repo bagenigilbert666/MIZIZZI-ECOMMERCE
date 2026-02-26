@@ -62,6 +62,7 @@ export function HomeContent({
         <NetworkStatus className="mx-auto w-full max-w-[1200px] px-1 sm:px-2 md:px-4 pt-2" />
 
         <div className="w-full mt-2 sm:mt-3 sm:py-2" style={{ backgroundColor: "var(--color-background)" }}>
+          {/* Carousel with LQIP and blur transitions for instant display */}
           <Carousel
             carouselItems={carouselItems}
             premiumExperiences={premiumExperiences}

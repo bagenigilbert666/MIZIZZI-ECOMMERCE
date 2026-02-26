@@ -282,8 +282,8 @@ export const productService = {
         timestamp: now,
       })
 
-      // Prefetch images for all products in the background
-      this.prefetchProductImages(enhancedProducts.map((p) => p.id.toString()))
+      // Note: Image prefetching disabled to prevent base64 LQIP generation
+      // Images load on-demand client-side instead
 
       return enhancedProducts
     } catch (error) {
@@ -398,12 +398,12 @@ export const productService = {
         timestamp: now,
       })
 
-      // Prefetch images for all products in the background
-      this.prefetchProductImages(enhancedProducts.map((p) => p.id.toString()))
+      // Note: Image prefetching disabled to prevent base64 LQIP generation
+      // Images load on-demand client-side instead
 
       return enhancedProducts
     } catch (error) {
-      console.error(`Error fetching products for category ${categorySlug}:`, error)
+      console.error(`Error fetching products by category ${categorySlug}:`, error)
       return []
     }
   },

@@ -5,20 +5,26 @@ import { getTopPicks } from "@/lib/server/get-top-picks"
 import { getTrendingProducts } from "@/lib/server/get-trending-products"
 import { getDailyFinds } from "@/lib/server/get-daily-finds"
 import { getCategories } from "@/lib/server/get-categories"
-import { getCarouselData } from "@/lib/server/get-carousel-data"
+import { getCarouselItems, getFeatureCards, getPremiumExperiences, getContactCTASlides, getProductShowcase } from "@/lib/server/get-carousel-data"
 import { getAllProductsForHome } from "@/lib/server/get-all-products"
 import { HomeContent } from "@/components/home/home-content"
 
 /**
- * Fetch all data in parallel without Suspense boundaries
- * This ensures cached data renders immediately, then updates silently
+ * Optimized homepage - fetches all data in parallel for instant rendering
+ * No Suspense boundaries = fully rendered page displays immediately
+ * ISR revalidates every 60 seconds for fresh content
  */
 export default async function Home() {
   try {
-    // Fetch all data in parallel (cache will return immediately)
+    // Fetch all data in parallel with ISR support
+    // All critical and non-critical data fetches together for fast rendering
     const [
       categories,
-      carouselData,
+      carouselItems,
+      premiumExperiences,
+      contactCTASlides,
+      featureCards,
+      productShowcase,
       flashSaleProducts,
       luxuryProducts,
       newArrivals,
@@ -28,7 +34,11 @@ export default async function Home() {
       allProductsData,
     ] = await Promise.all([
       getCategories(20),
-      getCarouselData(),
+      getCarouselItems(),
+      getPremiumExperiences(),
+      getContactCTASlides(),
+      getFeatureCards(),
+      getProductShowcase(),
       getFlashSaleProducts(50),
       getLuxuryProducts(12),
       getNewArrivals(20),
@@ -41,11 +51,11 @@ export default async function Home() {
     return (
       <HomeContent
         categories={categories}
-        carouselItems={carouselData.carouselItems}
-        premiumExperiences={carouselData.premiumExperiences}
-        contactCTASlides={carouselData.contactCTASlides}
-        featureCards={carouselData.featureCards}
-        productShowcase={carouselData.productShowcase}
+        carouselItems={carouselItems}
+        premiumExperiences={premiumExperiences}
+        contactCTASlides={contactCTASlides}
+        featureCards={featureCards}
+        productShowcase={productShowcase}
         flashSaleProducts={flashSaleProducts}
         luxuryProducts={luxuryProducts}
         newArrivals={newArrivals}
