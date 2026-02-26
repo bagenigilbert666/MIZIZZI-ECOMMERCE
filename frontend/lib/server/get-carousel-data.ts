@@ -124,7 +124,7 @@ const DEFAULT_PREMIUM_EXPERIENCES: PremiumExperience[] = [
     metric: "98.7%",
     description: "Satisfaction",
     icon_name: "Crown",
-    image: "/images/premium-bg.jpg",
+    image: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 300'%3E%3Crect fill='%23F59E0B' width='400' height='300'/%3E%3Ccircle cx='200' cy='150' r='80' fill='%23FCD34D'/%3E%3C/svg%3E",
     gradient: "from-amber-500 to-orange-600",
     features: ["Priority support", "Exclusive deals", "Free shipping", "Early access"],
     is_active: true,
@@ -136,7 +136,7 @@ const DEFAULT_CONTACT_SLIDES: ContactCTASlide[] = [
   {
     id: 1,
     subtitle: "Best Deals Await!",
-    image: "/images/contact-cta.jpg",
+    image: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 600 400'%3E%3Crect fill='%238B1538' width='600' height='400'/%3E%3Ctext x='50%25' y='50%25' font-size='32' fill='white' text-anchor='middle' dominant-baseline='middle'%3EExclusive Offers%3C/text%3E%3C/svg%3E",
     gradient: "from-cherry-600 to-cherry-800",
     accent_color: "text-yellow-300",
   },
@@ -145,7 +145,7 @@ const DEFAULT_CONTACT_SLIDES: ContactCTASlide[] = [
 // Default carousel items - shows fallback banner when API has no items
 const DEFAULT_CAROUSEL_ITEMS: CarouselItem[] = [
   {
-    image: "https://images.unsplash.com/photo-1572635196237-14b3f281503f?w=1200&h=600&fit=crop",
+    image: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 600'%3E%3Crect fill='%238B1538' width='1200' height='600'/%3E%3Ctext x='50%25' y='50%25' font-size='48' font-weight='bold' fill='white' text-anchor='middle' dominant-baseline='middle'%3EWelcome to Mizizzi Store%3C/text%3E%3C/svg%3E",
     title: "Welcome to Mizizzi Store",
     description: "Discover premium products and exclusive deals",
     buttonText: "Shop Now",
