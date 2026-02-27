@@ -46,7 +46,7 @@ const ProductRow = memo(function ProductRow({
   // Memoized callbacks
   const handleSelect = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
-    onSelect(product.id)
+    onSelect(String(product.id))
   }, [product.id, onSelect])
 
   const handleDelete = useCallback(() => {
@@ -58,12 +58,12 @@ const ProductRow = memo(function ProductRow({
     setIsDeleting(true)
     try {
       // Call the admin service to delete the product from the database
-      const result = await adminService.deleteProduct(product.id)
+      const result = await adminService.deleteProduct(String(product.id))
       
       if (result.success) {
         console.log("[v0] Product deleted successfully:", product.id)
         // Notify parent component of deletion
-        onDelete(product.id)
+        onDelete(String(product.id))
         setShowDeleteDialog(false)
       }
     } catch (error) {
@@ -127,7 +127,11 @@ const ProductRow = memo(function ProductRow({
     return () => document.removeEventListener("keydown", handleEscape)
   }, [isMenuOpen])
 
-  const status = product.status === "active" || product.is_active
+  // Safely handle a possible legacy `is_active` field without assuming it exists on the Product type
+  const status =
+    product.status === "active" ||
+    (("is_active" in product) ? Boolean((product as any).is_active) : false)
+
   const stockStatus = (product.stock || 0) > 0
 
   const menuItems: MenuItem[] = [
