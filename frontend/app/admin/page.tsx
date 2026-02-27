@@ -936,10 +936,9 @@ const QuickActionCard = ({
         group relative p-5 rounded-2xl border backdrop-blur-sm cursor-pointer
         transition-all duration-500 ease-out transform-gpu
         ${currentColor.bg} ${currentColor.hover} ${currentColor.border} ${currentColor.text}
-        ${
-          isCurrentlyLoading
-            ? "opacity-60 cursor-not-allowed scale-95"
-            : "hover:scale-105 hover:shadow-2xl hover:-translate-y-1"
+        ${isCurrentlyLoading
+          ? "opacity-60 cursor-not-allowed scale-95"
+          : "hover:scale-105 hover:shadow-2xl hover:-translate-y-1"
         }
         ${currentColor.shadow} ${currentColor.glow}
         active:scale-95 active:transition-none
@@ -1752,6 +1751,7 @@ export default function AdminDashboard() {
                       </div>
                     </CardContent>
                   </Card>
+                  <Card className="border-0 shadow-sm bg-white">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <AlertTriangle className="h-5 w-5 text-red-600" />
@@ -2017,8 +2017,7 @@ export default function AdminDashboard() {
                           <p className="text-sm text-gray-600 capitalize">{status}</p>
                           <p className="text-xl font-bold text-blue-600">{count as number}</p>
                           <div
-                            className={`w-full h-2 rounded-full mt-2 ${
-                              status === "delivered"
+                            className={`w-full h-2 rounded-full mt-2 ${status === "delivered"
                                 ? "bg-green-200"
                                 : status === "shipped"
                                   ? "bg-blue-200"
@@ -2027,11 +2026,10 @@ export default function AdminDashboard() {
                                     : status === "pending"
                                       ? "bg-orange-200"
                                       : "bg-red-200"
-                            }`}
+                              }`}
                           >
                             <div
-                              className={`h-full rounded-full ${
-                                status === "delivered"
+                              className={`h-full rounded-full ${status === "delivered"
                                   ? "bg-green-500"
                                   : status === "shipped"
                                     ? "bg-blue-500"
@@ -2040,13 +2038,12 @@ export default function AdminDashboard() {
                                       : status === "pending"
                                         ? "bg-orange-500"
                                         : "bg-red-500"
-                              }`}
+                                }`}
                               style={{
-                                width: `${
-                                  ((count as number) /
+                                width: `${((count as number) /
                                     Object.values(data.order_status).reduce((a: number, b: number) => a + b, 0)) *
                                   100
-                                }%`,
+                                  }%`,
                               }}
                             />
                           </div>
