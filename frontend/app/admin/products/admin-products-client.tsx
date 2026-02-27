@@ -981,7 +981,6 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
   // Handle product deletion from ProductRow
     const handleDeleteProductFromList = useCallback((productId: string | number) => {
       const id = String(productId)
-      console.log("[v0] Removing product from list:", id)
       
       // Remove product from all products list
       setAllProducts((prev) => prev.filter((p) => String(p.id) !== id))
@@ -1635,7 +1634,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                 isMobile={isMobile}
                 productImages={productImages}
                 onSelectProduct={handleSelectProduct}
-                onDeleteProduct={handleOpenDeleteDialog}
+                onDeleteProduct={handleDeleteProductFromList}
                 getProductImage={getProductImage}
               />
             )}
