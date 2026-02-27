@@ -1,13 +1,22 @@
 "use client"
 
-import React, { memo, useCallback } from "react"
+import React, { memo, useCallback, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Trash2, CheckCircle2, XCircle, Edit, Eye } from "lucide-react"
+import { Trash2, CheckCircle2, XCircle, Edit, Eye, MoreHorizontal } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
 import { TableCell, TableRow } from "@/components/ui/table"
 import { OptimizedImage } from "@/components/ui/optimized-image"
 import { Badge } from "@/components/ui/badge"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import type { Product } from "@/types"
 
 interface ProductRowProps {
@@ -26,6 +35,7 @@ const ProductRow = memo(function ProductRow({
   imageSrc,
 }: ProductRowProps) {
   const router = useRouter()
+  const [isMenuOpen, setIsMenuOpen] = useState(false)
 
   // Memoized callbacks to prevent unnecessary re-renders
   const handleSelect = useCallback((e: React.MouseEvent) => {
@@ -36,16 +46,19 @@ const ProductRow = memo(function ProductRow({
   const handleDelete = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
     onDelete(product.id)
+    setIsMenuOpen(false)
   }, [product.id, onDelete])
 
   const handleView = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
     router.push(`/admin/products/${product.id}`)
+    setIsMenuOpen(false)
   }, [product.id, router])
 
   const handleEdit = useCallback((e: React.MouseEvent) => {
     e.stopPropagation()
     router.push(`/admin/products/${product.id}/edit`)
+    setIsMenuOpen(false)
   }, [product.id, router])
 
   const status = product.status === "active" || product.is_active
@@ -53,7 +66,7 @@ const ProductRow = memo(function ProductRow({
 
   return (
     <TableRow 
-      className="hover:bg-gray-50 transition-colors border-b border-gray-200 group"
+      className="hover:bg-gray-50 transition-colors border-b border-gray-200"
     >
       <TableCell className="w-12" onClick={handleSelect}>
         <Checkbox checked={isSelected} onChange={() => {}} />
@@ -102,35 +115,52 @@ const ProductRow = memo(function ProductRow({
         )}
       </TableCell>
       <TableCell className="text-right">
-        <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleView}
-            className="h-8 px-3 text-blue-600 border-blue-200 hover:bg-blue-50"
-            title="View details"
+        <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+          <DropdownMenuTrigger asChild>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-8 w-8 hover:bg-gray-100 hover:text-gray-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500"
+              title="Product actions"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent 
+            align="end" 
+            side="bottom" 
+            sideOffset={4}
+            alignOffset={-4}
+            className="w-48"
+            collisionPadding={8}
           >
-            <Eye className="h-4 w-4" />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleEdit}
-            className="h-8 px-3 text-amber-600 border-amber-200 hover:bg-amber-50"
-            title="Edit product"
-          >
-            <Edit className="h-4 w-4" />
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={handleDelete}
-            className="h-8 px-3 text-red-600 border-red-200 hover:bg-red-50"
-            title="Delete product"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
+            <DropdownMenuLabel className="text-xs font-semibold text-gray-700">Actions</DropdownMenuLabel>
+            <DropdownMenuGroup>
+              <DropdownMenuItem 
+                onClick={handleView}
+                className="cursor-pointer focus:bg-blue-50 focus:text-blue-600"
+              >
+                <Eye className="mr-2 h-4 w-4" />
+                <span>View Details</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={handleEdit}
+                className="cursor-pointer focus:bg-amber-50 focus:text-amber-600"
+              >
+                <Edit className="mr-2 h-4 w-4" />
+                <span>Edit Product</span>
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+            <DropdownMenuSeparator className="my-1" />
+            <DropdownMenuItem 
+              onClick={handleDelete}
+              className="cursor-pointer focus:bg-red-50 focus:text-red-600 text-red-600"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              <span>Delete</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </TableCell>
     </TableRow>
   )
