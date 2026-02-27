@@ -2,21 +2,18 @@
 
 import React, { memo, useCallback, useRef, useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Trash2, CheckCircle2, XCircle, Edit, Eye, MoreHorizontal, Loader2 } from "lucide-react"
+import { CheckCircle2, XCircle, Edit, Eye, MoreHorizontal, Loader2 } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
 import { TableCell, TableRow } from "@/components/ui/table"
 import { OptimizedImage } from "@/components/ui/optimized-image"
 import { Badge } from "@/components/ui/badge"
-import { AppleDeleteDialog } from "./apple-delete-dialog"
-import { adminService } from "@/services/admin"
 import type { Product } from "@/types"
 
 interface ProductRowProps {
   product: Product
   isSelected: boolean
   onSelect: (id: string) => void
-  onDelete: (id: string) => void
   imageSrc?: string
 }
 
@@ -32,14 +29,11 @@ const ProductRow = memo(function ProductRow({
   product,
   isSelected,
   onSelect,
-  onDelete,
   imageSrc,
 }: ProductRowProps) {
   const router = useRouter()
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-  const [isDeleting, setIsDeleting] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
 
@@ -49,31 +43,7 @@ const ProductRow = memo(function ProductRow({
     onSelect(String(product.id))
   }, [product.id, onSelect])
 
-  const handleDelete = useCallback(() => {
-    setShowDeleteDialog(true)
-    setIsMenuOpen(false)
-  }, [])
 
-  const handleConfirmDelete = useCallback(async () => {
-    setIsDeleting(true)
-    try {
-      // Call the admin service to delete the product from the database
-      const result = await adminService.deleteProduct(String(product.id))
-      
-      if (result.success) {
-        console.log("[v0] Product deleted successfully:", product.id)
-        // Notify parent component of deletion
-        onDelete(String(product.id))
-        setShowDeleteDialog(false)
-      }
-    } catch (error) {
-      console.error("[v0] Failed to delete product:", error)
-      // Show error message (you can add a toast notification here)
-      alert("Failed to delete product. Please try again.")
-    } finally {
-      setIsDeleting(false)
-    }
-  }, [product.id, onDelete])
 
   const handleView = useCallback(async () => {
     setIsLoading(true)
@@ -145,13 +115,6 @@ const ProductRow = memo(function ProductRow({
       label: "Edit Product",
       icon: <Edit className="w-4 h-4" />,
       onClick: handleEdit,
-      disabled: isLoading,
-    },
-    {
-      label: "Delete",
-      icon: <Trash2 className="w-4 h-4" />,
-      onClick: handleDelete,
-      color: "danger",
       disabled: isLoading,
     },
   ]
@@ -274,15 +237,6 @@ const ProductRow = memo(function ProductRow({
         </div>
       </TableCell>
     </TableRow>
-
-    {/* Apple-style Delete Dialog */}
-    <AppleDeleteDialog
-      isOpen={showDeleteDialog}
-      product={product}
-      isDeleting={isDeleting}
-      onConfirm={handleConfirmDelete}
-      onCancel={() => setShowDeleteDialog(false)}
-    />
     </>
   )
 })
