@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
+import { AnimatePresence } from "framer-motion"
 import {
   Plus,
   Trash2,
@@ -896,6 +897,146 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
     setUiState((prev: typeof uiState) => ({ ...prev, isFilterActive: isActive }))
   }, [filterState.debouncedSearchQuery, uiState.activeTab, filterState.filterOption, filterState.categoryFilter, filterState.sortOption])
 
+  // Handler functions
+  const handleRefresh = useCallback(async () => {
+    setUiState((prev) => ({ ...prev, isRefreshing: true }))
+    try {
+      await fetchProducts()
+      toast({
+        title: "Success",
+        description: "Products refreshed successfully.",
+      })
+    } finally {
+      setUiState((prev) => ({ ...prev, isRefreshing: false }))
+    }
+  }, [fetchProducts])
+
+  const handleFilterChange = useCallback((field: string, value: any) => {
+    setFilterState((prev: any) => ({
+      ...prev,
+      [field]: value,
+    }))
+  }, [])
+
+  const handleToggleTab = useCallback((tab: string) => {
+    setUiState((prev) => ({ ...prev, activeTab: tab }))
+  }, [])
+
+  const handleUIStateChange = useCallback((field: string, value: any) => {
+    setUiState((prev) => ({
+      ...prev,
+      [field]: value,
+    }))
+  }, [])
+
+  const resetFilters = useCallback(() => {
+    setFilterState((prev) => ({
+      ...prev,
+      searchQuery: "",
+      debouncedSearchQuery: "",
+      filterOption: "all",
+      categoryFilter: null,
+      sortOption: "newest",
+      pageSize: isMobile ? 8 : 10,
+    }))
+    setUiState((prev) => ({ ...prev, activeTab: "all" }))
+    setCurrentPage(1)
+  }, [isMobile])
+
+  const handleSelectProduct = useCallback(
+    (productId: string) => {
+      setSelectedProducts((prev) =>
+        prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId]
+      )
+    },
+    []
+  )
+
+  const handleEditProduct = useCallback(
+    (productId: string) => {
+      router.push(`/admin/products/${productId}/edit`)
+    },
+    [router]
+  )
+
+  const handleViewProduct = useCallback(
+    (productId: string) => {
+      window.open(`/products/${productId}`, "_blank")
+    },
+    []
+  )
+
+  const handleOpenDeleteDialog = useCallback((productId: string) => {
+    setDialogState((prev) => ({ ...prev, productToDelete: productId }))
+  }, [])
+
+  const handleCloseDeleteDialog = useCallback(() => {
+    setDialogState((prev) => ({ ...prev, productToDelete: null }))
+  }, [])
+
+  const handleDeleteProduct = useCallback(async () => {
+    if (!dialogState.productToDelete) return
+
+    try {
+      setUiState((prev) => ({ ...prev, isOperating: true, operationType: null }))
+      await adminService.deleteProduct(dialogState.productToDelete)
+      
+      setAllProducts((prev) => prev.filter((p) => p.id !== dialogState.productToDelete))
+      
+      toast({
+        title: "Success",
+        description: "Product deleted successfully.",
+      })
+      
+      setDialogState((prev) => ({ ...prev, productToDelete: null }))
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to delete product",
+        variant: "destructive",
+      })
+    } finally {
+      setUiState((prev) => ({ ...prev, isOperating: false }))
+    }
+  }, [dialogState.productToDelete])
+
+  const handleBulkDelete = useCallback(async () => {
+    if (selectedProducts.length === 0) return
+
+    try {
+      setUiState((prev) => ({ ...prev, isOperating: true, operationType: "bulk" }))
+      
+      for (const productId of selectedProducts) {
+        await adminService.deleteProduct(productId)
+      }
+      
+      setAllProducts((prev) => prev.filter((p) => !selectedProducts.includes(p.id)))
+      setSelectedProducts([])
+      
+      toast({
+        title: "Success",
+        description: `${selectedProducts.length} product(s) deleted successfully.`,
+      })
+      
+      setDialogState((prev) => ({ ...prev, isBulkDeleteDialogOpen: false }))
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error?.message || "Failed to delete products",
+        variant: "destructive",
+      })
+    } finally {
+      setUiState((prev) => ({ ...prev, isOperating: false, operationType: null }))
+    }
+  }, [selectedProducts])
+
+  // Get paginated products
+  const paginatedProducts = useMemo(() => {
+    const startIndex = (currentPage - 1) * filterState.pageSize
+    const endIndex = startIndex + filterState.pageSize
+    return filteredProducts.slice(startIndex, endIndex)
+  }, [filteredProducts, currentPage, filterState.pageSize])
+
   return (
     <div className="min-h-screen bg-gray-50 p-3 md:p-6 space-y-6">
       {/* Header */}
@@ -925,7 +1066,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
               disabled={uiState.isLoading}
               className="rounded-lg text-xs md:text-sm"
             >
-              {isLoading ? <MiniSpinner /> : <RefreshCw className="h-4 w-4" />}
+              {uiState.isLoading ? <MiniSpinner /> : <RefreshCw className="h-4 w-4" />}
               <span className="ml-1 hidden sm:inline">Refresh</span>
             </Button>
             <Button
@@ -1007,8 +1148,8 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
                   placeholder="Search products..."
-                  value={searchQuery}
-                  onChange={(e) => handleFilterChange("searchQuery", e.target.value)}
+            value={filterState.searchQuery}
+            onChange={(e) => handleFilterChange("searchQuery", e.target.value)}
                   className="pl-10 w-80 rounded-full border-gray-200 focus:border-gray-300"
                 />
               </div>
@@ -1110,7 +1251,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                           <Checkbox
                             id="filter-new"
                             checked={uiState.activeTab === "new"}
-                            onCheckedChange={() => setActiveTab(uiState.activeTab === "new" ? "all" : "new")}
+                            onCheckedChange={() => handleToggleTab(uiState.activeTab === "new" ? "all" : "new")}
                             className="h-4 w-4 rounded-md border-gray-300"
                           />
                           <label htmlFor="filter-new" className="ml-2 text-sm text-gray-700">
@@ -1121,7 +1262,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                           <Checkbox
                             id="filter-flash-sale"
                             checked={uiState.activeTab === "flash_sale"}
-                            onCheckedChange={() => setActiveTab(uiState.activeTab === "flash_sale" ? "all" : "flash_sale")}
+                            onCheckedChange={() => handleToggleTab(uiState.activeTab === "flash_sale" ? "all" : "flash_sale")}
                             className="h-4 w-4 rounded-md border-gray-300"
                           />
                           <label htmlFor="filter-flash-sale" className="ml-2 text-sm text-gray-700">
@@ -1132,18 +1273,16 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                           <Checkbox
                             id="filter-luxury-deal"
                             checked={uiState.activeTab === "luxury_deal"}
-                            onCheckedChange={() => setActiveTab(uiState.activeTab === "luxury_deal" ? "all" : "luxury_deal")}
-                            className="h-4 w-4 rounded-md border-gray-300"
-                          />
-                          <label htmlFor="filter-luxury-deal" className="ml-2 text-sm text-gray-700">
-                            Luxury Deals
-                          </label>
-                        </div>
-                        <div className="flex items-center">
-                          <Checkbox
-                            id="filter-trending"
-                            checked={uiState.activeTab === "trending"}
-                            onCheckedChange={() => setActiveTab(uiState.activeTab === "trending" ? "all" : "trending")}
+                onCheckedChange={() => handleToggleTab(uiState.activeTab === "luxury_deal" ? "all" : "luxury_deal")}
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge className="bg-purple-50 text-purple-700 border border-purple-200">
+                <Crown className="h-3 w-3 mr-1" /> Luxury Deals ({productStats?.luxuryDeal || 0})
+              </Badge>
+              <Checkbox
+                checked={uiState.activeTab === "luxury_deal"}
+                onCheckedChange={() => handleToggleTab(uiState.activeTab === "trending" ? "all" : "trending")}
                             className="h-4 w-4 rounded-md border-gray-300"
                           />
                           <label htmlFor="filter-trending" className="ml-2 text-sm text-gray-700">
@@ -1154,7 +1293,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                           <Checkbox
                             id="filter-low-stock"
                             checked={uiState.activeTab === "low_stock"}
-                            onCheckedChange={() => setActiveTab(uiState.activeTab === "low_stock" ? "all" : "low_stock")}
+                            onCheckedChange={() => handleToggleTab(uiState.activeTab === "low_stock" ? "all" : "low_stock")}
                             className="h-4 w-4 rounded-md border-gray-300"
                           />
                           <label htmlFor="filter-low-stock" className="ml-2 text-sm text-gray-700">
@@ -1166,7 +1305,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                             id="filter-high-performing"
                             checked={uiState.activeTab === "high_performing"}
                             onCheckedChange={() =>
-                              setActiveTab(uiState.activeTab === "high_performing" ? "all" : "high_performing")
+                              handleToggleTab(uiState.activeTab === "high_performing" ? "all" : "high_performing")
                             }
                             className="h-4 w-4 rounded-md border-gray-300"
                           />
@@ -1179,7 +1318,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                             id="filter-needs-attention"
                             checked={uiState.activeTab === "needs_attention"}
                             onCheckedChange={() =>
-                              setActiveTab(uiState.activeTab === "needs_attention" ? "all" : "needs_attention")
+                              handleToggleTab(uiState.activeTab === "needs_attention" ? "all" : "needs_attention")
                             }
                             className="h-4 w-4 rounded-md border-gray-300"
                           />
@@ -1191,7 +1330,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                           <Checkbox
                             id="filter-draft"
                             checked={uiState.activeTab === "draft"}
-                            onCheckedChange={() => setActiveTab(uiState.activeTab === "draft" ? "all" : "draft")}
+                            onCheckedChange={() => handleToggleTab(uiState.activeTab === "draft" ? "all" : "draft")}
                             className="h-4 w-4 rounded-md border-gray-300"
                           />
                           <label htmlFor="filter-draft" className="ml-2 text-sm text-gray-700">
@@ -1202,7 +1341,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                           <Checkbox
                             id="filter-archived"
                             checked={uiState.activeTab === "archived"}
-                            onCheckedChange={() => setActiveTab(uiState.activeTab === "archived" ? "all" : "archived")}
+                            onCheckedChange={() => handleToggleTab(uiState.activeTab === "archived" ? "all" : "archived")}
                             className="h-4 w-4 rounded-md border-gray-300"
                           />
                           <label htmlFor="filter-archived" className="ml-2 text-sm text-gray-700">
@@ -1214,7 +1353,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
 
                     <div>
                       <h3 className="text-sm font-medium text-gray-700 mb-2">Sort By</h3>
-                      <Select value={sortOption}             onValueChange={(value: SortOption) => handleFilterChange("sortOption", value)}>
+        <Select value={filterState.sortOption}             onValueChange={(value: SortOption) => handleFilterChange("sortOption", value)}>
                         <SelectTrigger className="w-full rounded-full border-gray-200">
                           <SelectValue placeholder="Sort by" />
                         </SelectTrigger>
@@ -1272,7 +1411,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                   <Button
                     variant="destructive"
                     size="sm"
-                    onClick={() => setIsBulkDeleteDialogOpen(true)}
+                    onClick={() => setDialogState((prev) => ({ ...prev, isBulkDeleteDialogOpen: true }))}
                     className="rounded-full"
                   >
                     <Trash2 className="mr-1 h-3 w-3" />
@@ -1281,7 +1420,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                 </div>
               )}
 
-              <Select value={sortOption}             onValueChange={(value: SortOption) => handleFilterChange("sortOption", value)}>
+              <Select value={filterState.sortOption}             onValueChange={(value: SortOption) => handleFilterChange("sortOption", value)}>
                 <SelectTrigger className="w-[180px] rounded-full border-gray-200">
                   <SelectValue placeholder="Sort by" />
                 </SelectTrigger>
@@ -1378,12 +1517,12 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                 <Package className="h-16 w-16 text-gray-400 mb-6" />
                 <h3 className="text-2xl font-bold mb-3">No products found</h3>
                 <p className="text-gray-600 mb-6 max-w-md">
-                  {isFilterActive
+          {uiState.isFilterActive
                     ? "Try adjusting your filters to see more results"
                     : "Get started by adding your first product to the catalog"}
                 </p>
                 <div className="flex gap-3">
-                  {isFilterActive && (
+          {uiState.isFilterActive && (
                     <Button variant="outline" onClick={resetFilters} className="rounded-full bg-transparent">
                       <X className="mr-2 h-4 w-4" />
                       Reset Filters
@@ -1453,8 +1592,8 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
             {filteredProducts.length > 0 && totalPages > 1 && (
               <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-100">
                 <div className="text-sm text-gray-600">
-                  Showing <span className="font-semibold">{(currentPage - 1) * pageSize + 1}</span> to{" "}
-                  <span className="font-semibold">{Math.min(currentPage * pageSize, filteredProducts.length)}</span> of{" "}
+                  Showing <span className="font-semibold">{(currentPage - 1) * filterState.pageSize + 1}</span> to{" "}
+                  <span className="font-semibold">{Math.min(currentPage * filterState.pageSize, filteredProducts.length)}</span> of{" "}
                   <span className="font-semibold">{filteredProducts.length}</span> products
                 </div>
                 <div className="flex items-center gap-2">
@@ -1510,10 +1649,12 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
 
       {/* Enhanced loading overlay */}
       <AnimatePresence>
-        {operationLoading.type && <LoadingOverlay message={operationLoading.message} />}
+        {uiState.operationType && <LoadingOverlay message={uiState.operationMessage || "Processing..."} />}
       </AnimatePresence>
 
-      <AlertDialog open={uiState.isDeleteDialogOpen} onOpenChange={handleCloseDeleteDialog}>
+      <AlertDialog open={dialogState.productToDelete !== null} onOpenChange={(open) => {
+        if (!open) handleCloseDeleteDialog()
+      }}>
         <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-xl font-semibold">Delete Product?</AlertDialogTitle>
@@ -1537,7 +1678,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={uiState.isBulkDeleteDialogOpen} onOpenChange={(open) => setUiState((prev) => ({ ...prev, isBulkDeleteDialogOpen: open }))}>
+      <AlertDialog open={dialogState.isBulkDeleteDialogOpen} onOpenChange={(open) => setDialogState((prev) => ({ ...prev, isBulkDeleteDialogOpen: open }))}>
         <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-xl font-semibold">
