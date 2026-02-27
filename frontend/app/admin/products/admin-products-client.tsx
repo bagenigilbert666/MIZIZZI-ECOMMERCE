@@ -995,6 +995,10 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
     setDialogState((prev) => ({ ...prev, productToDelete: productId }))
   }, [])
 
+  const handleCloseDeleteDialog = useCallback(() => {
+    setDialogState((prev) => ({ ...prev, productToDelete: null }))
+  }, [])
+
   // Bulk delete selected products
   const handleBulkDelete = useCallback(async () => {
     if (selectedProducts.length === 0) {
@@ -1038,24 +1042,25 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
   }, [selectedProducts])
 
   const handleSelectAll = useCallback(() => {
-    if (selectedProducts.length === paginatedProducts.length && selectedProducts.length > 0) {
+    // Compute current page items directly to avoid referencing paginatedProducts (defined later)
+    const startIndex = (currentPage - 1) * filterState.pageSize
+    const endIndex = startIndex + filterState.pageSize
+    const currentPageItems = filteredProducts.slice(startIndex, endIndex)
+
+    if (selectedProducts.length === currentPageItems.length && selectedProducts.length > 0) {
       setSelectedProducts([])
     } else {
-      setSelectedProducts(paginatedProducts.map(p => p.id.toString()))
+      setSelectedProducts(currentPageItems.map((p) => p.id.toString()))
     }
-  }, [selectedProducts.length, paginatedProducts.length, paginatedProducts])
+  }, [selectedProducts.length, filteredProducts, currentPage, filterState.pageSize])
 
-  const handleSelectProduct = useCallback((id: string) => {
-    setSelectedProducts(prev =>
-      prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
-    )
-  }, [])
+  // Duplicate handleSelectProduct removed — original definition is retained above.
 
   const handleDeleteProduct = useCallback(async () => {
     if (!dialogState.productToDelete) return
 
     try {
-      setUiState((prev) => ({ ...prev, isOperating: true, operationType: null }))
+      setUiState((prev) => ({ ...prev, isDeleting: true }))
       await adminService.deleteProduct(dialogState.productToDelete)
 
       setAllProducts((prev) => prev.filter((p) => p.id?.toString() !== dialogState.productToDelete))
@@ -1073,41 +1078,10 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
         variant: "destructive",
       })
     } finally {
-      setUiState((prev) => ({ ...prev, isOperating: false }))
+      setUiState((prev) => ({ ...prev, isDeleting: false }))
     }
   }, [dialogState.productToDelete])
 
-  const handleBulkDelete = useCallback(async () => {
-    if (selectedProducts.length === 0) return
-
-    try {
-      setUiState((prev) => ({ ...prev, isOperating: true, operationType: "bulk" }))
-
-      for (const productId of selectedProducts) {
-        await adminService.deleteProduct(productId)
-      }
-
-      setAllProducts((prev) => prev.filter((p) => !selectedProducts.includes(p.id?.toString())))
-      setSelectedProducts([])
-
-      toast({
-        title: "Success",
-        description: `${selectedProducts.length} product(s) deleted successfully.`,
-      })
-
-      setDialogState((prev) => ({ ...prev, isBulkDeleteDialogOpen: false }))
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error?.message || "Failed to delete products",
-        variant: "destructive",
-      })
-    } finally {
-      setUiState((prev) => ({ ...prev, isOperating: false, operationType: null }))
-    }
-  }, [selectedProducts])
-
-  // Get paginated products
   const paginatedProducts = useMemo(() => {
     const startIndex = (currentPage - 1) * filterState.pageSize
     const endIndex = startIndex + filterState.pageSize
