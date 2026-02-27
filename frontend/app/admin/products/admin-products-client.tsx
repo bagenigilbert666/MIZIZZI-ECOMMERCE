@@ -227,17 +227,8 @@ interface ProductStats {
 }
 
 const LoadingOverlay = ({ message }: { message: string }) => (
-  <motion.div
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 1 }}
-    exit={{ opacity: 0 }}
-    className="fixed inset-0 bg-white/90 backdrop-blur-md z-50 flex items-center justify-center"
-  >
-    <motion.div
-      initial={{ scale: 0.9, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-8 flex flex-col items-center gap-6 max-w-sm mx-4"
-    >
+  <div className="fixed inset-0 bg-white/90 backdrop-blur-md z-50 flex items-center justify-center">
+    <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-8 flex flex-col items-center gap-6 max-w-sm mx-4">
       <div className="relative">
         <div className="w-12 h-12 border-3 border-gray-200 border-t-gray-900 rounded-full animate-spin" />
         <div
@@ -249,8 +240,8 @@ const LoadingOverlay = ({ message }: { message: string }) => (
         <p className="text-gray-900 font-semibold text-lg">{message}</p>
         <p className="text-gray-500 text-sm mt-1">Please wait...</p>
       </div>
-    </motion.div>
-  </motion.div>
+    </div>
+  </div>
 )
 
 const MiniSpinner = () => (
@@ -1074,7 +1065,22 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
   const totalPages = Math.ceil(filteredProducts.length / pageSize)
 
   // Get current page products
-  // Pagination - compute current page products
+  // Helper functions
+  const getProductImage = (product: Product): string => {
+    if (productImages[product.id]) {
+      return productImages[product.id]
+    }
+    if (product.images && product.images.length > 0) {
+      return product.images[0]
+    }
+    return "/placeholder-product.png"
+  }
+
+  const getCategoryName = (categoryId?: number | null): string => {
+    if (!categoryId) return "Uncategorized"
+    const category = categories.find((c) => c.id === categoryId)
+    return category?.name || "Uncategorized"
+  }
   const currentProducts = useMemo(() => {
     return filteredProducts.slice((currentPage - 1) * filterState.pageSize, currentPage * filterState.pageSize)
   }, [filteredProducts, currentPage, filterState.pageSize])
@@ -1478,11 +1484,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white p-4 md:p-6 space-y-8">
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100"
-      >
+      <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
         <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
           <div className="space-y-3">
             <h1 className="text-4xl font-bold text-gray-900 tracking-tight">Products</h1>
@@ -1512,7 +1514,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
             <Button
               variant="outline"
               onClick={handleRefresh}
-              disabled={isLoading}
+              disabled={uiState.isLoading}
               className="rounded-full border-gray-200 hover:bg-gray-50 transition-all duration-200 bg-transparent"
             >
               {isLoading ? <MiniSpinner /> : <RefreshCw className="mr-2 h-4 w-4" />}
@@ -1526,7 +1528,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
             </Button>
           </div>
         </div>
-      </motion.div>
+      </div>
 
       {/* Simplified stats grid layout with better spacing */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
@@ -1587,12 +1589,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
         />
       </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden"
-      >
+      <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-100">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div className="flex items-center gap-4">
@@ -1605,19 +1602,19 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                   className="pl-10 w-80 rounded-full border-gray-200 focus:border-gray-300"
                 />
               </div>
-              <Sheet open={isFilterSheetOpen} onOpenChange={setIsFilterSheetOpen}>
+              <Sheet open={uiState.isFilterSheetOpen} onOpenChange={(open) => setUiState((prev) => ({ ...prev, isFilterSheetOpen: open }))}>
                 <SheetTrigger asChild>
                   <Button
                     variant="outline"
                     className={cn(
                       "rounded-full border-gray-200 hover:bg-gray-50 transition-all duration-200",
-                      isFilterActive && "bg-blue-50 border-blue-200 text-blue-700",
+                      uiState.isFilterActive && "bg-blue-50 border-blue-200 text-blue-700",
                     )}
                   >
                     <Filter className="mr-2 h-4 w-4" />
                     Filters{" "}
-                    {isFilterActive &&
-                      `(${Object.values({ searchQuery, filterOption, categoryFilter }).filter(Boolean).length})`}
+                    {uiState.isFilterActive &&
+                      `(${Object.values({ searchQuery: filterState.searchQuery, filterOption: filterState.filterOption, categoryFilter: filterState.categoryFilter }).filter(Boolean).length})`}
                   </Button>
                 </SheetTrigger>
                 <SheetContent className="w-96">
@@ -1631,7 +1628,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                     <div>
                       <h3 className="text-sm font-medium text-gray-700 mb-2">Category</h3>
                       <Select
-                        value={categoryFilter?.toString() || "all"}
+                        value={filterState.categoryFilter?.toString() || "all"}
                         onValueChange={(value) => handleFilterChange("categoryFilter", value === "all" ? null : Number.parseInt(value))}
                       >
                         <SelectTrigger className="w-full rounded-full border-gray-200">
@@ -1852,11 +1849,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
 
             <div className="flex items-center gap-3">
               {selectedProducts.length > 0 && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-full"
-                >
+                <div className="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-full">
                   <span className="text-sm font-medium">{selectedProducts.length} selected</span>
                   <Button
                     variant="ghost"
@@ -1875,7 +1868,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                     <Trash2 className="mr-1 h-3 w-3" />
                     Delete
                   </Button>
-                </motion.div>
+                </div>
               )}
 
               <Select value={sortOption}             onValueChange={(value: SortOption) => handleFilterChange("sortOption", value)}>
@@ -2103,7 +2096,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
             )}
           </div>
         </Tabs>
-      </motion.div>
+      </div>
 
       {/* Enhanced loading overlay */}
       <AnimatePresence>
