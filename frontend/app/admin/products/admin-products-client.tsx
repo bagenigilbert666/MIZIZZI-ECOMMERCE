@@ -1636,6 +1636,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                 productImages={productImages}
                 onSelectProduct={handleSelectProduct}
                 onDeleteProduct={handleOpenDeleteDialog}
+                onDeleteProductFromList={handleDeleteProductFromList}
                 getProductImage={getProductImage}
               />
             )}
