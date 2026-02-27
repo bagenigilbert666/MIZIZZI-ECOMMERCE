@@ -9,6 +9,7 @@ import { TableCell, TableRow } from "@/components/ui/table"
 import { OptimizedImage } from "@/components/ui/optimized-image"
 import { Badge } from "@/components/ui/badge"
 import { AppleDeleteDialog } from "./apple-delete-dialog"
+import { adminService } from "@/services/admin"
 import type { Product } from "@/types"
 
 interface ProductRowProps {
@@ -56,9 +57,19 @@ const ProductRow = memo(function ProductRow({
   const handleConfirmDelete = useCallback(async () => {
     setIsDeleting(true)
     try {
-      await new Promise(resolve => setTimeout(resolve, 500)) // Simulate API call
-      onDelete(product.id)
-      setShowDeleteDialog(false)
+      // Call the admin service to delete the product from the database
+      const result = await adminService.deleteProduct(product.id)
+      
+      if (result.success) {
+        console.log("[v0] Product deleted successfully:", product.id)
+        // Notify parent component of deletion
+        onDelete(product.id)
+        setShowDeleteDialog(false)
+      }
+    } catch (error) {
+      console.error("[v0] Failed to delete product:", error)
+      // Show error message (you can add a toast notification here)
+      alert("Failed to delete product. Please try again.")
     } finally {
       setIsDeleting(false)
     }
