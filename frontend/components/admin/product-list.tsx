@@ -13,9 +13,7 @@ interface ProductListProps {
   isMobile: boolean
   productImages: Record<string, string>
   onSelectProduct: (id: string) => void
-  onEditProduct: (id: string) => void
   onDeleteProduct: (id: string) => void
-  onViewProduct: (id: string) => void
   getProductImage: (product: Product) => string
 }
 
@@ -26,9 +24,7 @@ const ProductList = memo(function ProductList({
   isMobile,
   productImages,
   onSelectProduct,
-  onEditProduct,
   onDeleteProduct,
-  onViewProduct,
   getProductImage,
 }: ProductListProps) {
   // Auto-switch to grid on mobile
@@ -43,9 +39,7 @@ const ProductList = memo(function ProductList({
             product={product}
             isSelected={selectedProducts.includes(product.id.toString())}
             onSelect={onSelectProduct}
-            onEdit={onEditProduct}
             onDelete={onDeleteProduct}
-            onView={onViewProduct}
             imageSrc={productImages[product.id] || getProductImage(product)}
           />
         ))}
@@ -76,9 +70,7 @@ const ProductList = memo(function ProductList({
               product={product}
               isSelected={selectedProducts.includes(product.id.toString())}
               onSelect={onSelectProduct}
-              onEdit={onEditProduct}
               onDelete={onDeleteProduct}
-              onView={onViewProduct}
               imageSrc={productImages[product.id] || getProductImage(product)}
             />
           ))}

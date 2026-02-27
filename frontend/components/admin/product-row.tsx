@@ -1,30 +1,19 @@
 "use client"
 
 import React, { memo, useCallback } from "react"
-import { Trash2, Edit, Eye, MoreHorizontal, CheckCircle2, XCircle } from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
+import { useRouter } from "next/navigation"
+import { Trash2, CheckCircle2, XCircle } from "lucide-react"
 import { Checkbox } from "@/components/ui/checkbox"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  DropdownMenuLabel,
-  DropdownMenuGroup,
-} from "@/components/ui/dropdown-menu"
 import { TableCell, TableRow } from "@/components/ui/table"
 import { OptimizedImage } from "@/components/ui/optimized-image"
+import { Badge } from "@/components/ui/badge"
 import type { Product } from "@/types"
 
 interface ProductRowProps {
   product: Product
   isSelected: boolean
   onSelect: (id: string) => void
-  onEdit: (id: string) => void
   onDelete: (id: string) => void
-  onView: (id: string) => void
   imageSrc?: string
 }
 
@@ -32,35 +21,36 @@ const ProductRow = memo(function ProductRow({
   product,
   isSelected,
   onSelect,
-  onEdit,
   onDelete,
-  onView,
   imageSrc,
 }: ProductRowProps) {
+  const router = useRouter()
+
   // Memoized callbacks to prevent unnecessary re-renders
-  const handleSelect = useCallback(() => {
+  const handleSelect = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
     onSelect(product.id)
   }, [product.id, onSelect])
 
-  const handleEdit = useCallback(() => {
-    onEdit(product.id)
-  }, [product.id, onEdit])
-
-  const handleDelete = useCallback(() => {
+  const handleDelete = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation()
     onDelete(product.id)
   }, [product.id, onDelete])
 
-  const handleView = useCallback(() => {
-    onView(product.id)
-  }, [product.id, onView])
+  const handleRowClick = useCallback(() => {
+    router.push(`/admin/products/${product.id}`)
+  }, [product.id, router])
 
   const status = product.status === "active" || product.is_active
   const stockStatus = (product.stock || 0) > 0
 
   return (
-    <TableRow className="hover:bg-gray-50 transition-colors">
-      <TableCell className="w-12">
-        <Checkbox checked={isSelected} onChange={handleSelect} />
+    <TableRow 
+      className="hover:bg-blue-50 transition-colors cursor-pointer group"
+      onClick={handleRowClick}
+    >
+      <TableCell className="w-12" onClick={handleSelect}>
+        <Checkbox checked={isSelected} onChange={() => {}} />
       </TableCell>
       <TableCell className="w-16">
         <div className="w-14 h-14 rounded-lg bg-gray-100 flex-shrink-0 overflow-hidden">
@@ -78,7 +68,7 @@ const ProductRow = memo(function ProductRow({
         </div>
       </TableCell>
       <TableCell>
-        <div className="font-medium text-gray-900 line-clamp-1">{product.name}</div>
+        <div className="font-medium text-gray-900 line-clamp-1 group-hover:text-blue-600">{product.name}</div>
         <div className="text-sm text-gray-500">{product.sku || "No SKU"}</div>
       </TableCell>
       <TableCell className="text-right">${parseFloat(String(product.price || 0)).toFixed(2)}</TableCell>
@@ -105,32 +95,20 @@ const ProductRow = memo(function ProductRow({
           <Badge className="bg-red-50 text-red-700 border border-red-200">Out of Stock</Badge>
         )}
       </TableCell>
-      <TableCell className="text-right">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" side="bottom" sideOffset={8} className="w-48">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
-            <DropdownMenuGroup>
-              <DropdownMenuItem onClick={handleView}>
-                <Eye className="mr-2 h-4 w-4" />
-                View
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleEdit}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={handleDelete} className="text-red-600">
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-          </DropdownMenuContent>
-        </DropdownMenu>
+      <TableCell 
+        className="text-right"
+        onClick={(e) => {
+          e.stopPropagation()
+          handleDelete(e as any)
+        }}
+      >
+        <button
+          onClick={handleDelete}
+          className="p-2 hover:bg-red-50 rounded-lg transition-colors"
+          title="Delete product"
+        >
+          <Trash2 className="h-4 w-4 text-red-600" />
+        </button>
       </TableCell>
     </TableRow>
   )

@@ -995,8 +995,60 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
     setDialogState((prev) => ({ ...prev, productToDelete: productId }))
   }, [])
 
-  const handleCloseDeleteDialog = useCallback(() => {
-    setDialogState((prev) => ({ ...prev, productToDelete: null }))
+  // Bulk delete selected products
+  const handleBulkDelete = useCallback(async () => {
+    if (selectedProducts.length === 0) {
+      toast({ title: "No products selected", description: "Please select at least one product to delete" })
+      return
+    }
+
+    setUiState((prev) => ({ ...prev, isBulkDeleteDialogOpen: true }))
+  }, [selectedProducts.length])
+
+  const confirmBulkDelete = useCallback(async () => {
+    if (selectedProducts.length === 0) return
+
+    try {
+      setUiState((prev) => ({ ...prev, isDeleting: true, operationType: "bulk", operationMessage: "Deleting products..." }))
+
+      // Delete each product
+      for (const productId of selectedProducts) {
+        await adminService.deleteProduct(productId)
+      }
+
+      // Remove from state
+      setAllProducts((prev) =>
+        prev.filter((p) => !selectedProducts.includes(p.id.toString()))
+      )
+      setSelectedProducts([])
+      setUiState((prev) => ({ ...prev, isBulkDeleteDialogOpen: false, isDeleting: false, operationType: null }))
+
+      toast({
+        title: "Success",
+        description: `${selectedProducts.length} product(s) deleted successfully`,
+      })
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to delete products",
+        variant: "destructive",
+      })
+      setUiState((prev) => ({ ...prev, isDeleting: false, operationType: null }))
+    }
+  }, [selectedProducts])
+
+  const handleSelectAll = useCallback(() => {
+    if (selectedProducts.length === paginatedProducts.length && selectedProducts.length > 0) {
+      setSelectedProducts([])
+    } else {
+      setSelectedProducts(paginatedProducts.map(p => p.id.toString()))
+    }
+  }, [selectedProducts.length, paginatedProducts.length, paginatedProducts])
+
+  const handleSelectProduct = useCallback((id: string) => {
+    setSelectedProducts(prev =>
+      prev.includes(id) ? prev.filter(p => p !== id) : [...prev, id]
+    )
   }, [])
 
   const handleDeleteProduct = useCallback(async () => {
@@ -1423,8 +1475,9 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
 
             <div className="flex items-center gap-3">
               {selectedProducts.length > 0 && (
-                <div className="flex items-center gap-2 bg-gray-100 px-4 py-2 rounded-full">
-                  <span className="text-sm font-medium">{selectedProducts.length} selected</span>
+                <div className="flex items-center gap-2 bg-blue-50 px-4 py-2 rounded-full border border-blue-200">
+                  <Checkbox checked={true} className="h-4 w-4" onChange={handleSelectAll} title="Select all products on page" />
+                  <span className="text-sm font-medium text-blue-900">{selectedProducts.length} selected</span>
                   <Button
                     variant="ghost"
                     size="sm"
@@ -1436,11 +1489,12 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                   <Button
                     variant="destructive"
                     size="sm"
-                    onClick={() => setDialogState((prev) => ({ ...prev, isBulkDeleteDialogOpen: true }))}
+                    onClick={handleBulkDelete}
+                    disabled={uiState.isDeleting}
                     className="rounded-full"
                   >
                     <Trash2 className="mr-1 h-3 w-3" />
-                    Delete
+                    Delete ({selectedProducts.length})
                   </Button>
                 </div>
               )}
@@ -1606,9 +1660,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                 isMobile={isMobile}
                 productImages={productImages}
                 onSelectProduct={handleSelectProduct}
-                onEditProduct={handleEditProduct}
                 onDeleteProduct={handleOpenDeleteDialog}
-                onViewProduct={handleViewProduct}
                 getProductImage={getProductImage}
               />
             )}
@@ -1701,7 +1753,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
         </AlertDialogContent>
       </AlertDialog>
 
-      <AlertDialog open={dialogState.isBulkDeleteDialogOpen} onOpenChange={(open) => setDialogState((prev) => ({ ...prev, isBulkDeleteDialogOpen: open }))}>
+      <AlertDialog open={uiState.isBulkDeleteDialogOpen} onOpenChange={(open) => setUiState((prev) => ({ ...prev, isBulkDeleteDialogOpen: open }))}>
         <AlertDialogContent className="rounded-2xl">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-xl font-semibold">
@@ -1716,7 +1768,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
-              onClick={handleBulkDelete}
+              onClick={confirmBulkDelete}
               disabled={uiState.isDeleting}
               className="rounded-full bg-red-600 hover:bg-red-700"
             >
