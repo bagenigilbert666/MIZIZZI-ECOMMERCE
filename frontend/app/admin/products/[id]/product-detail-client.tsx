@@ -75,43 +75,43 @@ export function ProductDetailClient({ initialProduct }: ProductDetailClientProps
   }, [product.id, router])
 
   return (
-    <div className="min-h-screen bg-white">
-      {/* Header */}
+    <div className="min-h-screen bg-gray-50">
+      {/* Header - Sticky */}
       <div className="sticky top-0 z-40 border-b border-gray-200 bg-white/80 backdrop-blur-xl">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-4">
-            <div className="flex items-center gap-4">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 py-4">
+            <div className="flex items-center gap-4 min-w-0">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() => router.back()}
-                className="rounded-full hover:bg-gray-100"
+                className="rounded-full hover:bg-gray-100 flex-shrink-0"
               >
                 <ChevronLeft className="h-5 w-5" />
               </Button>
-              <div>
-                <h1 className="text-2xl font-bold tracking-tight text-gray-900">{product.name}</h1>
-                <p className="text-sm text-gray-500">SKU: {product.sku || "N/A"}</p>
+              <div className="min-w-0">
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-gray-900 truncate">{product.name}</h1>
+                <p className="text-sm text-gray-500 truncate">SKU: {product.sku || "N/A"}</p>
               </div>
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 flex-wrap justify-end">
               {hasChanges && (
                 <Button
                   onClick={handleSave}
                   disabled={isSaving}
                   className="rounded-full bg-blue-600 hover:bg-blue-700 text-white"
+                  size="sm"
                 >
                   <Save className="mr-2 h-4 w-4" />
                   {isSaving ? "Saving..." : "Save"}
                 </Button>
               )}
               <Button
-                variant="ghost"
+                variant="outline"
                 size="icon"
-                onClick={() => window.open(`/product/${product.slug || product.id}`, "_blank")}
-                className="rounded-full hover:bg-gray-100"
+                className="rounded-full"
                 title="View product"
               >
                 <Eye className="h-5 w-5" />
@@ -119,9 +119,9 @@ export function ProductDetailClient({ initialProduct }: ProductDetailClientProps
               <Button
                 variant="destructive"
                 size="icon"
-                onClick={() => setShowDeleteConfirm(true)}
                 className="rounded-full"
-                title="Delete product"
+                onClick={() => setShowDeleteConfirm(true)}
+                disabled={isDeleting}
               >
                 <Trash2 className="h-5 w-5" />
               </Button>
@@ -131,38 +131,74 @@ export function ProductDetailClient({ initialProduct }: ProductDetailClientProps
       </div>
 
       {/* Main Content - Apple-like Two Column Layout */}
-      <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid grid-cols-1 gap-8 lg:grid-cols-3" style={{ contain: "layout" }}>
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3" style={{ contain: "layout" }}>
           {/* Left Column - Main Content */}
           <div className="lg:col-span-2 space-y-6" style={{ contain: "content" }}>
             {/* Product Images */}
-            <section className="space-y-4" style={{ contain: "layout" }}>
+            <section className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 sm:p-6" style={{ contain: "layout" }}>
               <h2 className="text-lg font-semibold text-gray-900">Gallery</h2>
               <ProductImages product={product} onProductChange={handleProductChange} />
             </section>
 
             {/* Basic Information */}
-            <section className="space-y-4" style={{ contain: "layout" }}>
+            <section className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 sm:p-6" style={{ contain: "layout" }}>
               <h2 className="text-lg font-semibold text-gray-900">Information</h2>
               <ProductBasicInfo product={product} onProductChange={handleProductChange} />
             </section>
 
             {/* Pricing */}
-            <section className="space-y-4" style={{ contain: "layout" }}>
+            <section className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 sm:p-6" style={{ contain: "layout" }}>
               <h2 className="text-lg font-semibold text-gray-900">Pricing</h2>
               <ProductPricing product={product} onProductChange={handleProductChange} />
             </section>
 
             {/* Inventory */}
-            <section className="space-y-4" style={{ contain: "layout" }}>
+            <section className="space-y-4 rounded-2xl border border-gray-200 bg-white p-5 sm:p-6" style={{ contain: "layout" }}>
               <h2 className="text-lg font-semibold text-gray-900">Inventory</h2>
               <ProductInventory product={product} onProductChange={handleProductChange} />
             </section>
           </div>
 
           {/* Right Column - Sidebar */}
-          <div className="space-y-6" style={{ contain: "layout" }}>
+          <div className="space-y-6 lg:sticky lg:top-24" style={{ contain: "layout" }}>
             <ProductActions product={product} onProductChange={handleProductChange} />
+          </div>
+        </div>
+      </div>
+
+      {/* Delete Confirmation Dialog */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="rounded-2xl bg-white p-6 sm:p-8 max-w-sm w-full shadow-2xl">
+            <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">Delete Product?</h2>
+            <p className="text-sm sm:text-base text-gray-600 mb-6">
+              This action cannot be undone. The product "{product.name}" will be permanently deleted from your catalog.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <Button
+                variant="outline"
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={isDeleting}
+                className="rounded-full"
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="destructive"
+                onClick={handleDelete}
+                disabled={isDeleting}
+                className="rounded-full"
+              >
+                {isDeleting ? "Deleting..." : "Delete"}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
             {/* Delete Section - Bottom */}
             {showDeleteConfirm && (

@@ -89,6 +89,8 @@ export interface Product {
     price_adjustment?: number
   }[]
   seo_keywords?: string[]
+  seo_title?: string
+  seo_description?: string
   canonical_url?: string
   condition?: "new" | "used" | "refurbished"
   video_url?: string
