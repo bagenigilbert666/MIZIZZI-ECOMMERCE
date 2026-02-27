@@ -306,14 +306,7 @@ const EnhancedProductCard = ({
   onView: () => void
   onDelete: () => void
 }) => (
-  <motion.div
-    layout
-    initial={{ opacity: 0, y: 20 }}
-    animate={{ opacity: 1, y: 0 }}
-    exit={{ opacity: 0, y: -20 }}
-    whileHover={{ y: -4 }}
-    className="bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 group"
-  >
+  <div className="bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 group">
     <div className="relative aspect-square bg-gradient-to-br from-gray-50 to-gray-100">
       <OptimizedImage
         src={product.thumbnail_url || product.featured_image || "/placeholder.svg?height=300&width=300&query=product"}
@@ -517,7 +510,7 @@ const EnhancedProductCard = ({
         ))}
       </div>
     </div>
-  </motion.div>
+  </div>
 )
 
 interface AdminProductsClientProps {
@@ -601,10 +594,10 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        setUiState(prev => ({ ...prev, isLoadingCategories: true }))
+        setUiState((prev) => ({ ...prev, isLoadingCategories: true }))
         const response = await adminService.getCategories({ per_page: 10000 })
-        if (response && response.data) {
-          setCategories(Array.isArray(response.data) ? response.data : response.data.categories || [])
+        if (response && response.items) {
+          setCategories(Array.isArray(response.items) ? response.items : [])
         }
       } catch {
         console.error("Failed to fetch categories")
@@ -634,10 +627,10 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
     // Apply status filter
     switch (filterState.filterOption) {
       case "in_stock":
-        result = result.filter((p) => p.stock_quantity > 0)
+        result = result.filter((p) => (p.stock || 0) > 0)
         break
       case "out_of_stock":
-        result = result.filter((p) => p.stock_quantity <= 0)
+        result = result.filter((p) => (p.stock || 0) <= 0)
         break
       case "featured":
         result = result.filter((p) => p.is_featured)
@@ -649,7 +642,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
         result = result.filter((p) => p.is_new)
         break
       case "low_stock":
-        result = result.filter((p) => p.stock_quantity > 0 && p.stock_quantity <= 10)
+        result = result.filter((p) => (p.stock || 0) > 0 && (p.stock || 0) <= 10)
         break
       case "draft":
         result = result.filter((p) => p.status === "draft")
@@ -682,10 +675,10 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
         result.sort((a, b) => a.price - b.price)
         break
       case "stock_high":
-        result.sort((a, b) => (b.stock_quantity || 0) - (a.stock_quantity || 0))
+        result.sort((a, b) => (b.stock || 0) - (a.stock || 0))
         break
       case "stock_low":
-        result.sort((a, b) => (a.stock_quantity || 0) - (b.stock_quantity || 0))
+        result.sort((a, b) => (a.stock || 0) - (b.stock || 0))
         break
     }
 
@@ -702,13 +695,13 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
   const productStats = useMemo(() => {
     const stats: ProductStats = {
       totalProducts: allProducts.length,
-      inStock: allProducts.filter((p) => (p.stock_quantity || 0) > 0).length,
-      outOfStock: allProducts.filter((p) => (p.stock_quantity || 0) <= 0).length,
-      lowStock: allProducts.filter((p) => (p.stock_quantity || 0) > 0 && (p.stock_quantity || 0) <= 10).length,
+      inStock: allProducts.filter((p) => (p.stock || 0) > 0).length,
+      outOfStock: allProducts.filter((p) => (p.stock || 0) <= 0).length,
+      lowStock: allProducts.filter((p) => (p.stock || 0) > 0 && (p.stock || 0) <= 10).length,
       onSale: allProducts.filter((p) => p.is_sale).length,
       featured: allProducts.filter((p) => p.is_featured).length,
       newProducts: allProducts.filter((p) => p.is_new).length,
-      totalInventoryValue: allProducts.reduce((sum, p) => sum + (p.price || 0) * ((p.stock_quantity || 0) as number), 0),
+      totalInventoryValue: allProducts.reduce((sum, p) => sum + (p.price || 0) * ((p.stock || 0) as number), 0),
       averagePrice: allProducts.length > 0 ? allProducts.reduce((sum, p) => sum + (p.price || 0), 0) / allProducts.length : 0,
       categoriesCount: categories.length,
       luxuryDeal: allProducts.filter((p) => p.is_luxury_deal).length,
@@ -927,144 +920,9 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
     }
   }, [fetchProducts]) // Add fetchProducts to dependency array
 
-  // Filter and sort products
-  const filteredProducts = allProducts
-    .filter((product) => {
-      // Apply search filter
-      if (debouncedSearchQuery) {
-        const searchLower = debouncedSearchQuery.toLowerCase()
-        if (
-          !product.name.toLowerCase().includes(searchLower) &&
-          !(product.sku && product.sku.toLowerCase().includes(searchLower)) &&
-          !(product.description && product.description.toLowerCase().includes(searchLower))
-        ) {
-          return false
-        }
-      }
-
-      // Apply category filter
-      if (categoryFilter && product.category_id?.toString() !== categoryFilter.toString()) {
-        return false
-      }
-
-      // Apply status filters
-      if (activeTab !== "all") {
-        switch (activeTab) {
-          case "in_stock":
-            return product.stock !== undefined && product.stock > 0
-          case "out_of_stock":
-            return product.stock === undefined || product.stock <= 0
-          case "featured":
-            return product.is_featured
-          case "on_sale":
-            return product.is_sale
-          case "new":
-            return product.is_new
-          case "flash_sale":
-            return product.is_flash_sale
-          case "luxury_deal":
-            return product.is_luxury_deal
-          case "trending": // Placeholder for trending filter
-            return product.views !== undefined && product.views > 100 // Example: products with more than 100 views
-          case "low_stock":
-            return product.stock !== undefined && product.stock < (product.low_stock_threshold || 10)
-          case "high_performing": // Placeholder for high performing filter
-            return product.conversion_rate !== undefined && product.conversion_rate > 5 // Example: conversion rate > 5%
-          case "needs_attention": // Placeholder for needs attention filter
-            return (
-              product.stock === undefined ||
-              product.stock <= 0 ||
-              (product.stock !== undefined && product.stock < (product.low_stock_threshold || 10))
-            )
-          case "draft":
-            return product.status === "draft"
-          case "archived":
-            return product.status === "archived"
-          default:
-            return true
-        }
-      } else if (filterOption !== "all") {
-        switch (filterOption) {
-          case "in_stock":
-            return product.stock !== undefined && product.stock > 0
-          case "out_of_stock":
-            return product.stock === undefined || product.stock <= 0
-          case "featured":
-            return product.is_featured
-          case "on_sale":
-            return product.is_sale
-          case "new":
-            return product.is_new
-          case "flash_sale":
-            return product.is_flash_sale
-          case "luxury_deal":
-            return product.is_luxury_deal
-          case "trending": // Placeholder for trending filter
-            return product.views !== undefined && product.views > 100 // Example: products with more than 100 views
-          case "low_stock":
-            return product.stock !== undefined && product.stock < (product.low_stock_threshold || 10)
-          case "high_performing": // Placeholder for high performing filter
-            return product.conversion_rate !== undefined && product.conversion_rate > 5 // Example: conversion rate > 5%
-          case "needs_attention": // Placeholder for needs attention filter
-            return (
-              product.stock === undefined ||
-              product.stock <= 0 ||
-              (product.stock !== undefined && product.stock < (product.low_stock_threshold || 10))
-            )
-          case "draft":
-            return product.status === "draft"
-          case "archived":
-            return product.status === "archived"
-          default:
-            return true
-        }
-      }
-
-      return true
-    })
-    .sort((a, b) => {
-      switch (sortOption) {
-        case "newest":
-          return new Date(b.created_at || "").getTime() - new Date(a.created_at || "").getTime()
-        case "oldest":
-          return new Date(a.created_at || "").getTime() - new Date(b.created_at || "").getTime()
-        case "name_asc":
-          return a.name.localeCompare(b.name)
-        case "name_desc":
-          return b.name.localeCompare(a.name)
-        case "price_high":
-          return (b.sale_price || b.price) - (a.sale_price || a.price)
-        case "price_low":
-          return (a.sale_price || a.price) - (b.sale_price || b.price)
-        case "stock_high":
-          return (b.stock || 0) - (a.stock || 0)
-        case "stock_low":
-          return (a.stock || 0) - (b.stock || 0)
-        case "sales_high":
-          return (b.total_sales || 0) - (a.total_sales || 0)
-        case "sales_low":
-          return (a.total_sales || 0) - (b.total_sales || 0)
-        case "rating_high":
-          return (b.rating || 0) - (a.rating || 0)
-        case "rating_low":
-          return (a.rating || 0) - (b.rating || 0)
-        case "views_high":
-          return (b.views || 0) - (a.views || 0)
-        case "views_low":
-          return (a.views || 0) - (b.views || 0)
-        case "profit_high":
-          return (b.profit_margin || 0) - (a.profit_margin || 0)
-        case "profit_low":
-          return (a.profit_margin || 0) - (b.profit_margin || 0)
-        default:
-          return 0
-      }
-    })
-
   // Calculate total pages
-  const totalPages = Math.ceil(filteredProducts.length / pageSize)
+  const totalPages = Math.ceil(filteredProducts.length / filterState.pageSize)
 
-  // Get current page products
   // Helper functions
   const getProductImage = (product: Product): string => {
     if (productImages[product.id]) {
@@ -1110,7 +968,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
       console.log("[v0] Cleared all image caches, refetching products...")
       await fetchProducts()
     } finally {
-      setOperationLoading({ type: null, message: "" })
+      setDialogState((prev) => ({ ...prev, operationType: null }))
     }
   }
 
