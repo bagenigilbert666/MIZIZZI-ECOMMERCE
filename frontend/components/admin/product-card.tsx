@@ -55,7 +55,7 @@ const ProductCard = memo(function ProductCard({
   }, [product.id, onView])
 
   const status = product.status === "active" || product.is_active
-  const stockStatus = product.stock_quantity > 0
+  const stockStatus = (product.stock || 0) > 0
 
   return (
     <Card className="overflow-hidden hover:shadow-lg transition-shadow">
@@ -118,7 +118,7 @@ const ProductCard = memo(function ProductCard({
             </div>
             <div>
               <p className="text-xs text-gray-500">Stock</p>
-              <p className="font-semibold text-gray-900">{product.stock_quantity || 0}</p>
+              <p className="font-semibold text-gray-900">{product.stock || 0}</p>
             </div>
           </div>
 

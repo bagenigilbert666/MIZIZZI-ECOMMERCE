@@ -839,11 +839,6 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
           return updated
         })
 
-        setImageVersions((prev) => ({
-          ...prev,
-          [productId]: (prev[productId] || 0) + 1,
-        }))
-
         // Also invalidate the image batch service cache
         imageBatchService.invalidateCache(productId)
 
@@ -890,11 +885,6 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
           return updated
         })
 
-        setImageVersions((prev) => ({
-          ...prev,
-          [productId]: (prev[productId] || 0) + 1,
-        }))
-
         imageBatchService.invalidateCache(productId)
 
         if (typeof localStorage !== "undefined") {
@@ -939,9 +929,13 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
     const category = categories.find((c) => c.id === categoryId)
     return category?.name || "Uncategorized"
   }
+
   const currentProducts = useMemo(() => {
     return filteredProducts.slice((currentPage - 1) * filterState.pageSize, currentPage * filterState.pageSize)
   }, [filteredProducts, currentPage, filterState.pageSize])
+
+  // Calculate total pages
+  const totalPages = Math.ceil(filteredProducts.length / filterState.pageSize)
 
   const handleRefresh = async () => {
     setDialogState((prev) => ({ ...prev, operationType: "refresh" }))
@@ -1011,11 +1005,11 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
   }, [])
 
   const handleFilterChange = useCallback((key: keyof typeof filterState, value: any) => {
-    setFilterState((prev) => ({ ...prev, [key]: value }))
+    setFilterState((prev: typeof filterState) => ({ ...prev, [key]: value }))
   }, [])
 
   const handleUIStateChange = useCallback((key: keyof typeof uiState, value: any) => {
-    setUiState((prev) => ({ ...prev, [key]: value }))
+    setUiState((prev: typeof uiState) => ({ ...prev, [key]: value }))
   }, [])
 
   // Handle product selection
@@ -1033,7 +1027,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
     if (!dialogState.productToDelete) return
 
     try {
-      setUiState((prev) => ({ ...prev, isDeleting: true }))
+      setUiState((prev: typeof uiState) => ({ ...prev, isDeleting: true }))
 
       // Check if admin token exists before making the API call
       const adminToken = localStorage.getItem("admin_token")
@@ -1078,7 +1072,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
     if (selectedProducts.length === 0) return
 
     try {
-      setUiState((prev) => ({ ...prev, isDeleting: true }))
+      setUiState((prev: typeof uiState) => ({ ...prev, isDeleting: true }))
 
       // Check if admin token exists before making the API call
       const adminToken = localStorage.getItem("admin_token")
@@ -1228,28 +1222,28 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
 
     // 1. Check thumbnail_url (most common field for product thumbnails)
     if (product.thumbnail_url) {
-      const version = imageVersions[product.id] || 0
+      const version = 0  // Image versioning removed
       const separator = product.thumbnail_url.includes("?") ? "&" : "?"
       return `${product.thumbnail_url}${separator}v=${version}`
     }
 
     // 2. Check featured_image
     if (product.featured_image) {
-      const version = imageVersions[product.id] || 0
+      const version = 0  // Image versioning removed
       const separator = product.featured_image.includes("?") ? "&" : "?"
       return `${product.featured_image}${separator}v=${version}`
     }
 
     // 3. Check image_urls array
     if (product.image_urls && product.image_urls.length > 0 && product.image_urls[0]) {
-      const version = imageVersions[product.id] || 0
+      const version = 0  // Image versioning removed
       const separator = product.image_urls[0].includes("?") ? "&" : "?"
       return `${product.image_urls[0]}${separator}v=${version}`
     }
 
     // 4. Check images array (with url property)
     if (product.images && product.images.length > 0 && product.images[0]?.url) {
-      const version = imageVersions[product.id] || 0
+      const version = 0  // Image versioning removed
       const separator = product.images[0].url.includes("?") ? "&" : "?"
       return `${product.images[0].url}${separator}v=${version}`
     }
@@ -1260,7 +1254,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
       const primaryImage = batchCachedImages.find((img: any) => img.is_primary)
       const selectedImage = primaryImage || batchCachedImages[0]
       if (selectedImage && selectedImage.url) {
-        const version = imageVersions[product.id] || 0
+        const version = 0  // Image versioning removed
         const separator = selectedImage.url.includes("?") ? "&" : "?"
         return `${selectedImage.url}${separator}v=${version}`
       }
@@ -1269,7 +1263,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
     // 6. Check state cached images from API call
     const cachedImage = productImages[product.id.toString()]
     if (cachedImage) {
-      const version = imageVersions[product.id] || 0
+      const version = 0  // Image versioning removed
       const separator = cachedImage.includes("?") ? "&" : "?"
       return `${cachedImage}${separator}v=${version}`
     }
@@ -1331,14 +1325,15 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
 
   // Check if any filters are active
   useEffect(() => {
-    setIsFilterActive(
-      debouncedSearchQuery !== "" ||
-        activeTab !== "all" ||
-        filterOption !== "all" ||
-        categoryFilter !== null ||
-        sortOption !== "newest",
-    )
-  }, [debouncedSearchQuery, activeTab, filterOption, categoryFilter, sortOption])
+    const isActive =
+      filterState.debouncedSearchQuery !== "" ||
+      uiState.activeTab !== "all" ||
+      filterState.filterOption !== "all" ||
+      filterState.categoryFilter !== null ||
+      filterState.sortOption !== "newest"
+    
+    setUiState((prev) => ({ ...prev, isFilterActive: isActive }))
+  }, [filterState.debouncedSearchQuery, uiState.activeTab, filterState.filterOption, filterState.categoryFilter, filterState.sortOption])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white p-4 md:p-6 space-y-8">

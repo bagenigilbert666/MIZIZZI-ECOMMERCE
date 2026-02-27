@@ -55,7 +55,7 @@ const ProductRow = memo(function ProductRow({
   }, [product.id, onView])
 
   const status = product.status === "active" || product.is_active
-  const stockStatus = product.stock_quantity > 0
+  const stockStatus = (product.stock || 0) > 0
 
   return (
     <TableRow className="hover:bg-gray-50 transition-colors">
@@ -82,7 +82,7 @@ const ProductRow = memo(function ProductRow({
         <div className="text-sm text-gray-500">{product.sku || "No SKU"}</div>
       </TableCell>
       <TableCell className="text-right">${parseFloat(String(product.price || 0)).toFixed(2)}</TableCell>
-      <TableCell className="text-right">{product.stock_quantity || 0} units</TableCell>
+      <TableCell className="text-right">{product.stock || 0} units</TableCell>
       <TableCell>
         <div className="flex items-center gap-2">
           {status ? (
