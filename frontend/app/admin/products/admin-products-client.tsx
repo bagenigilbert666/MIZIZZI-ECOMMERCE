@@ -484,24 +484,29 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
     }
   }, [isAuthenticated, authLoading, router])
 
-  // Fetch categories
+  // Fetch categories - only after authentication
   useEffect(() => {
     const fetchCategories = async () => {
+      // Only fetch if authenticated and not already loading
+      if (!isAuthenticated || authLoading) return
+      
       try {
         setUiState((prev) => ({ ...prev, isLoadingCategories: true }))
         const response = await adminService.getCategories({ per_page: 10000 })
         if (response && response.items) {
           setCategories(Array.isArray(response.items) ? response.items : [])
         }
-      } catch {
-        console.error("Failed to fetch categories")
+      } catch (error) {
+        // Silently handle errors (categories are optional)
+        console.debug("Failed to fetch categories:", error instanceof Error ? error.message : "Unknown error")
+        setCategories([])
       } finally {
         setUiState(prev => ({ ...prev, isLoadingCategories: false }))
       }
     }
 
     fetchCategories()
-  }, [])
+  }, [isAuthenticated, authLoading])
 
   // Memoized product filtering and sorting - compute derived values efficiently
   const filteredProducts = useMemo(() => {
