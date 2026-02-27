@@ -983,6 +983,23 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
     setDialogState((prev) => ({ ...prev, productToDelete: null }))
   }, [])
 
+  // Handle product deletion from ProductRow
+  const handleDeleteProductFromList = useCallback((productId: string | number) => {
+    const id = String(productId)
+    console.log("[v0] Removing product from list:", id)
+    
+    // Remove product from all products list
+    setAllProducts((prev) => prev.filter((p) => String(p.id) !== id))
+    
+    // Remove from selected products if it was selected
+    setSelectedProducts((prev) => prev.filter((pId) => pId !== id))
+    
+    // Reset pagination if needed
+    if (currentPage > 1 && paginatedProducts.length <= 1) {
+      setCurrentPage(Math.max(1, currentPage - 1))
+    }
+  }, [currentPage, paginatedProducts.length])
+
   // Bulk delete selected products
   const handleBulkDelete = useCallback(async () => {
     if (selectedProducts.length === 0) {
