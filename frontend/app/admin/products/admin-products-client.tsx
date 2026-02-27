@@ -31,8 +31,7 @@ import {
   SheetFooter,
 } from "@/components/ui/sheet"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import {
-} from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { OptimizedImage } from "@/components/ui/optimized-image"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
@@ -1679,12 +1678,13 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                 </div>
               </div>
             )}
-          </div>
+        </div>
         </Tabs>
       </div>
 
       {/* Loading overlay - no AnimatePresence for better performance */}
-      {uiState.operationType && <LoadingOverlay message={uiState.operationMessage || "Processing..."} />}
+      {dialogState.operationType && <LoadingOverlay message={dialogState.operationMessage || "Processing..."} />}
+
     </div>
   )
 }
