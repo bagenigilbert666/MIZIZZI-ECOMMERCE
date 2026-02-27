@@ -306,208 +306,100 @@ const EnhancedProductCard = ({
   onView: () => void
   onDelete: () => void
 }) => (
-  <div className="bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-xl transition-all duration-300 group">
-    <div className="relative aspect-square bg-gradient-to-br from-gray-50 to-gray-100">
+  <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm hover:shadow-md">
+    <div className="relative aspect-square bg-gray-50">
       <OptimizedImage
         src={product.thumbnail_url || product.featured_image || "/placeholder.svg?height=300&width=300&query=product"}
         alt={product.name}
-        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+        className="w-full h-full object-cover"
         fallback={
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-100 to-gray-200">
+          <div className="w-full h-full flex items-center justify-center bg-gray-100">
             <Package className="h-16 w-16 text-gray-400" />
           </div>
         }
       />
 
-      {/* Enhanced overlay with more actions */}
-      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all duration-300" />
-
       {/* Selection checkbox */}
-      <div className="absolute top-4 right-4">
+      <div className="absolute top-3 right-3">
         <Checkbox
           checked={isSelected}
           onCheckedChange={onSelect}
-          className="bg-white/90 backdrop-blur-sm border-white shadow-lg"
+          className="bg-white border-gray-300 shadow"
         />
       </div>
 
       {/* Status badges */}
-      <div className="absolute top-4 left-4 flex flex-col gap-2">
+      <div className="absolute top-3 left-3 flex flex-col gap-1">
         {product.is_featured && (
-          <Badge className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-full shadow-lg">
-            <Star className="h-3 w-3 mr-1 fill-current" /> Featured
+          <Badge className="bg-blue-500 text-white rounded-full text-xs px-2 py-0.5">
+            <Star className="h-2.5 w-2.5 mr-0.5 fill-current" /> Featured
           </Badge>
         )}
         {product.is_flash_sale && (
-          <Badge className="bg-gradient-to-r from-amber-500 to-orange-500 text-white rounded-full shadow-lg">
-            <Zap className="h-3 w-3 mr-1" /> Flash Sale
-          </Badge>
-        )}
-        {product.is_luxury_deal && (
-          <Badge className="bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-full shadow-lg">
-            <Crown className="h-3 w-3 mr-1" /> Luxury
-          </Badge>
-        )}
-        {product.is_new && (
-          <Badge className="bg-gradient-to-r from-green-500 to-emerald-500 text-white rounded-full shadow-lg">
-            <Sparkles className="h-3 w-3 mr-1" /> New
+          <Badge className="bg-amber-500 text-white rounded-full text-xs px-2 py-0.5">
+            <Zap className="h-2.5 w-2.5 mr-0.5" /> Flash Sale
           </Badge>
         )}
       </div>
-
-      {/* Quick actions */}
-      <div className="absolute bottom-4 right-4 flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300">
-        <Button
-          size="sm"
-          variant="secondary"
-          className="rounded-full bg-white/90 backdrop-blur-sm hover:bg-white shadow-lg"
-          onClick={onView}
-        >
-          <Eye className="h-4 w-4" />
-        </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          className="rounded-full bg-white/90 backdrop-blur-sm hover:bg-white shadow-lg"
-          onClick={onEdit}
-        >
-          <Edit className="h-4 w-4" />
-        </Button>
-      </div>
-
-      {/* Performance indicator */}
-      {product.conversion_rate && (
-        <div className="absolute bottom-4 left-4 opacity-0 group-hover:opacity-100 transition-all duration-300">
-          <div className="bg-white/90 backdrop-blur-sm rounded-full px-3 py-1 text-xs font-medium text-gray-700 shadow-lg">
-            {product.conversion_rate}% conversion
-          </div>
-        </div>
-      )}
     </div>
 
-    <div className="p-6">
-      <div className="flex items-start justify-between mb-3">
-        <h3 className="font-semibold text-gray-900 line-clamp-2 text-lg leading-tight">{product.name}</h3>
+    <div className="p-4">
+      <div className="flex items-start justify-between mb-2">
+        <h3 className="font-medium text-gray-900 line-clamp-2 text-sm">{product.name}</h3>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 rounded-full">
+            <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="rounded-2xl border-0 shadow-xl">
-            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+          <DropdownMenuContent align="end" className="w-40">
+            <DropdownMenuLabel className="text-xs">Actions</DropdownMenuLabel>
             <DropdownMenuGroup>
-              <DropdownMenuItem onClick={onView}>
-                <Eye className="mr-2 h-4 w-4" />
-                View Details
+              <DropdownMenuItem onClick={onView} className="text-xs">
+                <Eye className="mr-2 h-3 w-3" />
+                View
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={onEdit}>
-                <Edit className="mr-2 h-4 w-4" />
-                Edit Product
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Copy className="mr-2 h-4 w-4" />
-                Duplicate
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <Share2 className="mr-2 h-4 w-4" />
-                Share
+              <DropdownMenuItem onClick={onEdit} className="text-xs">
+                <Edit className="mr-2 h-3 w-3" />
+                Edit
               </DropdownMenuItem>
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              <DropdownMenuItem>
-                <BarChart3 className="mr-2 h-4 w-4" />
-                View Analytics
-              </DropdownMenuItem>
-              <DropdownMenuItem>
-                <MessageSquare className="mr-2 h-4 w-4" />
-                Reviews ({product.review_count || 0})
-              </DropdownMenuItem>
-            </DropdownMenuGroup>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onDelete} className="text-red-600">
-              <Trash2 className="mr-2 h-4 w-4" />
+            <DropdownMenuItem onClick={onDelete} className="text-red-600 text-xs">
+              <Trash2 className="mr-2 h-3 w-3" />
               Delete
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
-      {/* Enhanced pricing with profit margin */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="space-y-1">
-          {product.sale_price && product.sale_price < product.price ? (
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-xl text-gray-900">KSh {product.sale_price?.toLocaleString()}</span>
-              <span className="text-sm line-through text-gray-500">KSh {product.price?.toLocaleString()}</span>
-              <Badge variant="secondary" className="bg-red-100 text-red-700 rounded-full">
-                -{Math.round(((product.price - product.sale_price) / product.price) * 100)}%
-              </Badge>
-            </div>
-          ) : (
-            <span className="font-bold text-xl text-gray-900">KSh {product.price?.toLocaleString()}</span>
-          )}
-          {product.profit_margin && (
-            <p className="text-xs text-gray-500">
-              Profit: {product.profit_margin}% • Cost: KSh {product.cost_price?.toLocaleString()}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* Enhanced metrics */}
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <div className="text-center p-3 bg-gray-50 rounded-xl">
-          <div className="text-lg font-bold text-gray-900">{product.total_sales || 0}</div>
-          <div className="text-xs text-gray-500">Sales</div>
-        </div>
-        <div className="text-center p-3 bg-gray-50 rounded-xl">
-          <div className="flex items-center justify-center gap-1">
-            <div className="text-lg font-bold text-gray-900">{product.rating || 0}</div>
-            <Star className="h-4 w-4 text-yellow-400 fill-current" />
-          </div>
-          <div className="text-xs text-gray-500">({product.review_count || 0} reviews)</div>
-        </div>
-      </div>
-
-      {/* Stock status with progress bar */}
-      <div className="space-y-2 mb-4">
-        <div className="flex items-center justify-between">
-          <span className="text-sm font-medium text-gray-700">Stock Level</span>
-          <Badge
-            variant="outline"
-            className={cn(
-              "rounded-full",
-              product.stock === undefined || product.stock <= 0
-                ? "bg-red-50 text-red-600 border-red-200"
-                : product.stock < 10
-                  ? "bg-amber-50 text-amber-600 border-amber-200"
-                  : "bg-green-50 text-green-600 border-green-200",
-            )}
-          >
-            {product.stock === undefined || product.stock <= 0
-              ? "Out of Stock"
-              : product.stock < 10
-                ? `Low: ${product.stock}`
-                : `${product.stock} in stock`}
-          </Badge>
-        </div>
-        {product.stock !== undefined && product.stock > 0 && (
-          <Progress value={Math.min((product.stock / 100) * 100, 100)} className="h-2" />
+      {/* Pricing */}
+      <div className="mb-3">
+        <div className="text-sm font-semibold text-gray-900">KSh {product.price?.toLocaleString() || 0}</div>
+        {product.sale_price && product.sale_price < product.price && (
+          <div className="text-xs text-gray-500 line-through">KSh {product.sale_price?.toLocaleString()}</div>
         )}
       </div>
 
-      {/* Category and tags */}
-      <div className="flex flex-wrap gap-2">
-        <Badge variant="outline" className="bg-gray-50 border-gray-200 text-gray-700 rounded-full">
-          {(typeof product.category === "object" && product.category?.name) || "Uncategorized"}
-        </Badge>
-        {product.tags?.slice(0, 2).map((tag, index) => (
-          <Badge key={index} variant="outline" className="bg-blue-50 border-blue-200 text-blue-700 rounded-full">
-            {tag}
-          </Badge>
-        ))}
+      {/* Quick info */}
+      <div className="grid grid-cols-2 gap-2 text-xs mb-3">
+        <div className="bg-gray-50 p-2 rounded">
+          <div className="font-medium text-gray-900">{product.total_sales || 0}</div>
+          <div className="text-gray-500">Sales</div>
+        </div>
+        <div className="bg-gray-50 p-2 rounded">
+          <div className="font-medium text-gray-900">{product.stock || 0}</div>
+          <div className="text-gray-500">Stock</div>
+        </div>
+      </div>
+
+      {/* Status badges */}
+      <div className="flex gap-1">
+        {(product.stock || 0) > 0 ? (
+          <Badge className="bg-green-50 text-green-700 text-xs rounded">In Stock</Badge>
+        ) : (
+          <Badge className="bg-red-50 text-red-700 text-xs rounded">Out of Stock</Badge>
+        )}
       </div>
     </div>
   </div>
@@ -1005,55 +897,51 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
   }, [filterState.debouncedSearchQuery, uiState.activeTab, filterState.filterOption, filterState.categoryFilter, filterState.sortOption])
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-white p-4 md:p-6 space-y-8">
-      <div className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100">
-        <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
-          <div className="space-y-3">
-            <h1 className="text-4xl font-bold text-gray-900 tracking-tight">Products</h1>
-            <p className="text-gray-600 text-lg">Manage your product catalog with advanced tools and insights</p>
+    <div className="min-h-screen bg-gray-50 p-3 md:p-6 space-y-6">
+      {/* Header */}
+      <div className="bg-white rounded-lg md:rounded-lg p-4 md:p-6 shadow-sm border border-gray-100">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-2xl md:text-4xl font-bold text-gray-900">Products</h1>
+            <p className="text-gray-600 text-sm md:text-lg mt-1">Manage your product catalog</p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 flex-wrap">
+            {!isMobile && (
+              <>
+                <Button variant="outline" size="sm" className="rounded-lg text-xs md:text-sm">
+                  <Download className="mr-1 h-4 w-4" />
+                  <span className="hidden sm:inline">Export</span>
+                </Button>
+                <Button variant="outline" size="sm" className="rounded-lg text-xs md:text-sm">
+                  <Upload className="mr-1 h-4 w-4" />
+                  <span className="hidden sm:inline">Import</span>
+                </Button>
+              </>
+            )}
             <Button
               variant="outline"
-              onClick={() => {
-                /* Export functionality */
-              }}
-              className="rounded-full border-gray-200 hover:bg-gray-50 transition-all duration-200"
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Export
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                /* Import functionality */
-              }}
-              className="rounded-full border-gray-200 hover:bg-gray-50 transition-all duration-200"
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              Import
-            </Button>
-            <Button
-              variant="outline"
+              size="sm"
               onClick={handleRefresh}
               disabled={uiState.isLoading}
-              className="rounded-full border-gray-200 hover:bg-gray-50 transition-all duration-200 bg-transparent"
+              className="rounded-lg text-xs md:text-sm"
             >
-              {isLoading ? <MiniSpinner /> : <RefreshCw className="mr-2 h-4 w-4" />}
-              {isMobile ? "" : "Refresh"}
+              {isLoading ? <MiniSpinner /> : <RefreshCw className="h-4 w-4" />}
+              <span className="ml-1 hidden sm:inline">Refresh</span>
             </Button>
             <Button
               onClick={() => router.push("/admin/products/new")}
-              className="rounded-full bg-gradient-to-r from-gray-900 to-gray-800 hover:from-gray-800 hover:to-gray-700 text-white shadow-lg transition-all duration-200"
+              size="sm"
+              className="rounded-lg bg-gray-900 hover:bg-gray-800 text-white text-xs md:text-sm"
             >
-              <Plus className="mr-2 h-4 w-4" /> {isMobile ? "Add" : "Add Product"}
+              <Plus className="h-4 w-4" />
+              <span className="ml-1 hidden sm:inline">Add Product</span>
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Simplified stats grid layout with better spacing */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      {/* Stats Grid - Responsive */}
+      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
         <StatsCard
           title="Total Products"
           value={productStats?.totalProducts || 0}
