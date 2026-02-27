@@ -39,29 +39,37 @@ function normalizeProductPrices(product: Product): Product {
 }
 
 export async function getNewArrivals(limit = 20): Promise<Product[]> {
-  try {
-    const url = `${API_BASE_URL}/api/products/?is_new_arrival=true&per_page=${limit}`
+  // Try up to 3 times with exponential backoff
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const url = `${API_BASE_URL}/api/products/?is_new_arrival=true&per_page=${limit}`
 
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
 
-    const response = await fetch(url, {
-      signal: controller.signal,
-      next: {
-        revalidate: 60,
-        tags: ["new-arrivals"],
-      },
-      headers: {
-        "Content-Type": "application/json",
-      },
-    })
+      const response = await fetch(url, {
+        signal: controller.signal,
+        next: {
+          revalidate: 60,
+          tags: ["new-arrivals"],
+        },
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
 
-    clearTimeout(timeoutId)
+      clearTimeout(timeoutId)
 
-    if (!response.ok) {
-      console.error(`[SSR] Failed to fetch new arrivals: ${response.status}`)
-      return await getFallbackNewArrivals(limit)
-    }
+      if (!response.ok) {
+        console.error(`[SSR] Attempt ${attempt + 1} failed with status ${response.status}`)
+        
+        // Wait before retry
+        if (attempt < 2) {
+          const waitTime = 500 * Math.pow(2, attempt)
+          await new Promise(resolve => setTimeout(resolve, waitTime))
+        }
+        continue
+      }
 
     const data = await response.json()
     let products: Product[] = extractProducts(data)
@@ -80,46 +88,67 @@ export async function getNewArrivals(limit = 20): Promise<Product[]> {
       } as Product
     })
 
-    return enhancedProducts
-  } catch (error) {
-    console.error("[SSR] Error fetching new arrivals:", error)
-    return await getFallbackNewArrivals(limit)
+      return enhancedProducts
+    } catch (error) {
+      console.error(`[SSR] Attempt ${attempt + 1} error fetching new arrivals:`, error)
+      
+      // Wait before retry
+      if (attempt < 2) {
+        const waitTime = 500 * Math.pow(2, attempt)
+        await new Promise(resolve => setTimeout(resolve, waitTime))
+      }
+    }
   }
+
+  // After all retries fail, try fallback
+  return await getFallbackNewArrivals(limit)
 }
 
 async function getFallbackNewArrivals(limit = 20): Promise<Product[]> {
-  try {
-    const url = `${API_BASE_URL}/api/products/?per_page=${limit}&sort_by=created_at&sort_order=desc`
+  // Try fallback with 2 retries
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const url = `${API_BASE_URL}/api/products/?per_page=${limit}&sort_by=created_at&sort_order=desc`
 
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
 
-    const response = await fetch(url, {
-      signal: controller.signal,
-      next: {
-        revalidate: 60,
-        tags: ["new-arrivals-fallback"],
-      },
-      headers: {
-        "Content-Type": "application/json",
-      },
-    })
+      const response = await fetch(url, {
+        signal: controller.signal,
+        next: {
+          revalidate: 60,
+          tags: ["new-arrivals-fallback"],
+        },
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
 
-    clearTimeout(timeoutId)
+      clearTimeout(timeoutId)
 
-    if (!response.ok) return []
+      if (!response.ok) {
+        if (attempt < 1) {
+          await new Promise(resolve => setTimeout(resolve, 500))
+        }
+        continue
+      }
 
-    const data = await response.json()
-    const products: Product[] = extractProducts(data)
+      const data = await response.json()
+      const products: Product[] = extractProducts(data)
 
-    return products.map((product) => {
-      product = normalizeProductPrices(product)
-      return {
-        ...product,
-        seller: product.seller || defaultSeller,
-      } as Product
-    })
-  } catch (error) {
-    return []
+      return products.map((product) => {
+        product = normalizeProductPrices(product)
+        return {
+          ...product,
+          seller: product.seller || defaultSeller,
+        } as Product
+      })
+    } catch (error) {
+      if (attempt < 1) {
+        await new Promise(resolve => setTimeout(resolve, 500))
+      }
+    }
   }
+  
+  return []
 }

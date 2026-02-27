@@ -46,19 +46,19 @@ function normalizeProductPrices(product: Product): Product {
  * Only returns products that are explicitly marked as luxury deals
  */
 export async function getLuxuryProducts(limit = 12): Promise<Product[]> {
-  try {
-    const urls = [
-      `${API_BASE_URL}/api/products/?is_luxury=true&per_page=${limit}`,
-      `${API_BASE_URL}/api/products/?is_luxury_deal=true&per_page=${limit}`,
-    ]
+  const urls = [
+    `${API_BASE_URL}/api/products/?is_luxury=true&per_page=${limit}`,
+    `${API_BASE_URL}/api/products/?is_luxury_deal=true&per_page=${limit}`,
+  ]
 
-    let allProducts: Product[] = []
+  let allProducts: Product[] = []
 
-    // Try fetching from both endpoints
-    for (const url of urls) {
+  // Try fetching from both endpoints with retries
+  for (const url of urls) {
+    for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
 
         const response = await fetch(url, {
           signal: controller.signal,
@@ -77,11 +77,20 @@ export async function getLuxuryProducts(limit = 12): Promise<Product[]> {
           const data = await response.json()
           const products: Product[] = extractProducts(data)
           allProducts = [...allProducts, ...products]
+          break // Success, move to next URL
+        } else if (attempt < 2) {
+          const waitTime = 500 * Math.pow(2, attempt)
+          await new Promise(resolve => setTimeout(resolve, waitTime))
         }
       } catch (e) {
-        console.error(`[SSR] Failed to fetch from ${url}:`, e)
+        console.error(`[SSR] Attempt ${attempt + 1} failed for ${url}:`, e)
+        if (attempt < 2) {
+          const waitTime = 500 * Math.pow(2, attempt)
+          await new Promise(resolve => setTimeout(resolve, waitTime))
+        }
       }
     }
+  }
 
     const luxuryProducts = allProducts.filter((p) => {
       const anyP = p as any
@@ -113,9 +122,5 @@ export async function getLuxuryProducts(limit = 12): Promise<Product[]> {
       }
     })
 
-    return enhancedProducts
-  } catch (error) {
-    console.error("[SSR] Error fetching luxury products:", error)
-    return []
-  }
+  return enhancedProducts
 }

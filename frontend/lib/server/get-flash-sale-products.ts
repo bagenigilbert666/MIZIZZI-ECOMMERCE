@@ -135,7 +135,7 @@ export async function getFlashSaleProducts(limit = 50): Promise<FlashSaleProduct
 
     try {
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
 
       const response = await fetch(flashSaleEndpoint, {
         signal: controller.signal,
@@ -187,7 +187,7 @@ export async function getFlashSaleProducts(limit = 50): Promise<FlashSaleProduct
 
     try {
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
 
       const response = await fetch(featuredEndpoint, {
         signal: controller.signal,
@@ -287,7 +287,7 @@ export async function getFlashSaleProducts(limit = 50): Promise<FlashSaleProduct
       console.log("[v0] getFlashSaleProducts: Trying fallback URL:", url)
       try {
         const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
 
         const response = await fetch(url, {
           signal: controller.signal,
@@ -391,7 +391,7 @@ export async function getFlashSaleEvent(): Promise<FlashSaleEvent> {
 
   try {
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
 
     const response = await fetch(`${API_BASE_URL}/api/flash-sale/event`, {
       signal: controller.signal,

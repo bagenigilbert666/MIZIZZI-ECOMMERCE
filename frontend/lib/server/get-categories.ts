@@ -42,27 +42,39 @@ function normalizeImageUrl(url: string | undefined | null): string | undefined {
 // Server-side category fetcher with React cache for deduplication
 // Fast caching pattern same as flash-sales (60s revalidate + real-time product counts)
 export const getCategories = cache(async (limit = 20): Promise<Category[]> => {
-  try {
-    console.log("[v0] getCategories: Fetching from", `${BASE_URL}/api/categories?parent_id=null&per_page=${limit}`)
-    
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 8000) // 8 second timeout
+  let lastError: Error | null = null
 
-    // Fetch with include_product_count to get real-time item counts
-    const response = await fetch(`${BASE_URL}/api/categories?parent_id=null&per_page=${limit}&include_product_count=true`, {
-      signal: controller.signal,
-      next: { revalidate: 30, tags: ["categories"] }, // Even faster cache + real-time counts
-      headers: {
-        "Content-Type": "application/json",
-      },
-    })
+  // Try up to 3 times with exponential backoff
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const url = `${BASE_URL}/api/categories?parent_id=null&per_page=${limit}&include_product_count=true`
+      console.log(`[v0] getCategories: Attempt ${attempt + 1} to fetch from ${url}`)
+      
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
 
-    clearTimeout(timeoutId)
+      // Fetch with include_product_count to get real-time item counts
+      const response = await fetch(url, {
+        signal: controller.signal,
+        next: { revalidate: 30, tags: ["categories"] }, // Even faster cache + real-time counts
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
 
-    if (!response.ok) {
-      console.warn("[v0] getCategories: Failed to fetch, status:", response.status)
-      return []
-    }
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        console.warn(`[v0] getCategories: Attempt ${attempt + 1} failed with status ${response.status}`)
+        lastError = new Error(`HTTP ${response.status}`)
+        
+        // Wait before retry
+        if (attempt < 2) {
+          const waitTime = 500 * Math.pow(2, attempt) // 500ms, 1000ms
+          await new Promise(resolve => setTimeout(resolve, waitTime))
+        }
+        continue
+      }
 
     const data = await response.json()
     let categories = data?.items ?? data ?? []
@@ -88,12 +100,22 @@ export const getCategories = cache(async (limit = 20): Promise<Category[]> => {
         return mapped
       })
 
-    console.log("[v0] getCategories: Fetched", categories.length, "categories with real product counts")
-    return categories
-  } catch (error) {
-    console.error("[v0] getCategories: Error:", error)
-    return []
+      console.log("[v0] getCategories: Fetched", categories.length, "categories with real product counts")
+      return categories
+    } catch (error) {
+      lastError = error as Error
+      console.error(`[v0] getCategories: Attempt ${attempt + 1} error:`, error)
+      
+      // Wait before retry
+      if (attempt < 2) {
+        const waitTime = 500 * Math.pow(2, attempt) // 500ms, 1000ms
+        await new Promise(resolve => setTimeout(resolve, waitTime))
+      }
+    }
   }
+
+  console.error("[v0] getCategories: All retry attempts failed:", lastError)
+  return []
 })
 
 // Get featured/popular categories (for homepage display)
