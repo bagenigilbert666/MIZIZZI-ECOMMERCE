@@ -59,6 +59,22 @@ export function ProductDetailClient({ initialProduct }: ProductDetailClientProps
     try {
       setSaveStatus("saving")
       setIsSaving(true)
+      
+      // Check if token exists before attempting save
+      const token = typeof window !== "undefined" 
+        ? localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
+        : null
+      
+      if (!token) {
+        setSaveStatus("error")
+        toast({
+          title: "Authentication Required",
+          description: "Your session has expired. Please log in again to save changes.",
+          variant: "destructive",
+        })
+        return
+      }
+      
       await adminService.updateProduct(product.id.toString(), product)
       setHasChanges(false)
       setSaveStatus("saved")
@@ -72,6 +88,7 @@ export function ProductDetailClient({ initialProduct }: ProductDetailClientProps
       })
     } catch (error) {
       setSaveStatus("error")
+      console.log("[v0] Save error:", error)
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to save product",
@@ -255,58 +272,6 @@ export function ProductDetailClient({ initialProduct }: ProductDetailClientProps
           </div>
         </div>
       )}
-      </div>
-
-      {/* Delete Confirmation Dialog */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="rounded-2xl bg-white p-6 sm:p-8 max-w-sm w-full shadow-2xl">
-            <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">Delete Product?</h2>
-            <p className="text-sm sm:text-base text-gray-600 mb-6">
-              This action cannot be undone. The product "{product.name}" will be permanently deleted from your catalog.
-            </p>
-            <div className="flex gap-3 justify-end">
-              <Button
-                variant="outline"
-                onClick={() => setShowDeleteConfirm(false)}
-                disabled={isDeleting}
-                className="rounded-full"
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleDelete}
-                disabled={isDeleting}
-                className="rounded-full"
-              >
-                {isDeleting ? "Deleting..." : "Delete"}
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
-                  >
-                    Cancel
-                  </Button>
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    onClick={handleDelete}
-                    disabled={isDeleting}
-                    className="flex-1"
-                  >
-                    {isDeleting ? "Deleting..." : "Delete"}
-                  </Button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
     </div>
   )
 }
