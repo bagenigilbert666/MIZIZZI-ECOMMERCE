@@ -2,44 +2,6 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react"
 import { useRouter } from "next/navigation"
-import { AnimatePresence } from "framer-motion"
-import {
-  Plus,
-  Trash2,
-  Edit,
-  Eye,
-  MoreHorizontal,
-  Package,
-  Star,
-  RefreshCw,
-  Search,
-  CheckCircle2,
-  XCircle,
-  Percent,
-  Filter,
-  X,
-  AlertCircle,
-  FileText,
-  Zap,
-  Crown,
-  Copy,
-  ChevronLeft,
-  ChevronRight,
-  TrendingUp,
-  DollarSign,
-  BarChart3,
-  Download,
-  Upload,
-  MessageSquare,
-  Share2,
-  PieChart,
-  Sparkles,
-  AlertTriangle,
-  Tag,
-} from "lucide-react"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Checkbox } from "@/components/ui/checkbox"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -416,6 +378,8 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
   const isMobile = useMobile()
 
   // Consolidated state management - reduced from 16+ to 8 main state objects
+  // Separate search input state from filter state for better debouncing
+  const [searchInput, setSearchInput] = useState("")
   const [allProducts, setAllProducts] = useState<Product[]>(initialProducts)
   const [selectedProducts, setSelectedProducts] = useState<string[]>([])
   const [categories, setCategories] = useState<any[]>([])
@@ -437,7 +401,6 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
 
   // Combined filter/search state
   const [filterState, setFilterState] = useState({
-    searchQuery: "",
     debouncedSearchQuery: "",
     sortOption: "newest" as SortOption,
     filterOption: "all" as FilterOption,
@@ -457,14 +420,14 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
   const [productImages, setProductImages] = useState<Record<string, string>>({})
   const [itemLoadingStates, setItemLoadingStates] = useState<Record<string, boolean>>({})
 
-  // Debounce search input
+  // Debounce search input (using ref for proper debouncing)
   useEffect(() => {
     const timer = setTimeout(() => {
-      setFilterState(prev => ({ ...prev, debouncedSearchQuery: filterState.searchQuery }))
-    }, 300) // Reduced from 500ms to 300ms
+      setFilterState(prev => ({ ...prev, debouncedSearchQuery: searchInput }))
+    }, 300)
 
     return () => clearTimeout(timer)
-  }, [filterState.searchQuery])
+  }, [searchInput])
 
   // Reset to page 1 when filters change
   useEffect(() => {
@@ -930,9 +893,9 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
   }, [])
 
   const resetFilters = useCallback(() => {
+    setSearchInput("")
     setFilterState((prev) => ({
       ...prev,
-      searchQuery: "",
       debouncedSearchQuery: "",
       filterOption: "all",
       categoryFilter: null,
@@ -1148,8 +1111,8 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                 <Input
                   placeholder="Search products..."
-            value={filterState.searchQuery}
-            onChange={(e) => handleFilterChange("searchQuery", e.target.value)}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
                   className="pl-10 w-80 rounded-full border-gray-200 focus:border-gray-300"
                 />
               </div>
@@ -1165,7 +1128,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                     <Filter className="mr-2 h-4 w-4" />
                     Filters{" "}
                     {uiState.isFilterActive &&
-                      `(${Object.values({ searchQuery: filterState.searchQuery, filterOption: filterState.filterOption, categoryFilter: filterState.categoryFilter }).filter(Boolean).length})`}
+                      `(${Object.values({ searchQuery: filterState.debouncedSearchQuery, filterOption: filterState.filterOption, categoryFilter: filterState.categoryFilter }).filter(Boolean).length})`}
                   </Button>
                 </SheetTrigger>
                 <SheetContent className="w-96">
@@ -1573,9 +1536,9 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                 </div>
               </div>
             ) : (
-              // Responsive list view
+              // Responsive list view - use memoized paginatedProducts
               <ProductList
-                products={filteredProducts.slice((currentPage - 1) * filterState.pageSize, currentPage * filterState.pageSize)}
+                products={paginatedProducts}
                 selectedProducts={selectedProducts}
                 viewMode={uiState.viewMode}
                 isMobile={isMobile}
@@ -1647,10 +1610,8 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
         </Tabs>
       </div>
 
-      {/* Enhanced loading overlay */}
-      <AnimatePresence>
-        {uiState.operationType && <LoadingOverlay message={uiState.operationMessage || "Processing..."} />}
-      </AnimatePresence>
+      {/* Loading overlay - no AnimatePresence for better performance */}
+      {uiState.operationType && <LoadingOverlay message={uiState.operationMessage || "Processing..."} />}
 
       <AlertDialog open={dialogState.productToDelete !== null} onOpenChange={(open) => {
         if (!open) handleCloseDeleteDialog()
