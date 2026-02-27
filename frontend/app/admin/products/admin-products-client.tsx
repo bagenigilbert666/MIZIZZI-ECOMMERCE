@@ -32,16 +32,7 @@ import {
 } from "@/components/ui/sheet"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
+} from "@/components/ui/tabs"
 import { OptimizedImage } from "@/components/ui/optimized-image"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Progress } from "@/components/ui/progress"
@@ -425,15 +416,9 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
     isRefreshing: false,
     isLoading: false,
     isDeleting: false,
-    isDeleteDialogOpen: false,
-    isBulkDeleteDialogOpen: false,
     isLoadingCategories: true,
     isFilterActive: false,
     activeTab: "all",
-    // Operation state for long-running actions
-    isOperating: false,
-    operationType: null as null | "refresh" | "fetch_images" | "bulk",
-    operationMessage: "",
   })
 
   // Combined filter/search state
@@ -1700,58 +1685,6 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
 
       {/* Loading overlay - no AnimatePresence for better performance */}
       {uiState.operationType && <LoadingOverlay message={uiState.operationMessage || "Processing..."} />}
-
-      <AlertDialog open={dialogState.productToDelete !== null} onOpenChange={(open) => {
-        if (!open) handleCloseDeleteDialog()
-      }}>
-        <AlertDialogContent className="rounded-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-semibold">Delete Product?</AlertDialogTitle>
-            <AlertDialogDescription className="text-gray-600">
-              This action cannot be undone. The product will be permanently removed from your catalog.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2">
-            <AlertDialogCancel disabled={uiState.isDeleting} className="rounded-full">
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteProduct}
-              disabled={uiState.isDeleting}
-              className="rounded-full bg-red-600 hover:bg-red-700"
-            >
-              {uiState.isDeleting ? <MiniSpinner /> : <Trash2 className="mr-2 h-4 w-4" />}
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={uiState.isBulkDeleteDialogOpen} onOpenChange={(open) => setUiState((prev) => ({ ...prev, isBulkDeleteDialogOpen: open }))}>
-        <AlertDialogContent className="rounded-2xl">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-semibold">
-              Delete {selectedProducts.length} Products?
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-gray-600">
-              This action cannot be undone. All selected products will be permanently removed from your catalog.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2">
-            <AlertDialogCancel disabled={uiState.isDeleting} className="rounded-full">
-              Cancel
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={confirmBulkDelete}
-              disabled={uiState.isDeleting}
-              className="rounded-full bg-red-600 hover:bg-red-700"
-            >
-              {uiState.isDeleting ? <MiniSpinner /> : <Trash2 className="mr-2 h-4 w-4" />}
-              Delete {selectedProducts.length} Products
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   )
 }
