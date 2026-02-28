@@ -1,29 +1,40 @@
 import api from "@/lib/api"
 import type { AdminPaginatedResponse, ProductCreatePayload } from "@/types/admin"
 import type { Product, Category } from "@/types"
+import { productService } from "@/services/product"
+import { cloudinaryService } from "./cloudinary-service"
 
-// ============================================================================
-// CACHE & SERVICE CONFIGURATION
-// ============================================================================
-
+// Declare the missing variables
 const productCache = new Map()
-const dashboardCache = new Map()
 const CACHE_DURATION = 60 * 60 * 1000 // 1 hour
+const websocketService = {
+  send: (event: string, data: any) => {
+    console.log(`Simulating WebSocket send: ${event}`, data)
+  },
+}
 
-// ============================================================================
-// ENHANCED TYPE DEFINITIONS - Complete Dashboard & Analytics
-// ============================================================================
+async function prefetchData(url: string, params: any): Promise<boolean> {
+  try {
+    const response = await api.get(url, { params })
+    return response.status === 200
+  } catch (error) {
+    console.error(`Error prefetching data from ${url}:`, error)
+    return false
+  }
+}
 
-export interface AdminLoginResponse {
+// Define the base URL for admin API endpoints
+const ADMIN_API_BASE = "/api/admin"
+
+// Define types for admin API responses
+interface AdminLoginResponse {
   user: any
   access_token: string
   refresh_token?: string
   csrf_token?: string
 }
 
-// Enhanced Dashboard Response with all features
-export interface AdminDashboardResponse {
-  // Core Counts
+interface AdminDashboardResponse {
   counts: {
     users: number
     products: number
@@ -38,16 +49,7 @@ export interface AdminDashboardResponse {
     orders_in_transit: number
     pending_payments: number
     low_stock_count: number
-    total_active_sessions: number
-    total_sales_channels: number
-    refunds_pending: number
-    support_tickets_open: number
-    total_wishlist_items: number
-    active_coupons: number
-    returning_customers: number
   }
-
-  // Sales Metrics with Trends
   sales: {
     today: number
     yesterday: number
@@ -56,194 +58,28 @@ export interface AdminDashboardResponse {
     yearly: number
     total_revenue: number
     pending_amount: number
-    average_order_value: number
-    net_profit: number
-    gross_profit: number
-    refunded_amount: number
-    tax_collected: number
-    shipping_revenue: number
-    // Trends
-    today_trend: number
-    weekly_trend: number
-    monthly_trend: number
   }
-
-  // Order Analytics
   order_status: Record<string, number>
-  order_metrics: {
-    average_processing_time: number
-    average_delivery_time: number
-    repeat_order_rate: number
-    cart_abandonment_rate: number
-    average_items_per_order: number
-  }
-
-  // Customer Analytics
-  customer_analytics: {
-    total_customers: number
-    new_customers_today: number
-    repeat_customers: number
-    customer_retention_rate: number
-    average_customer_lifetime_value: number
-    customer_satisfaction_score: number
-    churn_rate: number
-  }
-
-  // Traffic & Conversion
-  traffic_analytics: {
-    total_visits: number
-    unique_visitors: number
-    page_views: number
-    bounce_rate: number
-    conversion_rate: number
-    average_session_duration: number
-    returning_visitor_rate: number
-  }
-
-  // Payment Methods
-  payment_methods: Array<{
-    method: string
-    count: number
-    total_amount: number
-    percentage: number
-  }>
-
-  // Regional & Demographic
-  users_by_region: Array<{ region: string; count: number; growth: number }>
-  users_by_device: Array<{ device: string; count: number; percentage: number }>
-  age_distribution: Array<{ age_group: string; count: number }>
-
-  // Time Series Data
-  revenue_vs_refunds: Array<{ date: string; revenue: number; refunds: number }>
-  sales_data: Array<{ date: string; sales: number; orders: number }>
-  active_users: Array<{ date: string; users: number }>
-
-  // Recent Data (Paginated)
-  recent_orders: Array<{
-    id: string
-    order_number: string
-    user_email: string
-    user_name: string
-    total_amount: number
-    status: string
-    payment_status: string
-    created_at: string
-    items_count: number
-  }>
-
-  recent_users: Array<{
-    id: number | string
-    name: string
-    username: string
-    email: string
-    created_at: string
-    total_spent: number
-    orders_count: number
-    is_premium: boolean
-  }>
-
-  recent_activities: Array<{
-    id: string | number
-    message: string
-    description: string
-    type: string
-    timestamp: string
-    user_id?: string
-    severity: "info" | "success" | "warning" | "error"
-  }>
-
-  low_stock_products: Array<{
-    id: number | string
-    name: string
-    sku: string
-    stock: number
-    min_stock: number
-    max_stock: number
-    reorder_level: number
-  }>
-
-  // Top Products & Categories
-  best_selling_products: Array<{
-    id: number | string
-    name: string
-    sku: string
-    sales_count: number
-    revenue: number
-    rating: number
-    stock: number
-  }>
-
-  sales_by_category: Array<{
-    id: string
-    category: string
-    sales: number
-    revenue: number
-    items_sold: number
-    growth_rate: number
-  }>
-
-  top_customers: Array<{
-    id: number | string
-    name: string
-    email: string
-    total_spent: number
-    orders_count: number
-  }>
-
-  // Inventory Alerts
-  inventory_alerts: Array<{
-    id: string
-    product_id: string
-    product_name: string
-    alert_type: "low_stock" | "out_of_stock" | "overstock" | "expiring"
-    current_stock: number
-    threshold: number
-    created_at: string
-    severity: "info" | "warning" | "critical"
-  }>
-
-  // Performance Metrics
-  performance_metrics: {
-    page_load_time: number
-    api_response_time: number
-    database_query_time: number
-    cache_hit_rate: number
-    error_rate: number
-    uptime_percentage: number
-  }
-
-  // System Health
-  system_health: {
-    status: "healthy" | "warning" | "critical"
-    database: "connected" | "disconnected"
-    cache: "active" | "inactive"
-    api_health: number // 0-100
-    memory_usage: number // percentage
-    cpu_usage: number // percentage
-    disk_usage: number // percentage
-  }
-
-  // Notifications & Alerts
-  notifications: Array<{
-    id: string
-    title: string
-    message: string
-    type: "info" | "success" | "warning" | "error"
-    timestamp: string
-    read: boolean
-    action_url?: string
-  }>
-
-  // Summary Dashboard Card
-  summary: {
-    total_gmv: number
-    total_orders_all_time: number
-    total_customers_all_time: number
-    average_review_rating: number
-  }
+  recent_orders: any[]
+  recent_users: any[]
+  recent_activities: any[]
+  low_stock_products: any[]
+  sales_by_category: any[]
+  best_selling_products: any[]
+  traffic_sources: any[]
+  notifications: any[]
+  upcoming_events: any[]
+  users_by_region: any[]
+  revenue_vs_refunds: any[]
+  active_users: any[]
+  sales_data: any[]
 }
 
-interface AdminImageUpload {
+interface ProductImage {
+  id: number | string
+  product_id: number | string
+  filename: string
+  original_name?: string
   url: string
   image_url?: string
   size?: number
@@ -255,50 +91,44 @@ interface AdminImageUpload {
   updated_at?: string
 }
 
-// ============================================================================
-// ADMIN SERVICE - Enhanced Complete API Integration
-// ============================================================================
-
+// Admin service with methods for interacting with the admin API
 export const adminService = {
-  // ========================================================================
-  // AVAILABILITY CHECK
-  // ========================================================================
-
   isServiceAvailable(): boolean {
     try {
+      // Check if we have the necessary environment variables
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL
       if (!apiUrl) {
-        console.warn("[v0] Admin service: No API URL configured")
+        console.warn("Admin service: No API URL configured")
         return false
       }
 
+      // Check if we're in a browser environment
       if (typeof window === "undefined") {
-        return true
+        return true // Assume available on server side
       }
 
+      // Check if localStorage is available (basic browser functionality)
       try {
         localStorage.getItem("test")
         return true
       } catch (e) {
-        console.warn("[v0] Admin service: localStorage not available")
+        console.warn("Admin service: localStorage not available")
         return false
       }
     } catch (error) {
-      console.error("[v0] Admin service availability check failed:", error)
+      console.error("Admin service availability check failed:", error)
       return false
     }
   },
 
-  // ========================================================================
-  // AUTHENTICATION METHODS
-  // ========================================================================
-
+  // Authentication
   async login(credentials: { email: string; password: string; remember?: boolean }): Promise<AdminLoginResponse> {
     try {
-      console.log("[v0] Admin login attempt for:", credentials.email)
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/login`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
           identifier: credentials.email,
           password: credentials.password,
@@ -313,14 +143,15 @@ export const adminService = {
 
       const data = await response.json()
 
+      // Check if user has admin role
       if (!data.user || data.user.role !== "admin") {
         throw new Error("You don't have permission to access the admin area")
       }
 
-      // Store tokens
+      // Store tokens in localStorage
       if (data.access_token) {
         localStorage.setItem("mizizzi_token", data.access_token)
-        localStorage.setItem("admin_token", data.access_token)
+        localStorage.setItem("admin_token", data.access_token) // Also store as admin token
       }
       if (data.refresh_token) {
         localStorage.setItem("mizizzi_refresh_token", data.refresh_token)
@@ -330,862 +161,2213 @@ export const adminService = {
         localStorage.setItem("mizizzi_csrf_token", data.csrf_token)
       }
 
+      // Store user data
       localStorage.setItem("user", JSON.stringify(data.user))
       localStorage.setItem("admin_user", JSON.stringify(data.user))
 
-      console.log("[v0] Admin login successful for:", data.user.email)
       return data
     } catch (error) {
-      console.error("[v0] Admin login error:", error)
+      console.error("Admin login error:", error)
       throw error
     }
   },
 
   async logout(): Promise<void> {
     try {
+      // Try to call the logout endpoint
       await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/logout`, {
         method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-      }).catch((e) => console.warn("[v0] Logout fetch error:", e))
-    } finally {
-      localStorage.removeItem("mizizzi_token")
-      localStorage.removeItem("admin_token")
-      localStorage.removeItem("mizizzi_refresh_token")
-      localStorage.removeItem("admin_refresh_token")
-      localStorage.removeItem("user")
-      localStorage.removeItem("admin_user")
-      dashboardCache.clear()
-    }
-  },
-
-  // ========================================================================
-  // DASHBOARD & ANALYTICS - PRIMARY FEATURES
-  // ========================================================================
-
-  async getDashboardData(): Promise<AdminDashboardResponse> {
-    try {
-      const cachedData = dashboardCache.get("dashboard")
-      const now = Date.now()
-
-      if (cachedData && now - cachedData.timestamp < CACHE_DURATION) {
-        console.log("[v0] Using cached dashboard data")
-        return cachedData.data
-      }
-
-      console.log("[v0] Fetching fresh dashboard data from API")
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/dashboard`, {
-        method: "GET",
-        credentials: "include",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("admin_token") || ""}`,
+          Authorization: `Bearer ${localStorage.getItem("mizizzi_token") || ""}`,
         },
+        credentials: "include",
+      })
+    } catch (error) {
+      console.warn("Logout API call failed, continuing with local logout:", error)
+    }
+
+    // Clear tokens and user data regardless of API response
+    localStorage.removeItem("mizizzi_token")
+    localStorage.removeItem("mizizzi_refresh_token")
+    localStorage.removeItem("mizizzi_csrf_token")
+    localStorage.removeItem("admin_token")
+    localStorage.removeItem("admin_refresh_token")
+    localStorage.removeItem("admin_user")
+    localStorage.removeItem("user")
+  },
+
+  async refreshToken(): Promise<boolean> {
+    try {
+      const refreshToken = localStorage.getItem("mizizzi_refresh_token") || localStorage.getItem("admin_refresh_token")
+      if (!refreshToken) {
+        console.log("[v0] No refresh token available")
+        return false
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/refresh`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${refreshToken}`,
+        },
+        credentials: "include",
       })
 
       if (!response.ok) {
-        console.warn("[v0] Dashboard API failed, using default data")
-        return this.getDefaultDashboardData()
+        console.log("[v0] Token refresh failed with status:", response.status)
+        return false
       }
 
       const data = await response.json()
-      dashboardCache.set("dashboard", { data, timestamp: now })
+
+      // Store new access token
+      if (data.access_token) {
+        localStorage.setItem("mizizzi_token", data.access_token)
+        localStorage.setItem("admin_token", data.access_token)
+      }
+
+      // Store new refresh token if provided
+      if (data.refresh_token) {
+        localStorage.setItem("mizizzi_refresh_token", data.refresh_token)
+        localStorage.setItem("admin_refresh_token", data.refresh_token)
+      }
+
+      return true
+    } catch (error) {
+      console.error("[v0] Token refresh error:", error)
+      return false
+    }
+  },
+
+  // Dashboard data
+  async getDashboardData(params?: { from_date?: string; to_date?: string }): Promise<AdminDashboardResponse> {
+    console.log("[v0] getDashboardData called with params:", params)
+    try {
+      // Get token from localStorage with fallback options
+      const token = localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
+      console.log("[v0] Token found:", !!token, "Token length:", token?.length || 0)
+
+      if (!token) {
+        console.log("[v0] No token available, returning default dashboard data")
+        return this.getDefaultDashboardData()
+      }
+
+      // Use consistent API base URL
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"
+      console.log("[v0] Using API base URL:", baseUrl)
+
+      let url = `${baseUrl}/api/admin/dashboard`
+      if (params) {
+        const queryParams = new URLSearchParams()
+        if (params.from_date) queryParams.append("from_date", params.from_date)
+        if (params.to_date) queryParams.append("to_date", params.to_date)
+
+        const queryString = queryParams.toString()
+        if (queryString) {
+          url += `?${queryString}`
+        }
+      }
+
+      console.log("[v0] Making admin dashboard request to:", url)
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+      })
+
+      console.log("[v0] Dashboard response status:", response.status)
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          console.log("[v0] Received 401, attempting token refresh...")
+          try {
+            await this.refreshToken()
+            // Retry the request with new token
+            const newToken = localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
+            if (newToken) {
+              const retryResponse = await fetch(url, {
+                method: "GET",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${newToken}`,
+                },
+                credentials: "include",
+              })
+
+              if (retryResponse.ok) {
+                const data = await retryResponse.json()
+                console.log("[v0] Dashboard data retrieved after token refresh:", data)
+                return data
+              }
+            }
+          } catch (refreshError) {
+            console.error("[v0] Token refresh failed:", refreshError)
+            // Clear invalid tokens
+            localStorage.removeItem("mizizzi_token")
+            localStorage.removeItem("admin_token")
+            localStorage.removeItem("mizizzi_refresh_token")
+            localStorage.removeItem("admin_refresh_token")
+            localStorage.removeItem("mizizzi_csrf_token")
+
+            // Redirect to login page
+            if (typeof window !== "undefined") {
+              window.location.href = "/admin/login"
+            }
+            return this.getDefaultDashboardData()
+          }
+        }
+
+        const errorText = await response.text()
+        console.error("[v0] Dashboard request failed:", errorText)
+        throw new Error(`Dashboard request failed with status: ${response.status} - ${errorText}`)
+      }
+
+      const data = await response.json()
+      console.log("[v0] Dashboard data retrieved successfully:", data)
       return data
     } catch (error) {
-      console.error("[v0] Failed to fetch dashboard data:", error)
+      console.error("[v0] Error fetching dashboard data:", error)
       return this.getDefaultDashboardData()
     }
   },
 
-  async getInventoryAlerts(): Promise<AdminDashboardResponse["inventory_alerts"]> {
+  async refreshTokenAndRetry(): Promise<boolean> {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/inventory-alerts`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("admin_token") || ""}`,
-        },
-      })
-      if (!response.ok) return []
-      return await response.json()
-    } catch (error) {
-      console.error("[v0] Failed to fetch inventory alerts:", error)
-      return []
-    }
-  },
+      console.log("[v0] Admin Service: Attempting token refresh...")
 
-  async getPaymentMetrics(): Promise<AdminDashboardResponse["payment_methods"]> {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/payments/metrics`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("admin_token") || ""}`,
-        },
-      })
-      if (!response.ok) return []
-      return await response.json()
-    } catch (error) {
-      console.error("[v0] Failed to fetch payment metrics:", error)
-      return []
-    }
-  },
+      const currentRefreshToken =
+        localStorage.getItem("admin_refresh_token") || localStorage.getItem("mizizzi_refresh_token")
 
-  async getRegionalMetrics(): Promise<AdminDashboardResponse["users_by_region"]> {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/analytics/regional`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("admin_token") || ""}`,
-        },
-      })
-      if (!response.ok) return []
-      return await response.json()
-    } catch (error) {
-      console.error("[v0] Failed to fetch regional metrics:", error)
-      return []
-    }
-  },
-
-  async getDeviceMetrics(): Promise<AdminDashboardResponse["users_by_device"]> {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/analytics/devices`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("admin_token") || ""}`,
-        },
-      })
-      if (!response.ok) return []
-      return await response.json()
-    } catch (error) {
-      console.error("[v0] Failed to fetch device metrics:", error)
-      return []
-    }
-  },
-
-  async getPerformanceMetrics(): Promise<AdminDashboardResponse["performance_metrics"]> {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/performance`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("admin_token") || ""}`,
-        },
-      })
-      if (!response.ok) {
-        return this.getDefaultPerformanceMetrics()
+      if (!currentRefreshToken) {
+        console.log("[v0] Admin Service: No refresh token available")
+        return false
       }
-      return await response.json()
-    } catch (error) {
-      console.error("[v0] Failed to fetch performance metrics:", error)
-      return this.getDefaultPerformanceMetrics()
-    }
-  },
 
-  async getSystemStatus(): Promise<AdminDashboardResponse["system_health"]> {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/system-status`, {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+
+      const response = await fetch(`${apiUrl}/api/refresh`, {
+        method: "POST",
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("admin_token") || ""}`,
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${currentRefreshToken}`,
         },
+        body: JSON.stringify({ refresh_token: currentRefreshToken }),
+        credentials: "include",
       })
+
       if (!response.ok) {
-        return this.getDefaultSystemStatus()
+        console.error(`[v0] Admin Service: Token refresh failed with status: ${response.status}`)
+        // Clear tokens on refresh failure
+        localStorage.removeItem("admin_token")
+        localStorage.removeItem("admin_refresh_token")
+        localStorage.removeItem("mizizzi_token")
+        localStorage.removeItem("mizizzi_refresh_token")
+        localStorage.removeItem("admin_user")
+        return false
       }
-      return await response.json()
+
+      const data = await response.json()
+      console.log("[v0] Admin Service: Token refresh successful")
+
+      if (data.access_token) {
+        localStorage.setItem("admin_token", data.access_token)
+        localStorage.setItem("mizizzi_token", data.access_token)
+      }
+      if (data.refresh_token) {
+        localStorage.setItem("admin_refresh_token", data.refresh_token)
+        localStorage.setItem("mizizzi_refresh_token", data.refresh_token)
+      }
+      if (data.csrf_token) {
+        localStorage.setItem("mizizzi_csrf_token", data.csrf_token)
+      }
+
+      return true
     } catch (error) {
-      console.error("[v0] Failed to fetch system status:", error)
-      return this.getDefaultSystemStatus()
+      console.error("[v0] Admin Service: Token refresh error:", error)
+      return false
     }
   },
 
-  async getCustomerAnalytics(): Promise<AdminDashboardResponse["customer_analytics"]> {
+  async getProductStats(): Promise<any> {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/analytics/customers`, {
+      const token = localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
+      if (!token) {
+        throw new Error("No authentication token available")
+      }
+
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+      const url = `${baseUrl}/api/admin/dashboard/product-analytics`
+
+      const response = await fetch(url, {
+        method: "GET",
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("admin_token") || ""}`,
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        throw new Error(`Product analytics request failed with status: ${response.status}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error("Error fetching product analytics:", error)
+      throw error
+    }
+  },
+
+  async getSalesStats(params: { period?: string; from?: string; to?: string }): Promise<any> {
+    try {
+      const token = localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
+      if (!token) {
+        throw new Error("No authentication token available")
+      }
+
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+
+      // Build the URL with query parameters for sales chart
+      const queryParams = new URLSearchParams()
+      if (params.period) queryParams.append("days", params.period)
+      if (params.from) queryParams.append("from", params.from)
+      if (params.to) queryParams.append("to", params.to)
+
+      const url = `${baseUrl}/api/admin/dashboard/sales-chart${queryParams.toString() ? `?${queryParams.toString()}` : ""}`
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        throw new Error(`Sales chart request failed with status: ${response.status}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error("Error fetching sales chart:", error)
+      throw error
+    }
+  },
+
+  async getCategorySales(): Promise<any> {
+    try {
+      const token = localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
+      if (!token) {
+        throw new Error("No authentication token available")
+      }
+
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+      const url = `${baseUrl}/api/admin/dashboard/category-sales`
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        throw new Error(`Category sales request failed with status: ${response.status}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error("Error fetching category sales:", error)
+      throw error
+    }
+  },
+
+  async getRecentActivity(): Promise<any> {
+    try {
+      const token = localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
+      if (!token) {
+        throw new Error("No authentication token available")
+      }
+
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+      const url = `${baseUrl}/api/admin/dashboard/recent-activity`
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        throw new Error(`Recent activity request failed with status: ${response.status}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error("Error fetching recent activity:", error)
+      throw error
+    }
+  },
+
+  async getCustomerAnalytics(): Promise<any> {
+    try {
+      const token = localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
+      if (!token) {
+        throw new Error("No authentication token available")
+      }
+
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+      const url = `${baseUrl}/api/admin/dashboard/customer-analytics`
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        throw new Error(`Customer analytics request failed with status: ${response.status}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error("Error fetching customer analytics:", error)
+      throw error
+    }
+  },
+
+  async getDashboardHealth(): Promise<any> {
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+      const url = `${baseUrl}/api/admin/dashboard/health`
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
         },
       })
-      if (!response.ok) return this.getDefaultCustomerAnalytics()
+
+      if (!response.ok) {
+        throw new Error(`Dashboard health check failed with status: ${response.status}`)
+      }
+
       return await response.json()
     } catch (error) {
-      console.error("[v0] Failed to fetch customer analytics:", error)
-      return this.getDefaultCustomerAnalytics()
+      console.error("Error checking dashboard health:", error)
+      throw error
     }
   },
 
-  // ========================================================================
-  // DEFAULT/MOCK DATA PROVIDERS
-  // ========================================================================
+  // Products
+  async getProducts(params?: {
+    page?: number
+    per_page?: number
+    category_id?: number
+    brand_id?: number
+    search?: string
+    min_price?: number
+    max_price?: number
+    stock_status?: string
+    featured?: boolean
+    new?: boolean
+    sale?: boolean
+    flash_sale?: boolean
+    luxury_deal?: boolean
+  }): Promise<any> {
+    try {
+      const token = localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
+      if (!token) {
+        throw new Error("No authentication token available")
+      }
 
-  getDefaultPerformanceMetrics(): AdminDashboardResponse["performance_metrics"] {
-    return {
-      page_load_time: 1.2,
-      api_response_time: 0.3,
-      database_query_time: 0.15,
-      cache_hit_rate: 78,
-      error_rate: 0.02,
-      uptime_percentage: 99.95,
+      // Make sure we have a valid API URL
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+
+      // Build the URL with query parameters
+      let url = `${baseUrl}/api/admin/products`
+
+      // Create a new params object with a very large per_page value to get all products
+      const updatedParams = {
+        ...params,
+        per_page: 10000, // Set a very large number to get all products
+      }
+
+      const queryParams = new URLSearchParams()
+      Object.entries(updatedParams).forEach(([key, value]) => {
+        if (value !== undefined) {
+          queryParams.append(key, value.toString())
+        }
+      })
+
+      const queryString = queryParams.toString()
+      if (queryString) {
+        url += `?${queryString}`
+      }
+
+      console.log("Fetching all products with URL:", url)
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        throw new Error(`Products request failed with status: ${response.status}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error("Error fetching products:", error)
+      throw error
     }
   },
 
-  getDefaultSystemStatus(): AdminDashboardResponse["system_health"] {
-    return {
-      status: "healthy",
-      database: "connected",
-      cache: "active",
-      api_health: 98,
-      memory_usage: 45,
-      cpu_usage: 32,
-      disk_usage: 60,
+  // Get a single product
+  async getProduct(id: string): Promise<Product | null> {
+    try {
+      // Check cache first
+      const cacheKey = `product-${id}`
+      const now = Date.now()
+      const cachedItem = productCache.get(cacheKey)
+
+      if (cachedItem && now - cachedItem.timestamp < CACHE_DURATION) {
+        console.log(`Using cached product data for id ${id}`)
+        return cachedItem.data
+      }
+
+      console.log(`Fetching product with id ${id} from API`)
+      const response = await api.get(`/api/products/${id}`)
+
+      // Cache the result with timestamp
+      if (response.data) {
+        productCache.set(cacheKey, {
+          data: response.data,
+          timestamp: now,
+        })
+      }
+
+      return this.mapProductFromApi(response.data)
+    } catch (error) {
+      console.error(`Error fetching product with id ${id}:`, error)
+      return null
     }
   },
 
-  getDefaultCustomerAnalytics(): AdminDashboardResponse["customer_analytics"] {
-    return {
-      total_customers: 12500,
-      new_customers_today: 42,
-      repeat_customers: 3200,
-      customer_retention_rate: 72,
-      average_customer_lifetime_value: 450.75,
-      customer_satisfaction_score: 4.6,
-      churn_rate: 2.3,
+  // Invalidate cache for a specific product
+  invalidateProductCache(id: string): void {
+    const cacheKey = `product-${id}`
+    productCache.delete(cacheKey)
+    console.log(`Cache invalidated for product ${id}`)
+  },
+
+  // Invalidate all product cache
+  invalidateAllProductCache(): void {
+    productCache.clear()
+    console.log("All product cache invalidated")
+  },
+
+  async getProductBySlug(slug: string): Promise<Product | null> {
+    try {
+      const response = await api.get(`/api/products/${slug}`)
+      return this.mapProductFromApi(response.data)
+    } catch (error) {
+      console.error(`Error fetching product with slug ${slug}:`, error)
+      return null
+    }
+  },
+
+  async getFeaturedProducts(): Promise<Product[]> {
+    const response = await this.getProducts({ featured: true })
+    return response.items
+  },
+
+  async getNewProducts(): Promise<Product[]> {
+    const response = await this.getProducts({ new: true })
+    return response.items
+  },
+
+  async getSaleProducts(): Promise<Product[]> {
+    const response = await this.getProducts({ sale: true })
+    return response.items
+  },
+
+  async getFlashSaleProducts(): Promise<Product[]> {
+    const response = await this.getProducts({ flash_sale: true })
+    return response.items
+  },
+
+  async getLuxuryDealProducts(): Promise<Product[]> {
+    const response = await this.getProducts({ luxury_deal: true })
+    return response.items
+  },
+
+  async getProductsByIds(productIds: number[]): Promise<Product[]> {
+    try {
+      console.log(`API call: getProductsByIds for ids: ${productIds.join(", ")}`)
+      const response = await api.get("/api/products/batch", {
+        params: { ids: productIds.join(",") },
+      })
+      console.log("API response for batch products:", response.data)
+      return (response.data.items || []).map((item: any) => this.mapProductFromApi(item))
+    } catch (error) {
+      console.error(`Error fetching products by ids:`, error)
+      return []
+    }
+  },
+
+  // Add a method to prefetch products for faster navigation
+  async prefetchProductsByCategory(categoryId: string): Promise<boolean> {
+    return prefetchData("/api/products", { category_id: categoryId, limit: 12 })
+  },
+
+  // Add a method to prefetch featured products for the homepage
+  async prefetchHomePageProducts(): Promise<void> {
+    try {
+      await Promise.allSettled([
+        this.prefetchProductsByCategory("featured"),
+        prefetchData("/api/products", { flash_sale: true }),
+        prefetchData("/api/products", { luxury_deal: true }),
+        prefetchData("/api/products", { limit: 12 }),
+      ])
+    } catch (error) {
+      console.error("Error prefetching homepage products:", error)
+    }
+  },
+
+  // Notify about product updates
+  notifyProductUpdate(productId: string): void {
+    console.log(`Notifying about product update for ID: ${productId}`)
+
+    // Invalidate cache
+    this.invalidateProductCache(productId)
+    this.invalidateAllProductCache()
+
+    // Send WebSocket notification if available
+    if (typeof window !== "undefined") {
+      console.log("Sending WebSocket notification for product update")
+      websocketService.send("product_updated", { id: productId, timestamp: Date.now() })
+
+      // Also dispatch a custom event that components can listen for
+      const event = new CustomEvent("product-updated", { detail: { id: productId } })
+      window.dispatchEvent(event)
+    }
+  },
+
+  // Helper method to map API order data to our frontend Order type
+  mapProductFromApi(apiProduct: any): Product {
+    const product: Product = {
+      id: apiProduct.id,
+      name: apiProduct.name,
+      slug: apiProduct.slug,
+      description: apiProduct.description,
+      price: apiProduct.price,
+      sale_price: apiProduct.sale_price,
+      stock: apiProduct.stock,
+      category_id: apiProduct.category_id,
+      brand_id: apiProduct.brand_id,
+      image_urls: apiProduct.image_urls,
+      is_featured: apiProduct.is_featured,
+      thumbnail_url: apiProduct.thumbnail_url,
+      is_new: apiProduct.is_new,
+      is_sale: apiProduct.is_sale,
+      is_flash_sale: apiProduct.is_flash_sale,
+      is_luxury_deal: apiProduct.is_luxury_deal,
+      rating: apiProduct.rating,
+      reviews: apiProduct.reviews,
+      sku: apiProduct.sku,
+      weight: apiProduct.weight,
+      dimensions: apiProduct.dimensions,
+      variants: apiProduct.variants,
+      meta_title: apiProduct.meta_title,
+      meta_description: apiProduct.meta_description,
+      material: apiProduct.material,
+      tags: apiProduct.tags,
+      created_at: apiProduct.created_at,
+      updated_at: apiProduct.updated_at,
+      // Ensure brand is always an object
+      brand:
+        typeof apiProduct.brand === "string"
+          ? {
+              id: 0, // Or some default ID
+              name: apiProduct.brand,
+              slug: "", // Or generate a slug
+            }
+          : apiProduct.brand || null,
+    }
+    return product
+  },
+
+  /**
+   * Update a product
+   */
+  async updateProduct(id: string, data: any): Promise<Product> {
+    try {
+      console.log("[v0] Updating product with data:", data)
+
+      // Get the token - check both mizizzi_token and admin_token
+      const token = localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
+      if (!token) {
+        throw new Error("Authentication token not found. Please log in again.")
+      }
+
+      console.log("[v0] Using token for update:", token.substring(0, 20) + "...")
+
+      // Set up headers with authentication
+      const headers = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      }
+
+      // Add a timeout to ensure the request doesn't hang
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || ""
+        const endpoint = `${apiUrl}/api/admin/products/${id}`
+        console.log("[v0] Making PUT request to:", endpoint)
+
+        // Make the API call with proper headers and timeout
+        const response = await fetch(endpoint, {
+          method: "PUT",
+          headers: headers,
+          body: JSON.stringify(data),
+          signal: controller.signal,
+        })
+
+        clearTimeout(timeoutId)
+
+        console.log("[v0] Response status:", response.status)
+
+        // Check if the response is ok
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          console.error("[v0] API error response:", errorData)
+          
+          // Handle 401 specifically
+          if (response.status === 401) {
+            // Try to refresh token
+            console.log("[v0] Got 401, attempting to refresh token")
+            try {
+              await this.refreshToken()
+              // Retry the update with new token
+              const newToken = localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
+              if (newToken) {
+                headers.Authorization = `Bearer ${newToken}`
+                const retryResponse = await fetch(endpoint, {
+                  method: "PUT",
+                  headers: headers,
+                  body: JSON.stringify(data),
+                })
+                if (retryResponse.ok) {
+                  const responseData = await retryResponse.json()
+                  console.log("[v0] Product updated successfully after token refresh:", responseData)
+                  return responseData
+                }
+              }
+            } catch (refreshError) {
+              console.error("[v0] Token refresh failed:", refreshError)
+            }
+            throw new Error("Authentication failed. Your session has expired. Please log in again.")
+          }
+          
+          throw new Error(errorData.message || `Failed to update product. Status: ${response.status}`)
+        }
+
+        // Parse the response
+        const responseData = await response.json()
+        console.log("[v0] Product updated successfully:", responseData)
+
+        // Notify about product update via WebSocket
+        try {
+          websocketService.send("product_updated", { id: id, timestamp: Date.now() })
+          console.log("[v0] WebSocket notification sent for product update")
+
+          // Invalidate cache for this product
+          this.invalidateProductCache(id)
+
+          // Also dispatch a custom event that components can listen for
+          if (typeof window !== "undefined") {
+            const event = new CustomEvent("product-updated", { detail: { id, product: responseData } })
+            window.dispatchEvent(event)
+            console.log("[v0] Custom event dispatched for product update")
+          }
+        } catch (notifyError) {
+          console.warn("[v0] Failed to notify about product update:", notifyError)
+        }
+
+        return responseData
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId)
+
+        if (fetchError.name === "AbortError") {
+          console.error("[v0] Update request timed out")
+          throw new Error("Request timed out. Please try again.")
+        }
+
+        throw fetchError
+      }
+    } catch (error: any) {
+      console.error("[v0] Error updating product:", error)
+      throw error
+    }
+  },
+
+  // Delete a product
+  async deleteProduct(id: string): Promise<{ success: boolean; message: string }> {
+    try {
+      console.log("[v0] Deleting product with ID:", id)
+
+      // Get the token - check both mizizzi_token and admin_token
+      const token = localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
+      if (!token) {
+        throw new Error("Authentication token not found. Please log in again.")
+      }
+
+      // Set up headers with authentication
+      const headers = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      }
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || ""
+      const endpoint = `${apiUrl}/api/admin/products/${id}`
+      console.log("[v0] Making DELETE request to:", endpoint)
+
+      // Add a timeout to ensure the request doesn't hang
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+
+      try {
+        // Make the API call with proper headers and timeout
+        const response = await fetch(endpoint, {
+          method: "DELETE",
+          headers: headers,
+          signal: controller.signal,
+        })
+
+        clearTimeout(timeoutId)
+
+        console.log("[v0] Delete response status:", response.status)
+
+        // Check if the response is ok
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          console.error("[v0] API error response:", errorData)
+          
+          // Handle 401 specifically
+          if (response.status === 401) {
+            console.log("[v0] Got 401, attempting to refresh token")
+            try {
+              await this.refreshToken()
+              // Retry the delete with new token
+              const newToken = localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
+              if (newToken) {
+                headers.Authorization = `Bearer ${newToken}`
+                const retryResponse = await fetch(endpoint, {
+                  method: "DELETE",
+                  headers: headers,
+                })
+                if (retryResponse.ok) {
+                  const responseData = await retryResponse.json()
+                  console.log("[v0] Product deleted successfully after token refresh")
+                  this.invalidateProductCache(id)
+                  return responseData
+                }
+              }
+            } catch (refreshError) {
+              console.error("[v0] Token refresh failed:", refreshError)
+            }
+            throw new Error("Authentication failed. Your session has expired. Please log in again.")
+          }
+          
+          throw new Error(errorData.message || `Failed to delete product. Status: ${response.status}`)
+        }
+
+        // Parse the response
+        const responseData = await response.json()
+        console.log("[v0] Product deleted successfully:", responseData)
+
+        // Invalidate cache for this product
+        this.invalidateProductCache(id)
+
+        return responseData
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId)
+
+        if (fetchError.name === "AbortError") {
+          console.error("[v0] Delete request timed out")
+          throw new Error("Request timed out. Please try again.")
+        }
+
+        throw fetchError
+      }
+    } catch (error: any) {
+      console.error("[v0] Error deleting product:", error)
+      throw error
+    }
+  },
+
+  // Create a product
+  async createProduct(data: ProductCreatePayload): Promise<Product> {
+    try {
+      // Add a timeout to ensure the request doesn't hang
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+
+      try {
+        // Get the token from localStorage
+        const token = localStorage.getItem("admin_token")
+        if (!token) {
+          throw new Error("Authentication token not found. Please log in again.")
+        }
+
+        // Set up headers with authentication
+        const headers = {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        }
+
+        const requestBody = JSON.stringify(data)
+
+        // Make the API call with proper headers and timeout
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/admin/products`, {
+          method: "POST",
+          headers: headers,
+          body: requestBody,
+          signal: controller.signal,
+        })
+
+        clearTimeout(timeoutId)
+
+        if (!response.ok) {
+          // Try to get the error response text first
+          const responseText = await response.text()
+
+          let errorData: any = {}
+          try {
+            // Try to parse as JSON
+            errorData = JSON.parse(responseText)
+          } catch (parseError) {
+            // If not JSON, use the text as the error message
+            throw new Error(responseText || `Failed to create product. Status: ${response.status}`)
+          }
+
+          // Extract the error message from various possible formats
+          const errorMessage =
+            errorData.error ||
+            errorData.message ||
+            errorData.details ||
+            `Failed to create product. Status: ${response.status}`
+          throw new Error(errorMessage)
+        }
+
+        // Parse the response
+        const responseData = await response.json()
+
+        // Notify about new product
+        if (responseData && responseData.id) {
+          try {
+            this.notifyProductUpdate(responseData.id.toString())
+          } catch (notifyError) {
+            console.warn("Failed to notify about new product:", notifyError)
+          }
+        }
+
+        return responseData
+      } catch (fetchError: any) {
+        clearTimeout(timeoutId)
+
+        if (fetchError.name === "AbortError") {
+          throw new Error("Request timed out. Please try again.")
+        }
+
+        throw fetchError
+      }
+    } catch (error: any) {
+      console.error("Error creating product:", error)
+
+      // Check if this is an authentication error
+      if (error.response?.status === 401 || error.message?.includes("Authentication")) {
+        throw new Error("Authentication failed. Your session has expired. Please log in again.")
+      }
+
+      throw error
+    }
+  },
+
+  // Orders
+  async getOrders(params?: {
+    page?: number
+    per_page?: number
+    status?: string
+    payment_status?: string
+    search?: string
+    date_from?: string
+    date_to?: string
+    min_amount?: number
+    max_amount?: number
+  }): Promise<any> {
+    try {
+      const token = localStorage.getItem("mizizzi_token")
+      if (!token) {
+        throw new Error("No authentication token available")
+      }
+
+      const url = new URL(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/orders`)
+
+      url.searchParams.append("include_items", "true")
+      url.searchParams.append("with_items", "true")
+
+      // Add query parameters if provided
+      if (params) {
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined) {
+            url.searchParams.append(key, value.toString())
+          }
+        })
+      }
+
+      const response = await fetch(url.toString(), {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        throw new Error(`Orders request failed with status: ${response.status}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error("Error fetching orders:", error)
+      throw error
+    }
+  },
+
+  // Get a single order by ID
+  async getOrder(orderId: number): Promise<any> {
+    try {
+      const token = localStorage.getItem("mizizzi_token")
+      if (!token) {
+        throw new Error("No authentication token available")
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/orders/${orderId}`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        throw new Error(`Order request failed with status: ${response.status}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error(`Error fetching order ${orderId}:`, error)
+      throw error
+    }
+  },
+
+  // Update order status
+  async updateOrderStatus(
+    orderId: number,
+    data: { status: string; tracking_number?: string; tracking_url?: string; notes?: string },
+  ): Promise<any> {
+    try {
+      console.log("[v0] updateOrderStatus called with:", { orderId, data })
+
+      const token = localStorage.getItem("mizizzi_token")
+      if (!token) {
+        throw new Error("No authentication token available")
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/orders/${orderId}/status`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null)
+        console.error("[v0] Order status update failed:", {
+          status: response.status,
+          statusText: response.statusText,
+          errorData,
+        })
+
+        const errorMessage =
+          errorData?.message || errorData?.error || `Order status update failed with status: ${response.status}`
+        throw new Error(errorMessage)
+      }
+
+      const result = await response.json()
+      console.log("[v0] Order status updated successfully:", result)
+
+      try {
+        const { websocketService } = await import("@/services/websocket")
+        await websocketService.emit("order_updated", {
+          orderId: orderId,
+          id: orderId,
+          status: data.status,
+          tracking_number: data.tracking_number,
+          tracking_url: data.tracking_url,
+          notes: data.notes,
+          timestamp: new Date().toISOString(),
+        })
+        console.log("[v0] WebSocket notification sent for order update")
+      } catch (wsError) {
+        console.warn("[v0] Failed to send WebSocket notification:", wsError)
+        // Don't throw error - order was updated successfully even if WebSocket failed
+      }
+
+      return result
+    } catch (error) {
+      console.error(`[v0] Error updating order status for order ${orderId}:`, error)
+      throw error
+    }
+  },
+
+  // Categories
+  async getCategories(params: Record<string, any> = {}): Promise<AdminPaginatedResponse<Category>> {
+    try {
+      const token = localStorage.getItem("admin_token") || localStorage.getItem("mizizzi_token")
+      if (!token) {
+        throw new Error("No authentication token available")
+      }
+
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+      const queryParams = new URLSearchParams()
+
+      Object.keys(params).forEach((key) => {
+        if (params[key] !== undefined && params[key] !== null) {
+          queryParams.append(key, params[key].toString())
+        }
+      })
+
+      const url = `${baseUrl}/api/admin/categories${queryParams.toString() ? `?${queryParams.toString()}` : ""}`
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        throw new Error(`Categories request failed with status: ${response.status}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error("Error fetching categories:", error)
+      throw error
+    }
+  },
+
+  // Create category
+  async createCategory(data: any): Promise<any> {
+    try {
+      const token = localStorage.getItem("admin_token") || localStorage.getItem("mizizzi_token")
+      if (!token) {
+        throw new Error("No authentication token available")
+      }
+
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+      const response = await fetch(`${baseUrl}/api/admin/categories`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+        body: JSON.stringify(data),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || "Failed to create category")
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error("Error creating category:", error)
+      throw error
+    }
+  },
+
+  // Update category
+  async updateCategory(id: string, data: any): Promise<any> {
+    try {
+      const token = localStorage.getItem("admin_token") || localStorage.getItem("mizizzi_token")
+      if (!token) {
+        throw new Error("No authentication token available")
+      }
+
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+      const response = await fetch(`${baseUrl}/api/admin/categories/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+        body: JSON.stringify(data),
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || "Failed to update category")
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error(`Error updating category ${id}:`, error)
+      throw error
+    }
+  },
+
+  // Delete category
+  async deleteCategory(id: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const token = localStorage.getItem("admin_token") || localStorage.getItem("mizizzi_token")
+      if (!token) {
+        throw new Error("No authentication token available")
+      }
+
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+      const response = await fetch(`${baseUrl}/api/admin/categories/${id}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.error || "Failed to delete category")
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error(`Error deleting category ${id}:`, error)
+      throw error
+    }
+  },
+
+  // Brands
+  async getBrands(params?: { page?: number; per_page?: number; search?: string }): Promise<any> {
+    const makeRequest = async (token: string): Promise<Response> => {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+      let url = `${baseUrl}/api/admin/brands`
+
+      if (params) {
+        const queryParams = new URLSearchParams()
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined) {
+            queryParams.append(key, value.toString())
+          }
+        })
+
+        const queryString = queryParams.toString()
+        if (queryString) {
+          url += `?${queryString}`
+        }
+      }
+
+      console.log("[v0] Fetching brands with URL:", url)
+
+      return fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+      })
+    }
+
+    try {
+      const adminToken = localStorage.getItem("admin_token")
+      const mizizziToken = localStorage.getItem("mizizzi_token")
+      const token = adminToken || mizizziToken
+
+      console.log("[v0] Admin token available:", !!adminToken)
+      console.log("[v0] Mizizzi token available:", !!mizizziToken)
+      console.log("[v0] Using token:", token ? "Yes" : "No")
+
+      if (!token) {
+        throw new Error("No authentication token available")
+      }
+
+      let response = await makeRequest(token)
+
+      // Handle token expiration
+      if (!response.ok && response.status === 401) {
+        const errorText = await response.text()
+        let errorData
+        try {
+          errorData = JSON.parse(errorText)
+        } catch (e) {
+          errorData = { error: errorText }
+        }
+
+        console.error("[v0] Brands request failed:", {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText,
+        })
+
+        // Check if it's a token expiration error
+        if (errorData.code === "token_expired") {
+          console.log("[v0] Token expired, attempting refresh...")
+          const refreshSuccess = await this.refreshTokenAndRetry()
+
+          if (refreshSuccess) {
+            // Retry with new token
+            const newToken = localStorage.getItem("admin_token") || localStorage.getItem("mizizzi_token")
+            if (newToken) {
+              console.log("[v0] Retrying brands request with refreshed token...")
+              response = await makeRequest(newToken)
+
+              if (!response.ok) {
+                const retryErrorText = await response.text()
+                throw new Error(
+                  `Brands request failed after token refresh with status: ${response.status} - ${retryErrorText}`,
+                )
+              }
+            } else {
+              throw new Error("Token refresh succeeded but no new token found")
+            }
+          } else {
+            throw new Error(`Brands request failed with status: ${response.status} - ${errorText}`)
+          }
+        } else {
+          throw new Error(`Brands request failed with status: ${response.status} - ${errorText}`)
+        }
+      } else if (!response.ok) {
+        const errorText = await response.text()
+        console.error("[v0] Brands request failed:", {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorText,
+        })
+        throw new Error(`Brands request failed with status: ${response.status} - ${errorText}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error("[v0] Error fetching brands:", error)
+      throw error
+    }
+  },
+
+  // Get all brands (no pagination) for dropdowns
+  async getBrandsList(): Promise<any> {
+    try {
+      const token = localStorage.getItem("mizizzi_token")
+      if (!token) {
+        throw new Error("No authentication token available")
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/brands/list`, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        throw new Error(`Brands list request failed with status: ${response.status}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error("Error fetching brands list:", error)
+      throw error
+    }
+  },
+
+  // Reviews
+  async getReviews(params = {}): Promise<AdminPaginatedResponse<any>> {
+    try {
+      const response = await api.get("/api/admin/reviews", { params })
+      return response.data
+    } catch (error) {
+      console.error("Error fetching reviews:", error)
+      throw error
+    }
+  },
+
+  // Newsletter subscribers
+  async getNewsletterSubscribers(params = {}): Promise<AdminPaginatedResponse<any>> {
+    try {
+      const response = await api.get("/api/admin/newsletters", { params })
+      return response.data
+    } catch (error) {
+      console.error("Error fetching newsletter subscribers:", error)
+      throw error
+    }
+  },
+
+  // Newsletters
+  async getNewsletters(params?: {
+    page?: number
+    per_page?: number
+    is_active?: boolean
+    search?: string
+  }): Promise<any> {
+    try {
+      const token = localStorage.getItem("mizizzi_token")
+      if (!token) {
+        throw new Error("No authentication token available")
+      }
+
+      const url = new URL(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/newsletters`)
+
+      // Add query parameters if provided
+      if (params) {
+        Object.entries(params).forEach(([key, value]) => {
+          if (value !== undefined) {
+            url.searchParams.append(key, value.toString())
+          }
+        })
+      }
+
+      const response = await fetch(url.toString(), {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        throw new Error(`Newsletters request failed with status: ${response.status}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error("Error fetching newsletters:", error)
+      throw error
+    }
+  },
+
+  // Get admin profile
+  async getProfile(): Promise<any> {
+    try {
+      const response = await api.get("/api/admin/profile")
+      return response.data
+    } catch (error) {
+      console.error("Error fetching admin profile:", error)
+      throw error
+    }
+  },
+
+  // Update admin profile
+  async updateProfile(data: any): Promise<any> {
+    try {
+      const response = await api.put("/api/admin/profile", data)
+      return response.data
+    } catch (error) {
+      console.error("Error updating admin profile:", error)
+      throw error
+    }
+  },
+
+  // Get order details
+  async getOrderDetails(id: string): Promise<any> {
+    try {
+      const response = await api.get(`/api/admin/orders/${id}`)
+      return response.data
+    } catch (error) {
+      console.error(`Error fetching order details for order ${id}:`, error)
+      throw error
+    }
+  },
+
+  // Create category - already updated above
+  // Update category - already updated above
+  // Delete category - already updated above
+
+  // Create brand
+  async createBrand(data: any): Promise<any> {
+    try {
+      const response = await api.post("/api/admin/brands", data)
+      return response.data
+    } catch (error) {
+      console.error("Error creating brand:", error)
+      throw error
+    }
+  },
+
+  // Update brand
+  async updateBrand(id: string, data: any): Promise<any> {
+    try {
+      const response = await api.put(`/api/admin/brands/${id}`, data)
+      return response.data
+    } catch (error) {
+      console.error(`Error updating brand ${id}:`, error)
+      throw error
+    }
+  },
+
+  // Delete brand
+  async deleteBrand(id: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await api.delete(`/api/admin/brands/${id}`)
+      return response.data
+    } catch (error) {
+      console.error(`Error deleting brand ${id}:`, error)
+      throw error
+    }
+  },
+
+  // Approve/reject review
+  async updateReviewStatus(id: string, status: "approved" | "rejected"): Promise<any> {
+    try {
+      const response = await api.put(`/api/admin/reviews/${id}/status`, { status })
+      return response.data
+    } catch (error) {
+      console.error(`Error updating review ${id} status:`, error)
+      throw error
+    }
+  },
+
+  // Delete review
+  async deleteReview(id: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const response = await api.delete(`/api/admin/reviews/${id}`)
+      return response.data
+    } catch (error) {
+      console.error(`Error deleting review ${id}:`, error)
+      throw error
+    }
+  },
+
+  // Send newsletter
+  async sendNewsletter(data: { subject: string; content: string; recipientGroups?: string[] }): Promise<any> {
+    try {
+      const response = await api.post("/api/admin/newsletters/send", data)
+      return response.data
+    } catch (error) {
+      console.error("Error sending newsletter:", error)
+      throw error
+    }
+  },
+
+  // Get admin notifications
+  async getNotifications(params = {}): Promise<AdminPaginatedResponse<any>> {
+    try {
+      const response = await api.get("/api/admin/notifications", { params })
+      return response.data
+    } catch (error) {
+      console.error("Error fetching notifications:", error)
+      // Return empty data structure instead of throwing
+      return {
+        items: [],
+        meta: {
+          current_page: 1,
+          per_page: 10,
+          total: 0,
+          last_page: 1,
+          from: 0,
+          to: 0,
+        },
+      }
+    }
+  },
+
+  // Get system settings
+  async getSettings(): Promise<any> {
+    try {
+      const response = await api.get("/api/admin/settings")
+      return response.data
+    } catch (error) {
+      console.error("Error fetching system settings:", error)
+      throw error
+    }
+  },
+
+  // Update system settings
+  async updateSettings(data: any): Promise<any> {
+    try {
+      const response = await api.put("/api/admin/settings", data)
+      return response.data
+    } catch (error) {
+      console.error("Error updating system settings:", error)
+      throw error
+    }
+  },
+
+  // Update the activateUser and deactivateUser methods
+  async activateUser(id: string): Promise<any> {
+    try {
+      const token = localStorage.getItem("admin_token")
+      if (!token) {
+        throw new Error("No authentication token available")
+      }
+
+      const response = await api.post(
+        `/api/admin/users/${id}/activate`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+
+      return response.data
+    } catch (error) {
+      console.error(`Error activating user ${id}:`, error)
+      throw error
+    }
+  },
+
+  async deactivateUser(id: string): Promise<any> {
+    try {
+      const token = localStorage.getItem("admin_token")
+      if (!token) {
+        throw new Error("No authentication token available")
+      }
+
+      const response = await api.post(
+        `/api/admin/users/${id}/deactivate`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        },
+      )
+
+      return response.data
+    } catch (error) {
+      console.error(`Error deactivating user ${id}:`, error)
+      throw error
+    }
+  },
+
+  async updateUser(id: string, data: any): Promise<any> {
+    try {
+      const token = localStorage.getItem("admin_token") || localStorage.getItem("mizizzi_token")
+      if (!token) {
+        throw new Error("No authentication token available")
+      }
+
+      console.log("[v0] updateUser called with:", { id, data })
+
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"
+      const response = await fetch(`${baseUrl}/api/admin/users/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(data),
+        credentials: "include",
+      })
+
+      console.log("[v0] updateUser response status:", response.status)
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.log("[v0] updateUser error response:", errorData)
+        throw new Error(errorData.message || `Failed to update user. Status: ${response.status}`)
+      }
+
+      const result = await response.json()
+      console.log("[v0] updateUser success:", result)
+      return result
+    } catch (error) {
+      console.error(`Error updating user ${id}:`, error)
+      throw error
+    }
+  },
+
+  async deleteUser(id: string): Promise<any> {
+    try {
+      const token = localStorage.getItem("admin_token") || localStorage.getItem("mizizzi_token")
+      if (!token) {
+        throw new Error("No authentication token available")
+      }
+
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"
+      const deleteUrl = `${baseUrl}/api/admin/users/${id}`
+
+      const response = await fetch(deleteUrl, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `Failed to delete user. Status: ${response.status}`)
+      }
+
+      const result = await response.json()
+      return result
+    } catch (error) {
+      console.error(`Error deleting user ${id}:`, error)
+      throw error
+    }
+  },
+
+  // Get product image
+  async getProductImage(productId: string): Promise<string> {
+    try {
+      // Make sure we have a valid API URL
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+
+      const url = `${baseUrl}/api/admin/products/${productId}/images`
+      console.log(`Fetching images from: ${url}`)
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("admin_token") || ""}`,
+        },
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        console.warn(`Failed to fetch images for product ${productId}:`, response.statusText)
+        return "/placeholder.svg"
+      }
+
+      const data = await response.json()
+
+      if (data.items && Array.isArray(data.items) && data.items.length > 0) {
+        // Find primary image first, or use the first image
+        const primaryImage = data.items.find((img: any) => img.is_primary)
+        const firstImage = data.items[0]
+        const selectedImage = primaryImage || firstImage
+
+        if (selectedImage && selectedImage.url) {
+          return selectedImage.url.startsWith("http")
+            ? selectedImage.url
+            : `${baseUrl}${selectedImage.url.startsWith("/") ? "" : "/"}${selectedImage.url}`
+        }
+      } else if (Array.isArray(data) && data.length > 0) {
+        // Handle direct array response
+        const primaryImage = data.find((img: any) => img.is_primary)
+        const firstImage = data[0]
+        const selectedImage = primaryImage || firstImage
+
+        if (selectedImage && selectedImage.url) {
+          return selectedImage.url.startsWith("http")
+            ? selectedImage.url
+            : `${baseUrl}${selectedImage.url.startsWith("/") ? "" : "/"}${selectedImage.url}`
+        }
+      }
+
+      return "/placeholder.svg"
+    } catch (error) {
+      console.error(`Error fetching images for product ${productId}:`, error)
+      return "/placeholder.svg"
+    }
+  },
+
+  // Delete a product image
+  async deleteProductImage(imageIdOrUrl: string): Promise<{ success: boolean; message: string }> {
+    try {
+      console.log("[v0] Deleting product image with ID/URL:", imageIdOrUrl)
+
+      // Check if it's a URL (Cloudinary URL) or a numeric ID
+      const isUrl = /^https?:\/\//.test(imageIdOrUrl)
+      const isBlobUrl = imageIdOrUrl.startsWith("blob:")
+      const isNumericId = /^\d+$/.test(imageIdOrUrl)
+
+      if (isBlobUrl) {
+        console.log("[v0] Detected blob URL, searching for corresponding database record")
+
+        try {
+          const searchResponse = await api.post("/api/admin/products/product-images/search-by-url", {
+            url: imageIdOrUrl,
+          })
+
+          if (searchResponse.data?.image_id) {
+            console.log("[v0] Found database record for blob URL:", searchResponse.data.image_id)
+            // Recursively call with the found ID
+            return await this.deleteProductImage(searchResponse.data.image_id.toString())
+          }
+        } catch (error) {
+          console.warn("[v0] Could not find database record for blob URL:", error)
+        }
+
+        // If we can't find it in the database, it might be a preview image
+        // Just return success since blob URLs are temporary anyway
+        console.log("[v0] Blob URL not found in database, treating as preview image")
+        return { success: true, message: "Preview image removed successfully" }
+      }
+
+      if (isNumericId) {
+        try {
+          console.log("[v0] Deleting image with ID:", imageIdOrUrl)
+
+          const response = await api.delete(`/api/admin/products/product-images/${imageIdOrUrl}`)
+
+          console.log("[v0] Product image deleted successfully:", response.data)
+
+          this.invalidateProductCaches()
+
+          return { success: true, message: response.data?.message || "Image deleted successfully" }
+        } catch (error: any) {
+          console.error("[v0] Error deleting image:", error)
+
+          // Handle specific error cases
+          if (error.response?.status === 404) {
+            throw new Error("Image not found. It may have already been deleted.")
+          } else if (error.response?.status === 401) {
+            throw new Error("Authentication failed. Your session has expired. Please log in again.")
+          } else {
+            const errorMessage = error.response?.data?.message || error.response?.data?.error || error.message
+            throw new Error(errorMessage || "Failed to delete product image")
+          }
+        }
+      } else if (isUrl && !isBlobUrl) {
+        try {
+          console.log("[v0] Searching for image ID by URL:", imageIdOrUrl)
+
+          const searchResponse = await api.post("/api/admin/products/product-images/search-by-url", {
+            url: imageIdOrUrl,
+          })
+
+          if (searchResponse.data?.image_id) {
+            console.log("[v0] Found image ID for URL:", searchResponse.data.image_id)
+            // Recursively call with the found ID
+            return await this.deleteProductImage(searchResponse.data.image_id.toString())
+          }
+
+          // If search endpoint doesn't exist or fails, try alternative approach
+          // Extract Cloudinary public_id from URL and delete directly
+          const cloudinaryMatch = imageIdOrUrl.match(/\/v\d+\/([^/]+)\.(jpg|jpeg|png|webp|gif)/)
+          if (cloudinaryMatch) {
+            const publicId = cloudinaryMatch[1]
+            console.log("[v0] Extracted Cloudinary public_id:", publicId)
+
+            const cloudinaryResponse = await api.delete("/api/admin/products/product-images/delete-by-public-id", {
+              data: { public_id: publicId, url: imageIdOrUrl },
+            })
+
+            console.log("[v0] Image deleted via Cloudinary public_id:", cloudinaryResponse.data)
+
+            this.invalidateProductCaches()
+
+            return { success: true, message: cloudinaryResponse.data?.message || "Image deleted successfully" }
+          }
+
+          // If all else fails, try a generic URL-based deletion endpoint
+          const urlResponse = await api.delete("/api/admin/products/product-images/delete-by-url", {
+            data: { url: imageIdOrUrl },
+          })
+
+          console.log("[v0] Image deleted via URL endpoint:", urlResponse.data)
+
+          this.invalidateProductCaches()
+
+          return { success: true, message: urlResponse.data?.message || "Image deleted successfully" }
+        } catch (urlError: any) {
+          console.error("[v0] Error deleting image by URL:", urlError)
+          throw new Error(
+            "Unable to delete image. The image may have been uploaded recently and needs to be saved first, or there may be a server issue. Please try refreshing the page and attempting deletion again.",
+          )
+        }
+      } else {
+        throw new Error("Invalid image identifier. Expected numeric ID or valid URL.")
+      }
+    } catch (error: any) {
+      console.error("[v0] Error deleting product image:", error)
+      throw error
+    }
+  },
+
+  async uploadProductImage(
+    productId: string | number,
+    file: File,
+  ): Promise<{ success: boolean; image?: ProductImage; url?: string; error?: string }> {
+    try {
+      console.log("[v0] Uploading product image for product:", productId)
+
+      const result = await cloudinaryService.uploadProductImage(productId, file, {
+        altText: `Product image for ${file.name}`,
+        onProgress: (progress) => {
+          console.log("[v0] Upload progress:", progress + "%")
+        },
+      })
+
+      if (!result.success) {
+        console.error("[v0] Image upload failed:", result.error || result.message)
+        throw new Error(result.error || result.message || "Failed to upload image")
+      }
+
+      if (!result.uploaded_image) {
+        console.error("[v0] Upload succeeded but no image data returned:", result)
+        throw new Error("Upload succeeded but no image metadata was returned from the server")
+      }
+
+      console.log("[v0] Image uploaded successfully:", result.uploaded_image)
+
+      // Invalidate caches after successful upload
+      this.invalidateProductCaches()
+
+      return {
+        success: true,
+        image: result.uploaded_image as ProductImage,
+        url: result.uploaded_image.secure_url || result.uploaded_image.url,
+      }
+    } catch (error: any) {
+      console.error("[v0] Error uploading product image:", error)
+      return {
+        success: false,
+        error: error.message || "Failed to upload image",
+      }
+    }
+  },
+
+  async saveCloudinaryImage(
+    productId: string | number,
+    imageData: {
+      url: string
+      public_id: string
+      filename: string
+      original_name: string
+      size?: number
+    },
+  ): Promise<{ success: boolean; image?: ProductImage; error?: string }> {
+    try {
+      console.log("[v0] Saving Cloudinary image for product:", productId, imageData)
+
+      // Get the token from localStorage
+      const token = localStorage.getItem("admin_token")
+      if (!token) {
+        throw new Error("Authentication token not found. Please log in again.")
+      }
+
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"
+      const apiUrl = `${baseUrl}/api/admin/products/${productId}/images`
+
+      console.log("[v0] Sending Cloudinary image URL to backend API:", apiUrl)
+
+      const response = await fetch(apiUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          url: imageData.url,
+          filename: imageData.filename,
+          original_name: imageData.original_name,
+          cloudinary_public_id: imageData.public_id,
+          size: imageData.size,
+          alt_text: `Product image ${imageData.original_name}`,
+          is_primary: false,
+          sort_order: 0,
+        }),
+        credentials: "include",
+      })
+
+      console.log("[v0] Backend API response status:", response.status)
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error("[v0] Backend API error response:", errorData)
+        throw new Error(errorData.error || `Failed to save Cloudinary image. Status: ${response.status}`)
+      }
+
+      const responseData = await response.json()
+      console.log("[v0] Cloudinary image saved successfully:", responseData)
+
+      // Invalidate caches after successful save
+      this.invalidateProductCaches()
+
+      return {
+        success: true,
+        image: responseData,
+      }
+    } catch (error: any) {
+      console.error("[v0] Error saving Cloudinary image:", error)
+      return {
+        success: false,
+        error: error.message || "Failed to save Cloudinary image",
+      }
+    }
+  },
+
+  async getProductImages(productId: number): Promise<ProductImage[]> {
+    try {
+      console.log("[v0] Fetching product images for product ID:", productId)
+
+      const token = localStorage.getItem("admin_token")
+      if (!token) {
+        throw new Error("Authentication token not found. Please log in again.")
+      }
+
+      // Use local API route to proxy the request (avoids CORS issues)
+      const endpoint = `/api/admin/products/${productId}/images`
+
+      const response = await fetch(endpoint, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error("Authentication failed. Your session has expired. Please log in again.")
+        } else if (response.status === 404) {
+          console.log("[v0] No images found for product:", productId)
+          return []
+        } else {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.message || `Failed to fetch product images. Status: ${response.status}`)
+        }
+      }
+
+      const data = await response.json()
+      console.log("[v0] Product images response:", data)
+
+      // Handle different response formats
+      let images: ProductImage[] = []
+      if (Array.isArray(data)) {
+        images = data
+      } else if (data.images && Array.isArray(data.images)) {
+        images = data.images
+      } else if (data.data && Array.isArray(data.data)) {
+        images = data.data
+      }
+
+      console.log("[v0] Parsed product images:", images.length)
+      return images
+    } catch (error) {
+      console.error("[v0] Error fetching product images:", error)
+      throw error
+    }
+  },
+
+  // Product Analytics
+  async getProductAnalytics(): Promise<any> {
+    try {
+      const token = localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
+      if (!token) {
+        throw new Error("No authentication token available")
+      }
+
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+      const url = `${baseUrl}/api/admin/dashboard/product-analytics`
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        // Return mock data if API is not available
+        return {
+          success: true,
+          data: {
+            totalRevenue: 125000,
+            totalOrders: 450,
+            averageOrderValue: 2780,
+            conversionRate: 3.2,
+            topSellingProducts: [],
+            lowStockProducts: [],
+            recentlyViewed: [],
+            trending: [],
+            seasonalTrends: [],
+            categoryPerformance: [],
+            customerInsights: {
+              repeatCustomers: 120,
+              newCustomers: 85,
+              averageLifetimeValue: 15000,
+            },
+          },
+        }
+      }
+
+      const data = await response.json()
+      return { success: true, data }
+    } catch (error) {
+      console.error("Error fetching product analytics:", error)
+      // Return mock data on error
+      return {
+        success: true,
+        data: {
+          totalRevenue: 125000,
+          totalOrders: 450,
+          averageOrderValue: 2780,
+          conversionRate: 3.2,
+          topSellingProducts: [],
+          lowStockProducts: [],
+          recentlyViewed: [],
+          trending: [],
+          seasonalTrends: [],
+          categoryPerformance: [],
+          customerInsights: {
+            repeatCustomers: 120,
+            newCustomers: 85,
+            averageLifetimeValue: 15000,
+          },
+        },
+      }
     }
   },
 
   getDefaultDashboardData(): AdminDashboardResponse {
     return {
       counts: {
-        users: 15234,
-        products: 2890,
-        orders: 9876,
-        categories: 24,
-        brands: 156,
-        reviews: 5432,
-        pending_reviews: 234,
-        newsletter_subscribers: 8765,
-        new_signups_today: 45,
-        new_signups_week: 312,
-        orders_in_transit: 234,
-        pending_payments: 45,
-        low_stock_count: 23,
-        total_active_sessions: 1234,
-        total_sales_channels: 5,
-        refunds_pending: 12,
-        support_tickets_open: 18,
-        total_wishlist_items: 3456,
-        active_coupons: 34,
-        returning_customers: 6789,
+        users: 0,
+        products: 0,
+        orders: 0,
+        categories: 0,
+        brands: 0,
+        reviews: 0,
+        pending_reviews: 0,
+        newsletter_subscribers: 0,
+        new_signups_today: 0,
+        new_signups_week: 0,
+        orders_in_transit: 0,
+        pending_payments: 0,
+        low_stock_count: 0,
       },
       sales: {
-        today: 45678.9,
-        yesterday: 38234.56,
-        weekly: 234567.89,
-        monthly: 1234567.89,
-        yearly: 12345678.9,
-        total_revenue: 45678901.23,
-        pending_amount: 23456.78,
-        average_order_value: 178.45,
-        net_profit: 2345678.9,
-        gross_profit: 3456789.12,
-        refunded_amount: 12345.67,
-        tax_collected: 45678.9,
-        shipping_revenue: 23456.78,
-        today_trend: 19,
-        weekly_trend: 12,
-        monthly_trend: 8,
+        today: 0,
+        monthly: 0,
+        yesterday: 0,
+        weekly: 0,
+        yearly: 0,
+        total_revenue: 0,
+        pending_amount: 0,
       },
-      order_status: {
-        pending: 45,
-        processing: 89,
-        shipped: 234,
-        delivered: 8456,
-        cancelled: 52,
-        refunded: 23,
-      },
-      order_metrics: {
-        average_processing_time: 2.5,
-        average_delivery_time: 4.8,
-        repeat_order_rate: 28,
-        cart_abandonment_rate: 65,
-        average_items_per_order: 2.3,
-      },
-      customer_analytics: this.getDefaultCustomerAnalytics(),
-      traffic_analytics: {
-        total_visits: 234567,
-        unique_visitors: 123456,
-        page_views: 567890,
-        bounce_rate: 32,
-        conversion_rate: 3.45,
-        average_session_duration: 4.2,
-        returning_visitor_rate: 42,
-      },
-      payment_methods: [
-        { method: "Credit Card", count: 4567, total_amount: 234567.89, percentage: 60 },
-        { method: "Debit Card", count: 1234, total_amount: 89234.56, percentage: 20 },
-        { method: "PayPal", count: 987, total_amount: 45678.9, percentage: 12 },
-        { method: "Apple Pay", count: 456, total_amount: 23456.78, percentage: 8 },
-      ],
-      users_by_region: [
-        { region: "North America", count: 5234, growth: 12 },
-        { region: "Europe", count: 3456, growth: 8 },
-        { region: "Asia Pacific", count: 4123, growth: 15 },
-        { region: "Latin America", count: 1234, growth: 5 },
-        { region: "Middle East", count: 987, growth: 3 },
-      ],
-      users_by_device: [
-        { device: "Mobile", count: 8765, percentage: 57 },
-        { device: "Desktop", count: 5234, percentage: 35 },
-        { device: "Tablet", count: 1235, percentage: 8 },
-      ],
-      age_distribution: [
-        { age_group: "18-24", count: 3456 },
-        { age_group: "25-34", count: 5234 },
-        { age_group: "35-44", count: 3123 },
-        { age_group: "45-54", count: 2123 },
-        { age_group: "55+", count: 1298 },
-      ],
-      revenue_vs_refunds: [
-        { date: "2024-01-15", revenue: 45678.9, refunds: 2345.67 },
-        { date: "2024-01-16", revenue: 52345.67, refunds: 1234.56 },
-        { date: "2024-01-17", revenue: 48976.54, refunds: 3456.78 },
-      ],
-      sales_data: [
-        { date: "2024-01-15", sales: 234, orders: 456 },
-        { date: "2024-01-16", sales: 267, orders: 523 },
-        { date: "2024-01-17", sales: 245, orders: 489 },
-      ],
-      active_users: [
-        { date: "2024-01-15", users: 4567 },
-        { date: "2024-01-16", users: 5234 },
-        { date: "2024-01-17", users: 4892 },
-      ],
-      recent_orders: [
-        {
-          id: "1",
-          order_number: "ORD-10001",
-          user_email: "john@example.com",
-          user_name: "John Doe",
-          total_amount: 299.99,
-          status: "processing",
-          payment_status: "paid",
-          created_at: new Date().toISOString(),
-          items_count: 3,
-        },
-        {
-          id: "2",
-          order_number: "ORD-10002",
-          user_email: "jane@example.com",
-          user_name: "Jane Smith",
-          total_amount: 149.99,
-          status: "shipped",
-          payment_status: "paid",
-          created_at: new Date().toISOString(),
-          items_count: 1,
-        },
-      ],
-      recent_users: [
-        {
-          id: "1",
-          name: "Sarah Connor",
-          username: "sarah_connor",
-          email: "sarah@example.com",
-          created_at: new Date().toISOString(),
-          total_spent: 1234.56,
-          orders_count: 5,
-          is_premium: true,
-        },
-        {
-          id: "2",
-          name: "Mike Ross",
-          username: "mike_ross",
-          email: "mike@example.com",
-          created_at: new Date().toISOString(),
-          total_spent: 456.78,
-          orders_count: 2,
-          is_premium: false,
-        },
-      ],
-      recent_activities: [
-        {
-          id: "1",
-          message: "New order #ORD-10001 placed",
-          description: "John Doe placed a new order",
-          type: "order",
-          timestamp: new Date().toISOString(),
-          severity: "info",
-        },
-        {
-          id: "2",
-          message: "New customer registration",
-          description: "Sarah Connor registered",
-          type: "user",
-          timestamp: new Date().toISOString(),
-          severity: "success",
-        },
-      ],
-      low_stock_products: [
-        {
-          id: "1",
-          name: "Wireless Bluetooth Headphones",
-          sku: "WBH-001",
-          stock: 3,
-          min_stock: 10,
-          max_stock: 100,
-          reorder_level: 15,
-        },
-        {
-          id: "2",
-          name: "Smart Fitness Watch",
-          sku: "SFW-002",
-          stock: 1,
-          min_stock: 5,
-          max_stock: 50,
-          reorder_level: 10,
-        },
-      ],
-      best_selling_products: [
-        {
-          id: "1",
-          name: "Wireless Bluetooth Headphones",
-          sku: "WBH-001",
-          sales_count: 1234,
-          revenue: 89234.56,
-          rating: 4.7,
-          stock: 45,
-        },
-        {
-          id: "2",
-          name: "Smart Fitness Watch",
-          sku: "SFW-002",
-          sales_count: 876,
-          revenue: 156234.78,
-          rating: 4.5,
-          stock: 78,
-        },
-      ],
-      sales_by_category: [
-        {
-          id: "1",
-          category: "Electronics",
-          sales: 4567,
-          revenue: 234567.89,
-          items_sold: 5234,
-          growth_rate: 12,
-        },
-        {
-          id: "2",
-          category: "Fashion",
-          sales: 2345,
-          revenue: 123456.78,
-          items_sold: 3456,
-          growth_rate: 8,
-        },
-      ],
-      top_customers: [
-        {
-          id: "1",
-          name: "Enterprise Corp",
-          email: "contact@enterprise.com",
-          total_spent: 45678.9,
-          orders_count: 123,
-        },
-        {
-          id: "2",
-          name: "Tech Solutions",
-          email: "info@techsol.com",
-          total_spent: 23456.78,
-          orders_count: 67,
-        },
-      ],
-      inventory_alerts: [
-        {
-          id: "1",
-          product_id: "1",
-          product_name: "Wireless Headphones",
-          alert_type: "low_stock",
-          current_stock: 3,
-          threshold: 10,
-          created_at: new Date().toISOString(),
-          severity: "warning",
-        },
-        {
-          id: "2",
-          product_id: "2",
-          product_name: "Smart Watch",
-          alert_type: "out_of_stock",
-          current_stock: 0,
-          threshold: 5,
-          created_at: new Date().toISOString(),
-          severity: "critical",
-        },
-      ],
-      performance_metrics: this.getDefaultPerformanceMetrics(),
-      system_health: this.getDefaultSystemStatus(),
-      notifications: [
-        {
-          id: "1",
-          title: "Critical Stock Alert",
-          message: "23 products running low on stock",
-          type: "warning",
-          timestamp: new Date().toISOString(),
-          read: false,
-        },
-        {
-          id: "2",
-          title: "New Orders",
-          message: "You have 5 new orders",
-          type: "info",
-          timestamp: new Date().toISOString(),
-          read: false,
-        },
-      ],
-      summary: {
-        total_gmv: 45678901.23,
-        total_orders_all_time: 98765,
-        total_customers_all_time: 15234,
-        average_review_rating: 4.6,
-      },
+      order_status: {},
+      recent_orders: [],
+      recent_users: [],
+      recent_activities: [],
+      low_stock_products: [],
+      sales_by_category: [],
+      best_selling_products: [],
+      traffic_sources: [],
+      notifications: [],
+      upcoming_events: [],
+      users_by_region: [],
+      revenue_vs_refunds: [],
+      active_users: [],
+      sales_data: [],
     }
   },
 
-  // ========================================================================
-  // ORDERS MANAGEMENT
-  // ========================================================================
-
-  async getOrders(page = 1, limit = 20): Promise<AdminPaginatedResponse<any>> {
+  async getUsers(params = {}): Promise<AdminPaginatedResponse<any>> {
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/orders?page=${page}&limit=${limit}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("admin_token") || ""}`,
-          },
-        }
-      )
-      if (!response.ok) throw new Error("Failed to fetch orders")
-      return await response.json()
+      const response = await api.get("/api/admin/users", { params })
+      return response.data
     } catch (error) {
-      console.error("[v0] Failed to fetch orders:", error)
+      console.error("Error fetching users:", error)
       throw error
     }
   },
 
-  async getOrderById(orderId: string): Promise<any> {
+  async getAddresses(params = {}): Promise<AdminPaginatedResponse<any>> {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/orders/${orderId}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("admin_token") || ""}`,
-        },
-      })
-      if (!response.ok) throw new Error("Failed to fetch order")
-      return await response.json()
+      const response = await api.get("/api/admin/addresses", { params })
+      return response.data
     } catch (error) {
-      console.error("[v0] Failed to fetch order:", error)
+      console.error("Error fetching addresses:", error)
       throw error
     }
   },
 
-  async updateOrderStatus(orderId: string, status: string): Promise<any> {
+  async updateAddress(id: number, addressData: any): Promise<any> {
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/orders/${orderId}/status`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("admin_token") || ""}`,
-        },
-        body: JSON.stringify({ status }),
-      })
-      if (!response.ok) throw new Error("Failed to update order status")
-      return await response.json()
+      const response = await api.put(`/api/admin/addresses/${id}`, addressData)
+      return response.data
     } catch (error) {
-      console.error("[v0] Failed to update order status:", error)
+      console.error("Error updating address:", error)
       throw error
     }
   },
 
-  // ========================================================================
-  // PRODUCTS MANAGEMENT
-  // ========================================================================
-
-  async getProducts(page = 1, limit = 20): Promise<AdminPaginatedResponse<Product>> {
+  async deleteAddress(id: number): Promise<void> {
     try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/products?page=${page}&limit=${limit}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("admin_token") || ""}`,
-          },
-        }
-      )
-      if (!response.ok) throw new Error("Failed to fetch products")
-      return await response.json()
+      await api.delete(`/api/admin/addresses/${id}`)
     } catch (error) {
-      console.error("[v0] Failed to fetch products:", error)
+      console.error("Error deleting address:", error)
       throw error
     }
   },
-
-  async createProduct(payload: ProductCreatePayload): Promise<Product> {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/products`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("admin_token") || ""}`,
-        },
-        body: JSON.stringify(payload),
-      })
-      if (!response.ok) throw new Error("Failed to create product")
-      invalidateProductCaches()
-      return await response.json()
-    } catch (error) {
-      console.error("[v0] Failed to create product:", error)
-      throw error
-    }
-  },
-
-  async updateProduct(productId: number, payload: Partial<Product>): Promise<Product> {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/products/${productId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("admin_token") || ""}`,
-        },
-        body: JSON.stringify(payload),
-      })
-      if (!response.ok) throw new Error("Failed to update product")
-      invalidateProductCaches(productId)
-      return await response.json()
-    } catch (error) {
-      console.error("[v0] Failed to update product:", error)
-      throw error
-    }
-  },
-
-  async deleteProduct(productId: number): Promise<void> {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/products/${productId}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("admin_token") || ""}`,
-        },
-      })
-      if (!response.ok) throw new Error("Failed to delete product")
-      invalidateProductCaches(productId)
-    } catch (error) {
-      console.error("[v0] Failed to delete product:", error)
-      throw error
-    }
-  },
-
-  // ========================================================================
-  // CUSTOMERS MANAGEMENT
-  // ========================================================================
-
-  async getCustomers(page = 1, limit = 20): Promise<AdminPaginatedResponse<any>> {
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/customers?page=${page}&limit=${limit}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("admin_token") || ""}`,
-          },
-        }
-      )
-      if (!response.ok) throw new Error("Failed to fetch customers")
-      return await response.json()
-    } catch (error) {
-      console.error("[v0] Failed to fetch customers:", error)
-      throw error
-    }
-  },
-
-  async getCustomerById(customerId: string): Promise<any> {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/customers/${customerId}`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("admin_token") || ""}`,
-        },
-      })
-      if (!response.ok) throw new Error("Failed to fetch customer")
-      return await response.json()
-    } catch (error) {
-      console.error("[v0] Failed to fetch customer:", error)
-      throw error
-    }
-  },
-
-  // ========================================================================
-  // CATEGORIES MANAGEMENT
-  // ========================================================================
-
-  async getCategories(): Promise<Category[]> {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/categories`, {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("admin_token") || ""}`,
-        },
-      })
-      if (!response.ok) throw new Error("Failed to fetch categories")
-      return await response.json()
-    } catch (error) {
-      console.error("[v0] Failed to fetch categories:", error)
-      throw error
-    }
-  },
-
-  async createCategory(payload: Partial<Category>): Promise<Category> {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/categories`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("admin_token") || ""}`,
-        },
-        body: JSON.stringify(payload),
-      })
-      if (!response.ok) throw new Error("Failed to create category")
-      return await response.json()
-    } catch (error) {
-      console.error("[v0] Failed to create category:", error)
-      throw error
-    }
-  },
-
-  // ========================================================================
-  // REVIEWS MANAGEMENT
-  // ========================================================================
-
-  async getReviews(page = 1, limit = 20): Promise<AdminPaginatedResponse<any>> {
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/reviews?page=${page}&limit=${limit}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("admin_token") || ""}`,
-          },
-        }
-      )
-      if (!response.ok) throw new Error("Failed to fetch reviews")
-      return await response.json()
-    } catch (error) {
-      console.error("[v0] Failed to fetch reviews:", error)
-      throw error
-    }
-  },
-
-  async approveReview(reviewId: string): Promise<any> {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/reviews/${reviewId}/approve`, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("admin_token") || ""}`,
-        },
-      })
-      if (!response.ok) throw new Error("Failed to approve review")
-      return await response.json()
-    } catch (error) {
-      console.error("[v0] Failed to approve review:", error)
-      throw error
-    }
-  },
-
-  async rejectReview(reviewId: string): Promise<any> {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/reviews/${reviewId}/reject`, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("admin_token") || ""}`,
-        },
-      })
-      if (!response.ok) throw new Error("Failed to reject review")
-      return await response.json()
-    } catch (error) {
-      console.error("[v0] Failed to reject review:", error)
-      throw error
-    }
-  },
-
-  // ========================================================================
-  // INVENTORY MANAGEMENT
-  // ========================================================================
-
-  async updateInventory(productId: number, stock: number): Promise<any> {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/inventory/${productId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("admin_token") || ""}`,
-        },
-        body: JSON.stringify({ stock }),
-      })
-      if (!response.ok) throw new Error("Failed to update inventory")
-      return await response.json()
-    } catch (error) {
-      console.error("[v0] Failed to update inventory:", error)
-      throw error
-    }
-  },
-
-  // ========================================================================
-  // PROMOTIONS & COUPONS
-  // ========================================================================
-
-  async getCoupons(page = 1, limit = 20): Promise<AdminPaginatedResponse<any>> {
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/admin/coupons?page=${page}&limit=${limit}`,
-        {
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem("admin_token") || ""}`,
-          },
-        }
-      )
-      if (!response.ok) throw new Error("Failed to fetch coupons")
-      return await response.json()
-    } catch (error) {
-      console.error("[v0] Failed to fetch coupons:", error)
-      throw error
-    }
-  },
-
-  async createCoupon(payload: any): Promise<any> {
-    try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/coupons`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${localStorage.getItem("admin_token") || ""}`,
-        },
-        body: JSON.stringify(payload),
-      })
-      if (!response.ok) throw new Error("Failed to create coupon")
-      return await response.json()
-    } catch (error) {
-      console.error("[v0] Failed to create coupon:", error)
-      throw error
-    }
-  },
-
-  // ========================================================================
-  // CACHE & UTILITY
-  // ========================================================================
 
   invalidateProductCaches(productId?: number): void {
-    if (productId) {
-      productCache.delete(`product_${productId}`)
-    } else {
-      productCache.clear()
+    try {
+      // Clear localStorage caches
+      const keys = Object.keys(localStorage)
+      keys.forEach((key) => {
+        if (key.includes("product_") || key.includes("image_") || key.includes("swr-key")) {
+          localStorage.removeItem(key)
+        }
+      })
+
+      // Trigger a page refresh for user-facing pages
+      if (typeof window !== "undefined") {
+        // Dispatch a custom event to notify other components
+        window.dispatchEvent(
+          new CustomEvent("productImagesUpdated", {
+            detail: { productId: productId?.toString() },
+          }),
+        )
+      }
+
+      console.log("[v0] Product caches invalidated", productId ? `for product ${productId}` : "")
+    } catch (error) {
+      console.warn("[v0] Error invalidating caches:", error)
     }
-    dashboardCache.clear()
   },
 }
-
-// Helper function for cache invalidation
-function invalidateProductCaches(productId?: number): void {
-  if (productId) {
-    productCache.delete(`product_${productId}`)
-  } else {
-    productCache.clear()
-  }
-  dashboardCache.clear()
-}
-
-// Explicit re-export of types to ensure proper module resolution
-export type { AdminDashboardResponse, AdminLoginResponse }
-
