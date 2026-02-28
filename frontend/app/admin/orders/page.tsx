@@ -1,31 +1,26 @@
-import { Suspense } from "react"
-import OrdersPageContent from "./orders-page-content"
-import { fetchOrdersSSR } from "./actions"
+import OrdersDisplay from "./orders-display"
+import { getAdminOrders } from "@/lib/server/get-admin-orders"
 
 /**
  * Orders management page - Server-Side Rendered
- * Fetches data server-side using cookies for authentication
+ * Fetches data on the server and renders instantly without loaders
  */
 export const metadata = {
   title: "Order Management | Mizizzi Admin",
   description: "Manage and track all customer orders",
 }
 
-async function OrdersContent() {
-  // Fetch orders server-side
-  const initialData = await fetchOrdersSSR({
+export const revalidate = 30 // Revalidate every 30 seconds
+
+export default async function OrdersPage() {
+  // Fetch orders server-side - this happens during SSR
+  const ordersData = await getAdminOrders({
     page: 1,
     per_page: 20,
   })
 
-  return <OrdersPageContent initialData={initialData} />
-}
-
-export default function OrdersPage() {
-  return (
-    <Suspense fallback={<div className="p-6">Loading orders...</div>}>
-      <OrdersContent />
-    </Suspense>
-  )
+  // Pass pre-fetched data to client component
+  // No loading spinners needed since data is already here
+  return <OrdersDisplay initialData={ordersData} />
 }
 
