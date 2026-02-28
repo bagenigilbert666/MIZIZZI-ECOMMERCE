@@ -231,7 +231,7 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
           <AdminProvider>
             <SessionManager>
               <AdminLayoutWrapper>
-                <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-50 antialiased">
+                <div className="min-h-screen bg-white text-slate-900 antialiased">
                   <AdminSidebar isCollapsed={isSidebarCollapsed} toggleSidebar={toggleSidebar} />
                   <div
                     className={cn(
