@@ -1064,7 +1064,7 @@ const StatCard = ({
   const TrendIcon = trend === "up" ? ArrowUpRight : trend === "down" ? ArrowDownRight : Activity
 
   return (
-    <Card className="border-0 shadow-sm bg-white hover:shadow-md transition-shadow">
+    <Card className="admin-glass-card border-0 shadow-sm">
       <CardContent className="p-6">
         <div className="flex items-center justify-between">
           <div className="space-y-2">
@@ -1304,9 +1304,9 @@ export default function AdminDashboard() {
           </div>
         ) : (
           <div className="space-y-6">
-            <Card className="border-0 shadow-xl bg-white/90 backdrop-blur-sm overflow-hidden">
+            <Card className="admin-glass-lg border-0 shadow-xl overflow-hidden">
               <CardHeader className="pb-8 bg-gradient-to-r from-gray-50 via-white to-gray-50/80">
-                <CardTitle className="text-2xl font-bold text-gray-900 flex items-center gap-4 tracking-tight">
+                <CardTitle className="text-2xl font-bold text-white flex items-center gap-4 tracking-tight">
                   <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl shadow-xl shadow-blue-500/30">
                     <Zap className="h-7 w-7 text-white" />
                   </div>
@@ -1520,7 +1520,7 @@ export default function AdminDashboard() {
                   </Card>
 
                   {/* Recent Activity */}
-                  <Card className="border-0 shadow-sm bg-white">
+                  <Card className="admin-glass-card border-0 shadow-sm">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2 text-xl font-bold">
                         <Activity className="h-6 w-6 text-green-600" />
@@ -1567,7 +1567,7 @@ export default function AdminDashboard() {
               {/* Sales Tab */}
               <TabsContent value="sales" className="space-y-4">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <Card className="border-0 shadow-sm bg-white">
+                  <Card className="admin-glass-card border-0 shadow-sm">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <DollarSign className="h-5 w-5 text-green-600" />
@@ -1593,7 +1593,7 @@ export default function AdminDashboard() {
                     </CardContent>
                   </Card>
 
-                  <Card className="border-0 shadow-sm bg-white">
+                  <Card className="admin-glass-card border-0 shadow-sm">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <BarChart3 className="h-5 w-5 text-blue-600" />
@@ -1625,7 +1625,7 @@ export default function AdminDashboard() {
 
                 {/* Additional Sales Metrics */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                  <Card className="border-0 shadow-sm bg-white">
+                  <Card className="admin-glass-card border-0 shadow-sm">
                     <CardContent className="p-4">
                       <div className="text-center">
                         <p className="text-sm text-gray-600">Avg Order Value</p>
@@ -1634,7 +1634,7 @@ export default function AdminDashboard() {
                       </div>
                     </CardContent>
                   </Card>
-                  <Card className="border-0 shadow-sm bg-white">
+                  <Card className="admin-glass-card border-0 shadow-sm">
                     <CardContent className="p-4">
                       <div className="text-center">
                         <p className="text-sm text-gray-600">Conversion Rate</p>
@@ -1643,7 +1643,7 @@ export default function AdminDashboard() {
                       </div>
                     </CardContent>
                   </Card>
-                  <Card className="border-0 shadow-sm bg-white">
+                  <Card className="admin-glass-card border-0 shadow-sm">
                     <CardContent className="p-4">
                       <div className="text-center">
                         <p className="text-sm text-gray-600">Cart Abandonment</p>
@@ -1652,7 +1652,7 @@ export default function AdminDashboard() {
                       </div>
                     </CardContent>
                   </Card>
-                  <Card className="border-0 shadow-sm bg-white">
+                  <Card className="admin-glass-card border-0 shadow-sm">
                     <CardContent className="p-4">
                       <div className="text-center">
                         <p className="text-sm text-gray-600">Return Rate</p>
@@ -1667,7 +1667,7 @@ export default function AdminDashboard() {
               {/* Products Tab */}
               <TabsContent value="products" className="space-y-4">
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                  <Card className="border-0 shadow-sm bg-white">
+                  <Card className="admin-glass-card border-0 shadow-sm">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Package className="h-5 w-5 text-blue-600" />
@@ -1702,7 +1702,7 @@ export default function AdminDashboard() {
                   </Card>
 
                   {/* Carousel/Deal Sections */}
-                  <Card className="border-0 shadow-sm bg-white">
+                  <Card className="admin-glass-card border-0 shadow-sm">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Zap className="h-5 w-5 text-yellow-600" />
@@ -1751,7 +1751,7 @@ export default function AdminDashboard() {
                       </div>
                     </CardContent>
                   </Card>
-                  <Card className="border-0 shadow-sm bg-white">
+                  <Card className="admin-glass-card border-0 shadow-sm">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <AlertTriangle className="h-5 w-5 text-red-600" />
@@ -1795,7 +1795,7 @@ export default function AdminDashboard() {
               {/* Customers Tab */}
               <TabsContent value="customers" className="space-y-4">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                  <Card className="border-0 shadow-sm bg-white">
+                  <Card className="admin-glass-card border-0 shadow-sm">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Users className="h-5 w-5 text-purple-600" />
@@ -1852,7 +1852,7 @@ export default function AdminDashboard() {
                     </CardContent>
                   </Card>
 
-                  <Card className="border-0 shadow-sm bg-white">
+                  <Card className="admin-glass-card border-0 shadow-sm">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <BarChart3 className="h-5 w-5 text-green-600" />
@@ -1910,7 +1910,7 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* Customer Segments */}
-                <Card className="border-0 shadow-sm bg-white">
+                <Card className="admin-glass-card border-0 shadow-sm">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Target className="h-5 w-5 text-purple-600" />
@@ -1940,7 +1940,7 @@ export default function AdminDashboard() {
               {/* Orders Tab */}
               <TabsContent value="orders" className="space-y-4">
                 <div className="grid grid-cols-1 gap-4">
-                  <Card className="border-0 shadow-sm bg-white">
+                  <Card className="admin-glass-card border-0 shadow-sm">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <ShoppingCart className="h-5 w-5 text-blue-600" />
@@ -2011,7 +2011,7 @@ export default function AdminDashboard() {
                 {/* Order Status Summary */}
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
                   {Object.entries(data.order_status).map(([status, count]) => (
-                    <Card key={status} className="border-0 shadow-sm bg-white">
+                    <Card key={status} className="admin-glass-card border-0 shadow-sm">
                       <CardContent className="p-4">
                         <div className="text-center">
                           <p className="text-sm text-gray-600 capitalize">{status}</p>
@@ -2058,7 +2058,7 @@ export default function AdminDashboard() {
               <TabsContent value="analytics" className="space-y-4">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                   {/* Traffic Sources */}
-                  <Card className="border-0 shadow-sm bg-white">
+                  <Card className="admin-glass-card border-0 shadow-sm">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Globe className="h-5 w-5 text-blue-600" />
@@ -2086,7 +2086,7 @@ export default function AdminDashboard() {
                   </Card>
 
                   {/* Device Analytics */}
-                  <Card className="border-0 shadow-sm bg-white">
+                  <Card className="admin-glass-card border-0 shadow-sm">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Monitor className="h-5 w-5 text-purple-600" />
@@ -2120,7 +2120,7 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* Geographic Data */}
-                <Card className="border-0 shadow-sm bg-white">
+                <Card className="admin-glass-card border-0 shadow-sm">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <MapPin className="h-5 w-5 text-green-600" />
@@ -2145,7 +2145,7 @@ export default function AdminDashboard() {
                 </Card>
 
                 {/* Browser Analytics */}
-                <Card className="border-0 shadow-sm bg-white">
+                <Card className="admin-glass-card border-0 shadow-sm">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Chrome className="h-5 w-5 text-orange-600" />

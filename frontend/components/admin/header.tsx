@@ -327,16 +327,16 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
           <Link
             key={`${result.type}-${result.id}`}
             href={result.href}
-            className="flex items-center gap-3 rounded-xl p-3 hover:bg-white/60 dark:hover:bg-gray-800/60 backdrop-blur-sm transition-all duration-200"
+            className="flex items-center gap-3 rounded-xl p-3 hover:bg-white/10 dark:hover:bg-white/10 backdrop-blur-sm transition-all duration-200"
           >
             <div
               className={cn(
                 "flex h-8 w-8 items-center justify-center rounded-lg backdrop-blur-sm",
                 result.type === "product"
-                  ? "bg-blue-100/80 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400"
+                  ? "bg-blue-500/30 text-blue-400 dark:bg-blue-500/30 dark:text-blue-400"
                   : result.type === "order"
-                    ? "bg-purple-100/80 text-purple-600 dark:bg-purple-900/50 dark:text-purple-400"
-                    : "bg-green-100/80 text-green-600 dark:bg-green-900/50 dark:text-green-400",
+                    ? "bg-purple-500/30 text-purple-400 dark:bg-purple-500/30 dark:text-purple-400"
+                    : "bg-green-500/30 text-green-400 dark:bg-green-500/30 dark:text-green-400",
               )}
             >
               {result.type === "product" ? (
@@ -348,16 +348,16 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
               )}
             </div>
             <div className="flex-1">
-              <div className="text-sm font-medium text-gray-900 dark:text-gray-100">{result.title}</div>
-              <div className="text-xs text-gray-500 dark:text-gray-400">{result.subtitle}</div>
+              <div className="text-sm font-medium text-white dark:text-white">{result.title}</div>
+              <div className="text-xs text-white/60 dark:text-white/60">{result.subtitle}</div>
             </div>
           </Link>
         ))}
-        <div className="mt-2 pt-2 border-t border-gray-200/50 dark:border-gray-800/50">
+        <div className="mt-2 pt-2 border-t border-white/10 dark:border-white/10">
           <Button
             variant="ghost"
             size="sm"
-            className="w-full text-xs justify-center text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 rounded-lg"
+            className="w-full text-xs justify-center text-orange-400 hover:text-orange-300 dark:text-orange-400 dark:hover:text-orange-300 rounded-lg hover:bg-orange-500/20"
             onClick={() => router.push(`/admin/search?q=${encodeURIComponent(searchQuery)}`)}
           >
             View all results
@@ -371,9 +371,8 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
     <motion.header
       className={cn(
         "sticky top-0 z-30 flex h-16 items-center gap-2 px-4 md:px-6 shadow-lg",
-        "bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl",
-        "border-b border-gray-200/50 dark:border-gray-800/50",
-        "shadow-gray-900/5 dark:shadow-black/20",
+        "admin-glass-lg border-b border-white/10",
+        "shadow-black/20",
       )}
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
@@ -386,9 +385,9 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
             size="icon"
             className={cn(
               "md:hidden rounded-xl",
-              "text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400",
-              "hover:bg-white/60 dark:hover:bg-gray-800/60 backdrop-blur-sm",
-              "border border-transparent hover:border-white/20 dark:hover:border-gray-700/50",
+              "text-orange-400 hover:text-orange-300 dark:text-orange-400 dark:hover:text-orange-300",
+              "hover:bg-orange-500/20 dark:hover:bg-orange-500/20 backdrop-blur-sm",
+              "border border-transparent hover:border-orange-400/30 dark:hover:border-orange-400/30",
             )}
             onClick={toggleSidebar}
           >
@@ -402,9 +401,9 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
             size="icon"
             className={cn(
               "hidden md:flex rounded-xl",
-              "text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400",
-              "hover:bg-white/60 dark:hover:bg-gray-800/60 backdrop-blur-sm",
-              "border border-transparent hover:border-white/20 dark:hover:border-gray-700/50",
+              "text-orange-400 hover:text-orange-300 dark:text-orange-400 dark:hover:text-orange-300",
+              "hover:bg-orange-500/20 dark:hover:bg-orange-500/20 backdrop-blur-sm",
+              "border border-transparent hover:border-orange-400/30 dark:hover:border-orange-400/30",
             )}
             onClick={toggleSidebar}
           >
@@ -422,7 +421,7 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
       )}
 
       {/* Breadcrumbs - Hidden on mobile */}
-      <div className="hidden md:flex items-center space-x-1 text-sm text-gray-500 dark:text-gray-400 ml-2">
+      <div className="hidden md:flex items-center space-x-1 text-sm text-white/60 dark:text-white/60 ml-2">
         {breadcrumbs.map((crumb, i) => (
           <motion.div
             key={i}
@@ -431,15 +430,15 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: i * 0.1, duration: 0.2 }}
           >
-            {i > 0 && <ChevronRight className="h-3 w-3 mx-1 text-gray-300 dark:text-gray-600" />}
+            {i > 0 && <ChevronRight className="h-3 w-3 mx-1 text-white/40" />}
             <Link
               href={crumb.href}
               className={cn(
-                "hover:text-blue-600 dark:hover:text-blue-400 transition-all duration-200 px-2 py-1 rounded-lg",
-                "hover:bg-white/40 dark:hover:bg-gray-800/40 backdrop-blur-sm",
+                "hover:text-orange-400 dark:hover:text-orange-400 transition-all duration-200 px-2 py-1 rounded-lg",
+                "hover:bg-white/10 dark:hover:bg-white/10 backdrop-blur-sm",
                 i === breadcrumbs.length - 1
-                  ? "font-medium text-gray-700 dark:text-gray-300 bg-white/30 dark:bg-gray-800/30"
-                  : "text-gray-500 dark:text-gray-400",
+                  ? "font-medium text-white/80 dark:text-white/80 bg-white/10 dark:bg-white/10"
+                  : "text-white/60 dark:text-white/60",
               )}
             >
               {crumb.label}
@@ -458,9 +457,9 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
                   size="icon"
                   className={cn(
                     "md:hidden rounded-xl",
-                    "text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400",
-                    "hover:bg-white/60 dark:hover:bg-gray-800/60 backdrop-blur-sm",
-                    "border border-transparent hover:border-white/20 dark:hover:border-gray-700/50",
+                    "text-orange-400 hover:text-orange-300 dark:text-orange-400 dark:hover:text-orange-300",
+                    "hover:bg-orange-500/20 dark:hover:bg-orange-500/20 backdrop-blur-sm",
+                    "border border-transparent hover:border-orange-400/30 dark:hover:border-orange-400/30",
                   )}
                 >
                   <Search className="h-5 w-5" />
@@ -471,21 +470,20 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
               side="top"
               className={cn(
                 "pt-12",
-                "bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl",
-                "border-b border-gray-200/50 dark:border-gray-800/50",
+                "admin-glass-lg border-b border-white/10",
               )}
             >
               <form onSubmit={handleSearch} className="w-full">
                 <div className="relative w-full">
-                  <Search className="absolute left-3 top-1/2 h-4 w-4 text-gray-400 dark:text-gray-500 -translate-y-1/2" />
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 text-white/40 -translate-y-1/2" />
                   <Input
                     type="search"
                     placeholder="Search products, orders, customers..."
                     className={cn(
                       "w-full pl-10 rounded-xl",
-                      "bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm",
-                      "border-gray-200/50 dark:border-gray-700/50",
-                      "focus-visible:ring-blue-500/20 focus-visible:border-blue-500/50",
+                      "admin-glass-sm border-white/10",
+                      "text-white placeholder:text-white/40",
+                      "focus-visible:ring-orange-500/20 focus-visible:border-orange-500/50",
                     )}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -505,16 +503,16 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
         >
           <form onSubmit={handleSearch} className="w-full">
             <div className="relative w-full">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 text-gray-400 dark:text-gray-500 -translate-y-1/2" />
+              <Search className="absolute left-3 top-1/2 h-4 w-4 text-white/40 -translate-y-1/2" />
               <Input
                 type="search"
                 placeholder="Search products, orders, customers..."
                 className={cn(
                   "w-full pl-10 rounded-xl transition-all duration-300",
-                  "bg-white/60 dark:bg-gray-800/60 backdrop-blur-sm",
-                  "border-gray-200/50 dark:border-gray-700/50",
-                  "focus-visible:ring-blue-500/20 focus-visible:border-blue-500/50",
-                  "focus-visible:bg-white/80 dark:focus-visible:bg-gray-800/80",
+                  "admin-glass-sm border-white/10",
+                  "text-white placeholder:text-white/40",
+                  "focus-visible:ring-orange-500/20 focus-visible:border-orange-500/50",
+                  "focus-visible:bg-white/10 dark:focus-visible:bg-white/10",
                 )}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -525,8 +523,7 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
                 <motion.div
                   className={cn(
                     "absolute top-full left-0 right-0 mt-2 rounded-xl shadow-xl z-50",
-                    "bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl",
-                    "border border-gray-200/50 dark:border-gray-800/50",
+                    "admin-glass-lg border border-white/10",
                   )}
                   initial={{ opacity: 0, y: -10, scale: 0.95 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -543,7 +540,7 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
 
       {/* Date and Time - Hidden on mobile */}
       <motion.div
-        className="hidden md:flex items-center gap-2 text-gray-500 dark:text-gray-400 px-3 py-2 rounded-xl bg-white/30 dark:bg-gray-800/30 backdrop-blur-sm"
+        className="hidden md:flex items-center gap-2 text-white/60 dark:text-white/60 px-3 py-2 rounded-xl admin-glass-sm border border-white/10"
         initial={{ opacity: 0, x: 20 }}
         animate={{ opacity: 1, x: 0 }}
         transition={{ delay: 0.2, duration: 0.3 }}
@@ -566,15 +563,15 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
                         size="icon"
                         className={cn(
                           "rounded-xl",
-                          "text-gray-500 hover:text-green-600 dark:text-gray-400 dark:hover:text-green-400",
-                          "hover:bg-white/60 dark:hover:bg-gray-800/60 backdrop-blur-sm",
-                          "border border-transparent hover:border-white/20 dark:hover:border-gray-700/50",
+                          "text-green-400 hover:text-green-300 dark:text-green-400 dark:hover:text-green-300",
+                          "hover:bg-green-500/20 dark:hover:bg-green-500/20 backdrop-blur-sm",
+                          "border border-transparent hover:border-green-400/30 dark:hover:border-green-400/30",
                         )}
                       >
                         {isOnline ? (
-                          <Wifi className="h-4 w-4 text-green-500" />
+                          <Wifi className="h-4 w-4 text-green-400" />
                         ) : (
-                          <WifiOff className="h-4 w-4 text-red-500" />
+                          <WifiOff className="h-4 w-4 text-red-400" />
                         )}
                       </Button>
                     </motion.div>
@@ -582,22 +579,21 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
                   <PopoverContent
                     className={cn(
                       "w-80",
-                      "bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl",
-                      "border border-gray-200/50 dark:border-gray-800/50 shadow-xl",
+                      "admin-glass-lg border border-white/10 shadow-xl",
                     )}
                     align="end"
                   >
                     <div className="space-y-4">
                       <div className="flex items-center justify-between">
-                        <h4 className="font-medium text-sm">System Status</h4>
-                        <Button variant="ghost" size="sm" className="h-8 text-xs rounded-lg">
+                        <h4 className="font-medium text-sm text-white">System Status</h4>
+                        <Button variant="ghost" size="sm" className="h-8 text-xs rounded-lg text-orange-400 hover:bg-orange-500/20">
                           <RefreshCw className="h-3 w-3 mr-1" />
                           Refresh
                         </Button>
                       </div>
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="text-sm text-gray-500 dark:text-gray-400">API</span>
+                          <span className="text-sm text-white/70 dark:text-white/70">API</span>
                           <div className="flex items-center">
                             <span
                               className={`h-2 w-2 rounded-full mr-2 ${getSystemStatusColor(systemStatus.api)}`}

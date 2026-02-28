@@ -184,6 +184,38 @@ body {
     --chart-4: 280 65% 60%;
     --chart-5: 340 75% 55%;
   }
+
+  /* Apple-inspired dark theme for admin */
+  .dark.admin-dark {
+    --color-background: #0a0a0a;
+    --color-card-bg: #0a0a0a;
+    --color-surface: #1a1a1a;
+    --color-text-primary: #f5f5f5;
+    --color-text-secondary: #a0a0a0;
+    --color-text-on-primary: #f5f5f5;
+    --color-border: rgba(255, 255, 255, 0.08);
+    --color-divider: rgba(255, 255, 255, 0.06);
+    --color-button-primary-bg: #FF8A00;
+    --color-button-primary-text: #ffffff;
+    --color-button-primary-hover: #ff9920;
+    --color-button-secondary-bg: rgba(255, 255, 255, 0.1);
+    --color-button-secondary-text: #f5f5f5;
+    --color-success: #34c759;
+    --color-warning: #ff9500;
+    --color-error: #ff3b30;
+    --color-info: #0a84ff;
+    --color-header-bg: rgba(20, 20, 20, 0.8);
+    --color-header-text: #f5f5f5;
+    --color-footer-bg: #0a0a0a;
+    --color-footer-text: #a0a0a0;
+    --color-link: #FF8A00;
+    --color-link-hover: #ff9920;
+    --color-badge-bg: #FF8A00;
+    --color-badge-text: #ffffff;
+    --color-nav-bg: rgba(255, 255, 255, 0.05);
+    --color-nav-text: #f5f5f5;
+    --color-nav-active: #FF8A00;
+  }
 }
 
 @layer base {
@@ -1383,6 +1415,73 @@ body {
   .feature-card::before {
     background: rgba(139, 0, 0, 0.15);
   }
+}
+
+/* Admin Liquid Glass Effects - iOS 26 Inspired Dark Theme */
+.admin-glass-card {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 20px;
+  transition: all 0.3s cubic-bezier(0.23, 1, 0.320, 1);
+}
+
+.admin-glass-card:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.18);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+}
+
+.admin-glass-sm {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px) saturate(180%);
+  -webkit-backdrop-filter: blur(10px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  transition: all 0.2s ease-out;
+}
+
+.admin-glass-sm:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.admin-glass-lg {
+  background: rgba(255, 255, 255, 0.10);
+  backdrop-filter: blur(30px) saturate(200%);
+  -webkit-backdrop-filter: blur(30px) saturate(200%);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 24px;
+}
+
+/* Admin button with orange accent */
+.admin-button-orange {
+  background: linear-gradient(135deg, #FF8A00 0%, #ff9920 100%);
+  color: white;
+  border: none;
+  font-weight: 600;
+  transition: all 0.2s ease-out;
+  box-shadow: 0 4px 15px rgba(255, 138, 0, 0.3);
+}
+
+.admin-button-orange:hover {
+  background: linear-gradient(135deg, #ff9920 0%, #ffb347 100%);
+  box-shadow: 0 8px 25px rgba(255, 138, 0, 0.4);
+  transform: translateY(-2px);
+}
+
+.admin-button-orange:active {
+  transform: translateY(0);
+}
+
+/* Admin gradient background */
+.admin-gradient-bg {
+  background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #0f3460 100%);
+}
+
+.admin-gradient-subtle {
+  background: linear-gradient(135deg, #0a0a0a 0%, #161627 100%);
 }
 
 /* Print styles */

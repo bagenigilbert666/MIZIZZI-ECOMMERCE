@@ -212,7 +212,7 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
   // If on login page, render without admin layout
   if (isLoginPage) {
     return (
-      <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+      <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
         <TooltipProvider>
           <AdminAuthProvider>{children}</AdminAuthProvider>
         </TooltipProvider>
@@ -225,13 +225,13 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
   }
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
+    <ThemeProvider attribute="class" defaultTheme="dark" enableSystem>
       <TooltipProvider>
         <AdminAuthProvider>
           <AdminProvider>
             <SessionManager>
               <AdminLayoutWrapper>
-                <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-50 antialiased">
+                <div className="min-h-screen admin-gradient-bg text-slate-200 antialiased dark">
                   <AdminSidebar isCollapsed={isSidebarCollapsed} toggleSidebar={toggleSidebar} />
                   <div
                     className={cn(
