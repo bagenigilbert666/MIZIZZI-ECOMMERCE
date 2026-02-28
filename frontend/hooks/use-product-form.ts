@@ -7,6 +7,7 @@ import * as z from "zod"
 import { adminService } from "@/services/admin"
 import { generateSlug } from "@/lib/utils"
 import type { Product, ProductVariant } from "@/types"
+import { updateProductAction } from "@/app/admin/products/[id]/edit/actions"
 
 // Helper function to validate product IDs
 function isValidProductId(id: string | undefined): boolean {
@@ -208,11 +209,11 @@ export function useProductForm({ productId, onSuccess, onError }: UseProductForm
     [setValue],
   )
 
-  // Handle form submission
+  // Handle form submission with SSR via Server Action
   const handleSubmit = async (data: ProductFormValues) => {
     try {
       setIsSubmitting(true)
-      console.log("Form submission started with data:", data)
+      console.log("[v0] Form submission via Server Action:", data)
 
       // Prepare product data for submission
       const productData = {
@@ -227,15 +228,16 @@ export function useProductForm({ productId, onSuccess, onError }: UseProductForm
         productData.brand_id = null
       }
 
-      console.log("Submitting product data:", productData)
+      console.log("[v0] Submitting to Server Action:", productData)
 
-      // Update the product
-      try {
-        const updatedProduct = await adminService.updateProduct(productId, productData)
-        console.log("Product updated successfully:", updatedProduct)
+      // Call Server Action for instant SSR updates with cache revalidation
+      const result = await updateProductAction(productId, productData)
+
+      if (result.success) {
+        console.log("[v0] Server Action success - data is instantly live", result.data)
 
         // Call the success callback
-        onSuccess(updatedProduct)
+        onSuccess(result.data)
 
         // Update local storage to track last saved time
         try {
@@ -243,22 +245,11 @@ export function useProductForm({ productId, onSuccess, onError }: UseProductForm
         } catch (storageError) {
           console.warn("Could not save to localStorage:", storageError)
         }
-      } catch (updateError: any) {
-        console.error("Error during product update:", updateError)
-        
-        // Don't trigger auth error for 401 - the API request will handle retry
-        // with refreshed token if needed. Keep user on the page so they don't lose work.
-        if (updateError.response?.status === 401) {
-          // Let the API error handler in adminService deal with token refresh
-          throw new Error("Session verification required. Please try saving again.")
-        }
-        if (updateError.message && updateError.message.includes("Authentication")) {
-          throw new Error("Session verification failed. Please check your connection and try again.")
-        }
-        throw updateError
+      } else {
+        throw new Error(result.error || "Failed to update product")
       }
     } catch (error: any) {
-      console.error("Failed to update product:", error)
+      console.error("[v0] Server Action error:", error)
       const errorMessage = error.message || "There was a problem updating the product. Please try again."
       onError(errorMessage)
     } finally {

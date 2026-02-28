@@ -28,12 +28,11 @@ import { useProductForm } from "@/hooks/use-product-form"
 import type { Product } from "@/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { websocketService } from "@/services/websocket"
-// Update imports at the top of the file to include our new hooks
 import { useProduct, useProductImages, useCategories, useBrands } from "@/hooks/use-swr-product"
 import { FormProvider } from "react-hook-form"
-// Add import for NetworkDetector
 import { NetworkDetector } from "@/components/network-detector"
 import { productService } from "@/services/product"
+import { updateProductAction, deleteProductImageAction, uploadProductImagesAction } from "./actions"
 
 // Function to check if productId is a valid number
 const isValidProductId = (productId: string): boolean => {
