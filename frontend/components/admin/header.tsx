@@ -368,13 +368,14 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
         "sticky top-0 z-30 flex h-14 md:h-16 items-center gap-1 sm:gap-2 px-2 sm:px-4 md:px-6 shadow-lg",
         "bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-800",
         "shadow-gray-900/5 dark:shadow-black/20",
+        "admin-header-motion",
       )}
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
-      transition={{ duration: 0.3 }}
+      transition={{ duration: 0.25 }}
     >
       {isMobile ? (
-        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+        <motion.div whileHover={{ y: -1 }} whileTap={{ y: 0 }}>
           <Button
             variant="ghost"
             size="icon"
@@ -382,6 +383,7 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
               "md:hidden rounded-lg h-8 w-8 sm:h-9 sm:w-9",
               "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100",
               "hover:bg-gray-100 dark:hover:bg-gray-800",
+              "transition-colors duration-150",
             )}
             onClick={toggleSidebar}
           >
@@ -389,7 +391,7 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
           </Button>
         </motion.div>
       ) : (
-        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+        <motion.div whileHover={{ y: -1 }} whileTap={{ y: 0 }}>
           <Button
             variant="ghost"
             size="icon"
@@ -397,15 +399,16 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
               "hidden md:flex rounded-lg h-8 w-8 sm:h-9 sm:w-9",
               "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100",
               "hover:bg-gray-100 dark:hover:bg-gray-800",
+              "transition-colors duration-150",
             )}
             onClick={toggleSidebar}
           >
             {isSidebarCollapsed ? (
-              <motion.div initial={{ rotate: -180 }} animate={{ rotate: 0 }} transition={{ duration: 0.3 }}>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }}>
                 <Menu className="h-5 w-5" />
               </motion.div>
             ) : (
-              <motion.div initial={{ rotate: 180 }} animate={{ rotate: 0 }} transition={{ duration: 0.3 }}>
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.15 }}>
                 <X className="h-5 w-5" />
               </motion.div>
             )}
@@ -444,19 +447,31 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
         <>
           <Sheet open={isSearchOpen} onOpenChange={setIsSearchOpen}>
             <SheetTrigger asChild>
-              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className={cn(
-                    "md:hidden rounded-lg h-8 w-8 sm:h-9 sm:w-9",
-                    "text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-100",
-                    "hover:bg-gray-100 dark:hover:bg-gray-800",
-                  )}
-                >
-                  <Search className="h-5 w-5" />
-                </Button>
-              </motion.div>
+                    <motion.div whileHover={{ y: -1 }} whileTap={{ y: 0 }}>
+                      <Button
+                        variant="ghost"
+                        className={cn(
+                          "flex items-center gap-2 px-2 sm:px-3 rounded-lg h-9",
+                          "text-gray-700 hover:text-gray-900",
+                          "hover:bg-gray-100",
+                          "transition-colors duration-150",
+                          "border border-gray-200 hover:border-gray-300",
+                        )}
+                      >
+                        <div className="flex items-center justify-center h-6 w-6 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 shadow-sm">
+                          <span className="text-xs font-bold text-white">
+                            {(user?.name || "AU").substring(0, 1).toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="hidden md:block text-left">
+                          <div className="text-sm font-medium text-gray-900">
+                            {(user?.name || "Admin User").split(' ')[0]}
+                          </div>
+                          <div className="text-xs text-gray-500">Admin</div>
+                        </div>
+                        <ChevronDown className="h-4 w-4 text-gray-400 hidden sm:block ml-auto" />
+                      </Button>
+                    </motion.div>
             </SheetTrigger>
             <SheetContent
               side="top"
@@ -519,10 +534,10 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
                     "bg-white dark:bg-gray-900",
                     "border border-gray-200 dark:border-gray-800",
                   )}
-                  initial={{ opacity: 0, y: -10, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -10, scale: 0.95 }}
-                  transition={{ duration: 0.2 }}
+                  initial={{ opacity: 0, y: -8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.15 }}
                 >
                   {renderSearchResults()}
                 </motion.div>
@@ -535,9 +550,9 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
       {/* Date and Time - Hidden on mobile */}
       <motion.div
         className="hidden lg:flex items-center gap-1 sm:gap-2 text-gray-600 dark:text-gray-400 px-2 sm:px-3 py-2 rounded-lg bg-gray-50 dark:bg-gray-800/50 text-xs sm:text-sm"
-        initial={{ opacity: 0, x: 20 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: 0.2, duration: 0.3 }}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 0.1, duration: 0.15 }}
       >
         <Calendar className="h-4 w-4" />
         <span className="font-medium hidden sm:inline">{format(currentTime, "EEEE, MMMM d, yyyy")}</span>
@@ -767,7 +782,7 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
         </TooltipProvider>
 
         {/* Help Button */}
-        <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+        <motion.div whileHover={{ y: -1 }} whileTap={{ y: 0 }}>
           <TooltipProvider>
             <Tooltip>
               <TooltipTrigger asChild>
@@ -778,7 +793,7 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
                     "rounded-lg h-9 w-9",
                     "text-gray-600 hover:text-blue-600",
                     "hover:bg-blue-50",
-                    "transition-colors duration-200",
+                    "transition-colors duration-150",
                   )}
                   onClick={() => router.push("/admin/help")}
                 >
@@ -798,27 +813,27 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
             <Tooltip>
               <TooltipTrigger asChild>
                 <DropdownMenuTrigger asChild>
-                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={cn(
-                        "relative rounded-lg h-9 w-9",
-                        "text-gray-600 hover:text-green-600",
-                        "hover:bg-green-50",
-                        "transition-colors duration-200",
-                      )}
-                      onClick={handleMessageClick}
-                    >
+                    <motion.div whileHover={{ y: -1 }} whileTap={{ y: 0 }}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={cn(
+                          "relative rounded-lg h-9 w-9",
+                          "text-gray-600 hover:text-green-600",
+                          "hover:bg-green-50",
+                          "transition-colors duration-150",
+                        )}
+                        onClick={handleMessageClick}
+                      >
                       <MessageCircle className="h-5 w-5" />
                       <AnimatePresence>
                         {showMessageBadge && messages.some((msg) => !msg.read) && (
                           <motion.span
                             className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-green-500 text-[10px] font-bold text-white shadow-md"
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            exit={{ scale: 0 }}
-                            transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                            initial={{ opacity: 0, scale: 0.6 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.6 }}
+                            transition={{ type: "spring", stiffness: 300, damping: 20, duration: 0.15 }}
                           >
                             {messages.filter((msg) => !msg.read).length}
                           </motion.span>
@@ -856,9 +871,9 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
                 {messages.map((message, index) => (
                   <motion.div
                     key={message.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ duration: 0.2, delay: index * 0.1 }}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ duration: 0.1, delay: index * 0.02 }}
                   >
                     <DropdownMenuItem className="flex items-start gap-3 p-3 hover:bg-blue-50 cursor-pointer rounded-lg mx-1">
                       <Avatar className="h-9 w-9">
@@ -908,27 +923,27 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
             <Tooltip>
               <TooltipTrigger asChild>
                 <DropdownMenuTrigger asChild>
-                  <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className={cn(
-                        "relative rounded-lg h-9 w-9",
-                        "text-gray-600 hover:text-red-600",
-                        "hover:bg-red-50",
-                        "transition-colors duration-200",
-                      )}
-                      onClick={handleNotificationClick}
-                    >
+                    <motion.div whileHover={{ y: -1 }} whileTap={{ y: 0 }}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className={cn(
+                          "relative rounded-lg h-9 w-9",
+                          "text-gray-600 hover:text-red-600",
+                          "hover:bg-red-50",
+                          "transition-colors duration-150",
+                        )}
+                        onClick={handleNotificationClick}
+                      >
                       <Bell className="h-5 w-5" />
                       <AnimatePresence>
                         {showNotificationBadge && notifications.length > 0 && (
                           <motion.span
                             className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white shadow-md"
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            exit={{ scale: 0 }}
-                            transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                            initial={{ opacity: 0, scale: 0.6 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.6 }}
+                            transition={{ type: "spring", stiffness: 300, damping: 20, duration: 0.15 }}
                           >
                             {notifications.length}
                           </motion.span>

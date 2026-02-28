@@ -1166,6 +1166,61 @@ body {
   .touch-target {
     @apply min-h-[44px] min-w-[44px];
   }
+  /* Performance-optimized animations - GPU accelerated, smooth and fast */
+  .smooth-animation {
+    will-change: transform, opacity;
+    transform: translateZ(0);
+    backface-visibility: hidden;
+  }
+
+  /* Fast, smooth button hover animations */
+  .smooth-hover {
+    @apply transition-all duration-150 ease-out;
+    will-change: background-color, border-color, color;
+  }
+
+  /* Smooth icon animations */
+  .smooth-icon {
+    @apply transition-colors duration-150;
+  }
+
+  /* Performance optimized dropdown animations */
+  .smooth-dropdown {
+    will-change: opacity, transform;
+    transform: translateZ(0);
+  }
+
+  /* Admin header specific optimizations */
+  .admin-header-motion {
+    @apply smooth-animation;
+  }
+
+  /* Badge pop animation - optimized spring */
+  @keyframes smoothBadgePop {
+    0% {
+      opacity: 0;
+      transform: scale(0.6) translateZ(0);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1) translateZ(0);
+    }
+  }
+
+  /* Ultra-fast fade in */
+  @keyframes ultraFastFade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .ultra-fast-fade {
+    animation: ultraFastFade 0.15s ease-out forwards;
+    will-change: opacity;
+  }
 }
 
 @layer utilities {
