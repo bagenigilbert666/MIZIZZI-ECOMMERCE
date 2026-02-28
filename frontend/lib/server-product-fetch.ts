@@ -71,20 +71,30 @@ function extractProducts(payload: any): Product[] {
 /**
  * Server-side fetcher for admin product edit page (hybrid SSR + client)
  * Fetches product data with full details for immediate rendering
+ * 
+ * Note: Admin endpoints require authentication, so SSR uses public endpoints
+ * and the client-side SWR will fetch admin data once authenticated
  */
 export async function getAdminProductEditData(productId: string) {
   try {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 8000) // 8 second timeout
 
-    // Fetch all required data in parallel for optimal performance
+    // Use public API for SSR (no auth required)
+    // The client will upgrade to admin endpoints once authenticated
     const [product, categories, brands, images] = await Promise.all([
-      fetch(`${API_BASE_URL}/api/admin/products/${productId}`, {
+      fetch(`${API_BASE_URL}/api/products/${productId}`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
         cache: 'no-store',
-      }).then(r => r.json()).catch(() => null),
+      }).then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      }).catch((err) => {
+        console.error(`[v0] Failed to fetch product ${productId}:`, err.message)
+        return null
+      }),
       
       fetch(`${API_BASE_URL}/api/categories`, {
         method: 'GET',
@@ -116,7 +126,7 @@ export async function getAdminProductEditData(productId: string) {
     }
 
     return {
-      product,
+      product: Array.isArray(product) ? product[0] : product,
       categories: categories?.categories || categories?.data || [],
       brands: brands?.brands || brands?.data || [],
       images: images?.images || images?.data || [],
