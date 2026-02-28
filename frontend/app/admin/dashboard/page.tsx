@@ -19,7 +19,6 @@ import { LowStockProducts } from "@/components/admin/dashboard/low-stock-product
 import { OrderStatusDistribution } from "@/components/admin/dashboard/order-status-distribution"
 import { QuickActions } from "@/components/admin/dashboard/quick-actions"
 import { RecentCustomers } from "@/components/admin/dashboard/recent-customers"
-import { Overview } from "@/components/admin/dashboard/overview"
 import { OrderStatusChart } from "@/components/admin/dashboard/order-status-chart"
 import { SalesByCategoryChart } from "@/components/admin/dashboard/sales-by-category"
 import { UpcomingEvents } from "@/components/admin/dashboard/upcoming-events"
@@ -27,7 +26,6 @@ import { UsersByRegionMap } from "@/components/admin/dashboard/users-by-region-m
 import { RevenueVsRefundsChart } from "@/components/admin/dashboard/revenue-vs-refunds-chart"
 import { ActiveUsersChart } from "@/components/admin/dashboard/active-users-chart"
 import { NotificationsPanel } from "@/components/admin/dashboard/notifications-panel"
-import { RecentSales } from "@/components/admin/dashboard/recent-sales"
 import { DashboardHeader } from "@/components/admin/dashboard/dashboard-header"
 import { motion } from "framer-motion"
 
@@ -521,7 +519,7 @@ export default function AdminDashboard() {
   console.log("[v0] isLoadingData:", isLoadingData, "isRefreshing:", isRefreshing)
 
   return (
-    <div className="flex-1 space-y-3 sm:space-y-4 md:space-y-6 p-2 sm:p-4 md:p-8 w-full overflow-x-hidden">
+    <div className="flex-1 space-y-2 sm:space-y-3 md:space-y-4 lg:space-y-6 p-2 sm:p-3 md:p-6 lg:p-8 w-full overflow-x-hidden bg-gray-50/50">
       <DashboardHeader
         onRefresh={fetchDashboardData}
         isRefreshing={isRefreshing}
@@ -572,134 +570,188 @@ export default function AdminDashboard() {
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.2 }}
+            transition={{ duration: 0.3, delay: 0.3 }}
             className="mt-6"
           >
-            <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl p-4">
-              <div className="mb-2">
-                <h2 className="text-lg font-semibold">Quick Actions</h2>
+            <Card className="border-none bg-white shadow-md overflow-hidden rounded-xl p-4">
+              <div className="mb-4">
+                <h2 className="text-xl font-bold text-gray-900">Quick Actions</h2>
+                <p className="text-sm text-gray-600 mt-1">Frequently used admin tasks and shortcuts</p>
               </div>
               <QuickActions />
             </Card>
           </motion.div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.3 }}
-            className="grid grid-cols-1 lg:grid-cols-3 gap-6"
-          >
-            <Card className="lg:col-span-2 border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl min-h-[400px]">
-              <SalesOverviewChart salesData={dashboardData?.sales_data || []} />
-            </Card>
-
-            <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl min-h-[400px]">
-              <OrderStatusChart data={dashboardData?.order_status || {}} />
-            </Card>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.4 }}
-            className="grid grid-cols-1 lg:grid-cols-3 gap-6"
-          >
-            <Card className="lg:col-span-2 border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl">
-              <RecentOrders orders={dashboardData?.recent_orders || []} />
-            </Card>
-
-            <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl">
-              <RecentSales />
-            </Card>
-          </motion.div>
-
+          {/* Section 1: Sales Performance Overview */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.5 }}
+            className="space-y-4"
           >
-            <Tabs defaultValue="overview" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-4 bg-muted/50 rounded-lg">
-                <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="products">Products</TabsTrigger>
-                <TabsTrigger value="sales">Sales</TabsTrigger>
-                <TabsTrigger value="customers">Customers</TabsTrigger>
-              </TabsList>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl md:text-2xl font-bold text-gray-900">Sales Performance</h2>
+                <p className="text-sm text-gray-600 mt-1">Real-time sales data and order status tracking</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+              <Card className="lg:col-span-2 border-none bg-white shadow-md overflow-hidden rounded-xl min-h-[400px]">
+                <SalesOverviewChart salesData={dashboardData?.sales_data || []} />
+              </Card>
 
-              <TabsContent value="overview" className="space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl min-h-[400px]">
-                    <Overview salesData={dashboardData?.sales_data || []} />
-                  </Card>
+              <Card className="border-none bg-white shadow-md overflow-hidden rounded-xl min-h-[400px]">
+                <OrderStatusChart data={dashboardData?.order_status || {}} />
+              </Card>
+            </div>
+          </motion.div>
 
-                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl min-h-[400px]">
-                    <SalesByCategoryChart data={dashboardData?.sales_by_category || []} />
-                  </Card>
-                </div>
+          {/* Section 2: Operations & Inventory */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.6 }}
+            className="space-y-4"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl md:text-2xl font-bold text-gray-900">Operations & Inventory</h2>
+                <p className="text-sm text-gray-600 mt-1">Manage orders and track stock levels</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+              <Card className="lg:col-span-2 border-none bg-white shadow-md overflow-hidden rounded-xl">
+                <RecentOrders orders={dashboardData?.recent_orders || []} />
+              </Card>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl">
-                    <RecentActivity activities={dashboardData?.recent_activities || []} />
-                  </Card>
+              <Card className="border-none bg-white shadow-md overflow-hidden rounded-xl">
+                <LowStockProducts products={dashboardData?.low_stock_products || []} />
+              </Card>
+            </div>
+          </motion.div>
 
-                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl">
-                    <NotificationsPanel notifications={dashboardData?.notifications || []} />
-                  </Card>
-                </div>
-              </TabsContent>
+          {/* Section 3: Products & Performance */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.7 }}
+            className="space-y-4"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl md:text-2xl font-bold text-gray-900">Top Performing Products</h2>
+                <p className="text-sm text-gray-600 mt-1">Best sellers and category performance</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+              <Card className="lg:col-span-2 border-none bg-white shadow-md overflow-hidden rounded-xl">
+                <BestSellingProducts products={dashboardData?.best_selling_products || []} />
+              </Card>
 
-              <TabsContent value="products" className="space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl">
-                    <LowStockProducts products={dashboardData?.low_stock_products || []} />
-                  </Card>
+              <Card className="border-none bg-white shadow-md overflow-hidden rounded-xl min-h-[400px]">
+                <SalesByCategoryChart data={dashboardData?.sales_by_category || []} />
+              </Card>
+            </div>
+          </motion.div>
 
-                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl">
-                    <BestSellingProducts products={dashboardData?.best_selling_products || []} />
-                  </Card>
-                </div>
-              </TabsContent>
+          {/* Section 4: Customer Insights */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.8 }}
+            className="space-y-4"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl md:text-2xl font-bold text-gray-900">Customer Insights</h2>
+                <p className="text-sm text-gray-600 mt-1">Customer data, regions, and upcoming events</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+              <Card className="border-none bg-white shadow-md overflow-hidden rounded-xl">
+                <RecentCustomers customers={dashboardData?.recent_users || []} />
+              </Card>
 
-              <TabsContent value="sales" className="space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl min-h-[400px]">
-                    <OrderStatusDistribution data={dashboardData?.order_status || {}} />
-                  </Card>
+              <Card className="border-none bg-white shadow-md overflow-hidden rounded-xl min-h-[400px]">
+                <UsersByRegionMap data={dashboardData?.users_by_region || []} />
+              </Card>
 
-                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl min-h-[400px]">
-                    <RevenueVsRefundsChart data={dashboardData?.revenue_vs_refunds || []} />
-                  </Card>
-                </div>
+              <Card className="border-none bg-white shadow-md overflow-hidden rounded-xl">
+                <UpcomingEvents events={dashboardData?.upcoming_events || []} />
+              </Card>
+            </div>
+          </motion.div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl min-h-[400px]">
-                    <TrafficSourcesChart data={dashboardData?.traffic_sources || []} />
-                  </Card>
+          {/* Section 5: Analytics Deep Dive */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.9 }}
+            className="space-y-4"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl md:text-2xl font-bold text-gray-900">Traffic & Conversion Analytics</h2>
+                <p className="text-sm text-gray-600 mt-1">Visitor sources and active user trends</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+              <Card className="border-none bg-white shadow-md overflow-hidden rounded-xl min-h-[400px]">
+                <TrafficSourcesChart data={dashboardData?.traffic_sources || []} />
+              </Card>
 
-                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl min-h-[400px]">
-                    <ActiveUsersChart data={dashboardData?.active_users || []} />
-                  </Card>
-                </div>
-              </TabsContent>
+              <Card className="border-none bg-white shadow-md overflow-hidden rounded-xl min-h-[400px]">
+                <ActiveUsersChart data={dashboardData?.active_users || []} />
+              </Card>
+            </div>
+          </motion.div>
 
-              <TabsContent value="customers" className="space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl">
-                    <RecentCustomers customers={dashboardData?.recent_users || []} />
-                  </Card>
+          {/* Section 6: Advanced Metrics */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 1 }}
+            className="space-y-4"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl md:text-2xl font-bold text-gray-900">Revenue & Order Analysis</h2>
+                <p className="text-sm text-gray-600 mt-1">Detailed financial and order distribution</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+              <Card className="border-none bg-white shadow-md overflow-hidden rounded-xl min-h-[400px]">
+                <OrderStatusDistribution data={dashboardData?.order_status || {}} />
+              </Card>
 
-                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl">
-                    <UsersByRegionMap data={dashboardData?.users_by_region || []} />
-                  </Card>
-                </div>
+              <Card className="border-none bg-white shadow-md overflow-hidden rounded-xl min-h-[400px]">
+                <RevenueVsRefundsChart data={dashboardData?.revenue_vs_refunds || []} />
+              </Card>
+            </div>
+          </motion.div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl">
-                    <UpcomingEvents events={dashboardData?.upcoming_events || []} />
-                  </Card>
-                </div>
-              </TabsContent>
-            </Tabs>
+          {/* Section 7: Activity & Alerts */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 1.1 }}
+            className="space-y-4"
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl md:text-2xl font-bold text-gray-900">Recent Activity & Alerts</h2>
+                <p className="text-sm text-gray-600 mt-1">System updates and important notifications</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+              <Card className="border-none bg-white shadow-md overflow-hidden rounded-xl">
+                <RecentActivity activities={dashboardData?.recent_activities || []} />
+              </Card>
+
+              <Card className="border-none bg-white shadow-md overflow-hidden rounded-xl">
+                <NotificationsPanel notifications={dashboardData?.notifications || []} />
+              </Card>
+            </div>
           </motion.div>
         </div>
       )}
