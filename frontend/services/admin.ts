@@ -136,8 +136,735 @@ export const adminService = {
         credentials: "include",
       })
 
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        throw new Error(errorData.message || `Login failed with status: ${response.status}`)
+      }
+
+      const data = await response.json()
+
+      // Check if user has admin role
+      if (!data.user || data.user.role !== "admin") {
+        throw new Error("You don't have permission to access the admin area")
+      }
+
+      // Store tokens in localStorage
+      if (data.access_token) {
+        localStorage.setItem("mizizzi_token", data.access_token)
+        localStorage.setItem("admin_token", data.access_token) // Also store as admin token
+      }
+      if (data.refresh_token) {
+        localStorage.setItem("mizizzi_refresh_token", data.refresh_token)
+        localStorage.setItem("admin_refresh_token", data.refresh_token)
+      }
+      if (data.csrf_token) {
+        localStorage.setItem("mizizzi_csrf_token", data.csrf_token)
+      }
+
+      // Store user data
+      localStorage.setItem("user", JSON.stringify(data.user))
+      localStorage.setItem("admin_user", JSON.stringify(data.user))
+
+      return data
+    } catch (error) {
+      console.error("Admin login error:", error)
+      throw error
+    }
+  },
+
+  async logout(): Promise<void> {
+    try {
+      // Try to call the logout endpoint
+      await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/logout`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${localStorage.getItem("mizizzi_token") || ""}`,
+        },
+        credentials: "include",
+      })
+    } catch (error) {
+      console.warn("Logout API call failed, continuing with local logout:", error)
+    }
+
+    // Clear tokens and user data regardless of API response
+    localStorage.removeItem("mizizzi_token")
+    localStorage.removeItem("mizizzi_refresh_token")
+    localStorage.removeItem("mizizzi_csrf_token")
+    localStorage.removeItem("admin_token")
+    localStorage.removeItem("admin_refresh_token")
+    localStorage.removeItem("user")
+    localStorage.removeItem("admin_user")
+  },
+
+  // Dashboard data
+  async getDashboardData(params?: { from_date?: string; to_date?: string }): Promise<AdminDashboardResponse> {
+    console.log("[v0] getDashboardData called with params:", params)
+    try {
+      // Get token from localStorage with fallback options
+      const token = localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
+      console.log("[v0] Token found:", !!token, "Token length:", token?.length || 0)
+
+      if (!token) {
+        console.log("[v0] No token available, returning default dashboard data")
+        return this.getDefaultDashboardData()
+      }
+
+      // Use consistent API base URL
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"
+      console.log("[v0] Using API base URL:", baseUrl)
+
+      let url = `${baseUrl}/api/admin/dashboard`
+      if (params) {
+        const queryParams = new URLSearchParams()
+        if (params.from_date) queryParams.append("from_date", params.from_date)
+        if (params.to_date) queryParams.append("to_date", params.to_date)
+
+        const queryString = queryParams.toString()
+        if (queryString) {
+          url += `?${queryString}`
+        }
+      }
+
+      console.log("[v0] Making admin dashboard request to:", url)
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+      })
+
+      console.log("[v0] Dashboard response status:", response.status)
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          console.log("[v0] Received 401, attempting token refresh...")
+          try {
+            await this.refreshToken()
+            // Retry the request with new token
+            const newToken = localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
+            if (newToken) {
+              const retryResponse = await fetch(url, {
+                method: "GET",
+                headers: {
+                  "Content-Type": "application/json",
+                  Authorization: `Bearer ${newToken}`,
+                },
+                credentials: "include",
+              })
+
+              if (retryResponse.ok) {
+                const data = await retryResponse.json()
+                console.log("[v0] Dashboard data retrieved after token refresh:", data)
+                return data
+              }
+            }
+          } catch (refreshError) {
+            console.error("[v0] Token refresh failed:", refreshError)
+            // Clear invalid tokens
+            localStorage.removeItem("mizizzi_token")
+            localStorage.removeItem("admin_token")
+            localStorage.removeItem("mizizzi_refresh_token")
+            localStorage.removeItem("admin_refresh_token")
+            localStorage.removeItem("mizizzi_csrf_token")
+
+            // Redirect to login page
+            if (typeof window !== "undefined") {
+              window.location.href = "/admin/login"
+            }
+            return this.getDefaultDashboardData()
+          }
+        }
+
+        const errorText = await response.text()
+        console.error("[v0] Dashboard request failed:", errorText)
+        throw new Error(`Dashboard request failed with status: ${response.status} - ${errorText}`)
+      }
+
+      const data = await response.json()
+      console.log("[v0] Dashboard data retrieved successfully:", data)
+      return data
+    } catch (error) {
+      console.error("[v0] Error fetching dashboard data:", error)
+      return this.getDefaultDashboardData()
+    }
+  },
+
+  async refreshToken(): Promise<void> {
+    const refreshToken = localStorage.getItem("mizizzi_refresh_token") || localStorage.getItem("admin_refresh_token")
+
+    if (!refreshToken) {
+      console.log("[v0] No refresh token available, clearing all tokens")
+      localStorage.removeItem("mizizzi_token")
+      localStorage.removeItem("admin_token")
+      localStorage.removeItem("mizizzi_refresh_token")
+      localStorage.removeItem("admin_refresh_token")
+      localStorage.removeItem("mizizzi_csrf_token")
+
+      // Redirect to login page
+      if (typeof window !== "undefined") {
+        window.location.href = "/admin/login"
+      }
+      return
+    }
+
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"
+
+    const response = await fetch(`${baseUrl}/api/admin/auth/refresh`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+      credentials: "include",
+    })
+
+    if (!response.ok) {
+      throw new Error("Token refresh failed")
+    }
+
+    const data = await response.json()
+
+    // Update tokens in localStorage
+    if (data.access_token) {
+      localStorage.setItem("mizizzi_token", data.access_token)
+      localStorage.setItem("admin_token", data.access_token)
+    }
+    if (data.refresh_token) {
+      localStorage.setItem("mizizzi_refresh_token", data.refresh_token)
+      localStorage.setItem("admin_refresh_token", data.refresh_token)
+    }
+  },
+
+  async refreshTokenAndRetry(): Promise<boolean> {
+    try {
+      console.log("[v0] Admin Service: Attempting token refresh...")
+
+      const currentRefreshToken =
+        localStorage.getItem("admin_refresh_token") || localStorage.getItem("mizizzi_refresh_token")
+
+      if (!currentRefreshToken) {
+        console.log("[v0] Admin Service: No refresh token available")
+        return false
+      }
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+
+      const response = await fetch(`${apiUrl}/api/refresh`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${currentRefreshToken}`,
+        },
+        body: JSON.stringify({ refresh_token: currentRefreshToken }),
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        console.error(`[v0] Admin Service: Token refresh failed with status: ${response.status}`)
+        // Clear tokens on refresh failure
+        localStorage.removeItem("admin_token")
+        localStorage.removeItem("admin_refresh_token")
+        localStorage.removeItem("mizizzi_token")
+        localStorage.removeItem("mizizzi_refresh_token")
+        localStorage.removeItem("admin_user")
+        return false
+      }
+
+      const data = await response.json()
+      console.log("[v0] Admin Service: Token refresh successful")
+
+      if (data.access_token) {
+        localStorage.setItem("admin_token", data.access_token)
+        localStorage.setItem("mizizzi_token", data.access_token)
+      }
+      if (data.refresh_token) {
+        localStorage.setItem("admin_refresh_token", data.refresh_token)
+        localStorage.setItem("mizizzi_refresh_token", data.refresh_token)
+      }
+      if (data.csrf_token) {
+        localStorage.setItem("mizizzi_csrf_token", data.csrf_token)
+      }
+
+      return true
+    } catch (error) {
+      console.error("[v0] Admin Service: Token refresh error:", error)
+      return false
+    }
+  },
+
+  async getProductStats(): Promise<any> {
+    try {
+      const token = localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
+      if (!token) {
+        throw new Error("No authentication token available")
+      }
+
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+      const url = `${baseUrl}/api/admin/dashboard/product-analytics`
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        throw new Error(`Product analytics request failed with status: ${response.status}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error("Error fetching product analytics:", error)
+      throw error
+    }
+  },
+
+  async getSalesStats(params: { period?: string; from?: string; to?: string }): Promise<any> {
+    try {
+      const token = localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
+      if (!token) {
+        throw new Error("No authentication token available")
+      }
+
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+
+      // Build the URL with query parameters for sales chart
+      const queryParams = new URLSearchParams()
+      if (params.period) queryParams.append("days", params.period)
+      if (params.from) queryParams.append("from", params.from)
+      if (params.to) queryParams.append("to", params.to)
+
+      const url = `${baseUrl}/api/admin/dashboard/sales-chart${queryParams.toString() ? `?${queryParams.toString()}` : ""}`
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        throw new Error(`Sales chart request failed with status: ${response.status}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error("Error fetching sales chart:", error)
+      throw error
+    }
+  },
+
+  async getCategorySales(): Promise<any> {
+    try {
+      const token = localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
+      if (!token) {
+        throw new Error("No authentication token available")
+      }
+
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+      const url = `${baseUrl}/api/admin/dashboard/category-sales`
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        throw new Error(`Category sales request failed with status: ${response.status}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error("Error fetching category sales:", error)
+      throw error
+    }
+  },
+
+  async getRecentActivity(): Promise<any> {
+    try {
+      const token = localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
+      if (!token) {
+        throw new Error("No authentication token available")
+      }
+
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+      const url = `${baseUrl}/api/admin/dashboard/recent-activity`
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        throw new Error(`Recent activity request failed with status: ${response.status}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error("Error fetching recent activity:", error)
+      throw error
+    }
+  },
+
+  async getCustomerAnalytics(): Promise<any> {
+    try {
+      const token = localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
+      if (!token) {
+        throw new Error("No authentication token available")
+      }
+
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+      const url = `${baseUrl}/api/admin/dashboard/customer-analytics`
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        throw new Error(`Customer analytics request failed with status: ${response.status}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error("Error fetching customer analytics:", error)
+      throw error
+    }
+  },
+
+  async getDashboardHealth(): Promise<any> {
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+      const url = `${baseUrl}/api/admin/dashboard/health`
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error(`Dashboard health check failed with status: ${response.status}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error("Error checking dashboard health:", error)
+      throw error
+    }
+  },
+
+  // Products
+  async getProducts(params?: {
+    page?: number
+    per_page?: number
+    category_id?: number
+    brand_id?: number
+    search?: string
+    min_price?: number
+    max_price?: number
+    stock_status?: string
+    featured?: boolean
+    new?: boolean
+    sale?: boolean
+    flash_sale?: boolean
+    luxury_deal?: boolean
+  }): Promise<any> {
+    try {
+      const token = localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
+      if (!token) {
+        throw new Error("No authentication token available")
+      }
+
+      // Make sure we have a valid API URL
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+
+      // Build the URL with query parameters
+      let url = `${baseUrl}/api/admin/products`
+
+      // Create a new params object with a very large per_page value to get all products
+      const updatedParams = {
+        ...params,
+        per_page: 10000, // Set a very large number to get all products
+      }
+
+      const queryParams = new URLSearchParams()
+      Object.entries(updatedParams).forEach(([key, value]) => {
+        if (value !== undefined) {
+          queryParams.append(key, value.toString())
+        }
+      })
+
+      const queryString = queryParams.toString()
+      if (queryString) {
+        url += `?${queryString}`
+      }
+
+      console.log("Fetching all products with URL:", url)
+
+      const response = await fetch(url, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        throw new Error(`Products request failed with status: ${response.status}`)
+      }
+
+      return await response.json()
+    } catch (error) {
+      console.error("Error fetching products:", error)
+      throw error
+    }
+  },
+
+  // Get a single product
+  async getProduct(id: string): Promise<Product | null> {
+    try {
+      // Check cache first
+      const cacheKey = `product-${id}`
+      const now = Date.now()
+      const cachedItem = productCache.get(cacheKey)
+
+      if (cachedItem && now - cachedItem.timestamp < CACHE_DURATION) {
+        console.log(`Using cached product data for id ${id}`)
+        return cachedItem.data
+      }
+
+      console.log(`Fetching product with id ${id} from API`)
+      const response = await api.get(`/api/products/${id}`)
+
+      // Cache the result with timestamp
+      if (response.data) {
+        productCache.set(cacheKey, {
+          data: response.data,
+          timestamp: now,
+        })
+      }
+
+      return this.mapProductFromApi(response.data)
+    } catch (error) {
+      console.error(`Error fetching product with id ${id}:`, error)
+      return null
+    }
+  },
+
+  // Invalidate cache for a specific product
+  invalidateProductCache(id: string): void {
+    const cacheKey = `product-${id}`
+    productCache.delete(cacheKey)
+    console.log(`Cache invalidated for product ${id}`)
+  },
+
+  // Invalidate all product cache
+  invalidateAllProductCache(): void {
+    productCache.clear()
+    console.log("All product cache invalidated")
+  },
+
+  async getProductBySlug(slug: string): Promise<Product | null> {
+    try {
+      const response = await api.get(`/api/products/${slug}`)
+      return this.mapProductFromApi(response.data)
+    } catch (error) {
+      console.error(`Error fetching product with slug ${slug}:`, error)
+      return null
+    }
+  },
+
+  async getFeaturedProducts(): Promise<Product[]> {
+    const response = await this.getProducts({ featured: true })
+    return response.items
+  },
+
+  async getNewProducts(): Promise<Product[]> {
+    const response = await this.getProducts({ new: true })
+    return response.items
+  },
+
+  async getSaleProducts(): Promise<Product[]> {
+    const response = await this.getProducts({ sale: true })
+    return response.items
+  },
+
+  async getFlashSaleProducts(): Promise<Product[]> {
+    const response = await this.getProducts({ flash_sale: true })
+    return response.items
+  },
+
+  async getLuxuryDealProducts(): Promise<Product[]> {
+    const response = await this.getProducts({ luxury_deal: true })
+    return response.items
+  },
+
+  async getProductsByIds(productIds: number[]): Promise<Product[]> {
+    try {
+      console.log(`API call: getProductsByIds for ids: ${productIds.join(", ")}`)
+      const response = await api.get("/api/products/batch", {
+        params: { ids: productIds.join(",") },
+      })
+      console.log("API response for batch products:", response.data)
+      return (response.data.items || []).map((item: any) => this.mapProductFromApi(item))
+    } catch (error) {
+      console.error(`Error fetching products by ids:`, error)
+      return []
+    }
+  },
+
+  // Add a method to prefetch products for faster navigation
+  async prefetchProductsByCategory(categoryId: string): Promise<boolean> {
+    return prefetchData("/api/products", { category_id: categoryId, limit: 12 })
+  },
+
+  // Add a method to prefetch featured products for the homepage
+  async prefetchHomePageProducts(): Promise<void> {
+    try {
+      await Promise.allSettled([
+        this.prefetchProductsByCategory("featured"),
+        prefetchData("/api/products", { flash_sale: true }),
+        prefetchData("/api/products", { luxury_deal: true }),
+        prefetchData("/api/products", { limit: 12 }),
+      ])
+    } catch (error) {
+      console.error("Error prefetching homepage products:", error)
+    }
+  },
+
+  // Notify about product updates
+  notifyProductUpdate(productId: string): void {
+    console.log(`Notifying about product update for ID: ${productId}`)
+
+    // Invalidate cache
+    this.invalidateProductCache(productId)
+    this.invalidateAllProductCache()
+
+    // Send WebSocket notification if available
+    if (typeof window !== "undefined") {
+      console.log("Sending WebSocket notification for product update")
+      websocketService.send("product_updated", { id: productId, timestamp: Date.now() })
+
+      // Also dispatch a custom event that components can listen for
+      const event = new CustomEvent("product-updated", { detail: { id: productId } })
+      window.dispatchEvent(event)
+    }
+  },
+
+  // Helper method to map API order data to our frontend Order type
+  mapProductFromApi(apiProduct: any): Product {
+    const product: Product = {
+      id: apiProduct.id,
+      name: apiProduct.name,
+      slug: apiProduct.slug,
+      description: apiProduct.description,
+      price: apiProduct.price,
+      sale_price: apiProduct.sale_price,
+      stock: apiProduct.stock,
+      category_id: apiProduct.category_id,
+      brand_id: apiProduct.brand_id,
+      image_urls: apiProduct.image_urls,
+      is_featured: apiProduct.is_featured,
+      thumbnail_url: apiProduct.thumbnail_url,
+      is_new: apiProduct.is_new,
+      is_sale: apiProduct.is_sale,
+      is_flash_sale: apiProduct.is_flash_sale,
+      is_luxury_deal: apiProduct.is_luxury_deal,
+      rating: apiProduct.rating,
+      reviews: apiProduct.reviews,
+      sku: apiProduct.sku,
+      weight: apiProduct.weight,
+      dimensions: apiProduct.dimensions,
+      variants: apiProduct.variants,
+      meta_title: apiProduct.meta_title,
+      meta_description: apiProduct.meta_description,
+      material: apiProduct.material,
+      tags: apiProduct.tags,
+      created_at: apiProduct.created_at,
+      updated_at: apiProduct.updated_at,
+      // Ensure brand is always an object
+      brand:
+        typeof apiProduct.brand === "string"
+          ? {
+              id: 0, // Or some default ID
+              name: apiProduct.brand,
+              slug: "", // Or generate a slug
+            }
+          : apiProduct.brand || null,
+    }
+    return product
+  },
+
+  /**
+   * Update a product
+   */
+  async updateProduct(id: string, data: any): Promise<Product> {
+    try {
+      console.log("[v0] Updating product with data:", data)
+
+      // Get the token - check both mizizzi_token and admin_token
+      const token = localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
+      if (!token) {
+        throw new Error("Authentication token not found. Please log in again.")
+      }
+
+      console.log("[v0] Using token for update:", token.substring(0, 20) + "...")
+
+      // Set up headers with authentication
+      const headers = {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      }
+
+      // Add a timeout to ensure the request doesn't hang
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
+
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || ""
+        const endpoint = `${apiUrl}/api/admin/products/${id}`
+        console.log("[v0] Making PUT request to:", endpoint)
+
+        // Make the API call with proper headers and timeout
+        const response = await fetch(endpoint, {
+          method: "PUT",
+          headers: headers,
+          body: JSON.stringify(data),
+          signal: controller.signal,
+        })
+
+        clearTimeout(timeoutId)
+
+        console.log("[v0] Response status:", response.status)
+
+        // Check if the response is ok
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}))
+          console.error("[v0] API error response:", errorData)
           
           // Handle 401 specifically
           if (response.status === 401) {
@@ -211,6 +938,7 @@ export const adminService = {
   // Delete a product
   async deleteProduct(id: string): Promise<{ success: boolean; message: string }> {
     try {
+      console.log("[v0] Deleting product with ID:", id)
 
       // Get the token - check both mizizzi_token and admin_token
       const token = localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
@@ -242,10 +970,16 @@ export const adminService = {
 
         clearTimeout(timeoutId)
 
+        console.log("[v0] Delete response status:", response.status)
+
         // Check if the response is ok
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}))
+          console.error("[v0] API error response:", errorData)
           
+          // Handle 401 specifically
+          if (response.status === 401) {
+            console.log("[v0] Got 401, attempting to refresh token")
             try {
               await this.refreshToken()
               // Retry the delete with new token
@@ -258,6 +992,7 @@ export const adminService = {
                 })
                 if (retryResponse.ok) {
                   const responseData = await retryResponse.json()
+                  console.log("[v0] Product deleted successfully after token refresh")
                   this.invalidateProductCache(id)
                   return responseData
                 }
@@ -273,6 +1008,7 @@ export const adminService = {
 
         // Parse the response
         const responseData = await response.json()
+        console.log("[v0] Product deleted successfully:", responseData)
 
         // Invalidate cache for this product
         this.invalidateProductCache(id)
