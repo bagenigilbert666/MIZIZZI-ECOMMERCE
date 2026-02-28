@@ -7,19 +7,19 @@ interface PageProps {
 }
 
 export default async function EditProductPage({ params }: PageProps) {
-  // In Next.js 16, params is a Promise that needs to be awaited
+  // Awaiting params in Next.js 16 (Server-side rendering)
   const resolvedParams = await params
   const id = resolvedParams.id
 
-  // Fetch all data server-side before rendering using proper server-side API calls
+  // Fetch product data server-side using proper server-side authentication
   const { product, categories, brands, images, error } = await getProductData(id)
 
-  // Redirect if product not found
+  // Redirect if product not found or error occurred
   if (error || !product) {
     redirect("/admin/products")
   }
 
-  // Pass the data to the client component
+  // Return the client component with server-fetched data
   return (
     <EditProductClient
       productId={id}

@@ -1,4 +1,5 @@
 // Server-side data fetching for product edit page
+// This module uses direct fetch calls with cookies - NO localStorage
 import type { Product } from "@/types"
 import { cookies } from "next/headers"
 
@@ -42,7 +43,7 @@ export async function getProductData(productId: string) {
   try {
     const token = await getAuthToken()
 
-    // Fetch all data in parallel
+    // Fetch all data in parallel using direct API calls
     const [product, categories, brands, images] = await Promise.all([
       fetchFromAPI<Product>(`/api/admin/products/${productId}`, token),
       fetchFromAPI<any[]>(`/api/admin/categories`, token),
@@ -58,7 +59,7 @@ export async function getProductData(productId: string) {
       error: null,
     }
   } catch (error: any) {
-    console.error("[v0] Error fetching product data:", error)
+    console.error("[v0] Error fetching product data on server:", error)
     return {
       product: null,
       categories: [],
