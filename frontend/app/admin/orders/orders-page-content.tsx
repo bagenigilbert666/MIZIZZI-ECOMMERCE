@@ -16,8 +16,6 @@ import {
   DollarSign,
   TrendingUp,
   ShoppingBag,
-  Loader2,
-  AlertCircleIcon,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -79,12 +77,11 @@ export default function OrdersPageContent({ initialData }: { initialData?: Order
 
   // State management
   const [orders, setOrders] = useState<Order[]>(initialData?.items || [])
-  const [isLoading, setIsLoading] = useState(!initialData)
   const [searchQuery, setSearchQuery] = useState("")
   const [currentPage, setCurrentPage] = useState(1)
   const [totalPages, setTotalPages] = useState(initialData?.pagination?.total_pages || 1)
-  const [statusFilter, setStatusFilter] = useState<string>("all")
   const [activeTab, setActiveTab] = useState("all")
+  const [isRefreshing, setIsRefreshing] = useState(false)
 
   // Statistics state
   const [stats, setStats] = useState({
@@ -112,28 +109,20 @@ export default function OrdersPageContent({ initialData }: { initialData?: Order
     }
   }, [isAuthenticated, authLoading, router])
 
-  // Fetch orders with proper error handling and auth token
-  const fetchOrders = async () => {
+  // Fetch orders immediately on mount - NO LOADING STATE
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchOrdersInstantly()
+    }
+  }, [isAuthenticated])
+
+  // Instant fetch without loading state
+  const fetchOrdersInstantly = async () => {
     try {
-      setIsLoading(true)
-
-      // Get the admin token from localStorage
-      const token =
-        typeof window !== "undefined"
-          ? localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
-          : null
-
-      if (!token) {
-        throw new Error("No authentication token available. Please log in again.")
-      }
-
-      // Use the admin service which handles token refresh and retries
       const response = await adminService.getOrders({
         page: currentPage,
         per_page: 20,
         search: searchQuery || undefined,
-        // DO NOT send status filter - it causes 500 error on backend
-        // Filtering will be done client-side via useMemo
       })
 
       setOrders(response.items || [])
@@ -143,30 +132,25 @@ export default function OrdersPageContent({ initialData }: { initialData?: Order
       console.error("Failed to fetch orders:", error)
       toast({
         title: "Error",
-        description:
-          error instanceof Error && error.message.includes("authentication")
-            ? "Authentication failed. Please log in again."
-            : "Failed to load orders. Please try again.",
+        description: "Failed to load orders. Please try again.",
         variant: "destructive",
       })
-    } finally {
-      setIsLoading(false)
     }
   }
 
-  // Refetch orders when relevant filters change
-  useEffect(() => {
-    if (isAuthenticated && !initialData) {
-      fetchOrders()
+  // Handle manual refresh
+  const handleRefresh = async () => {
+    setIsRefreshing(true)
+    try {
+      await fetchOrdersInstantly()
+      toast({
+        title: "Refreshed",
+        description: "Orders list has been updated.",
+      })
+    } finally {
+      setIsRefreshing(false)
     }
-  }, [isAuthenticated, currentPage, searchQuery])
-
-  // Ensure we have stats even with initial data
-  useEffect(() => {
-    if (initialData?.items) {
-      calculateStats(initialData.items)
-    }
-  }, [initialData])
+  }
 
   // Calculate statistics from orders
   const calculateStats = (ordersList: Order[]) => {
@@ -183,21 +167,231 @@ export default function OrdersPageContent({ initialData }: { initialData?: Order
     setStats(newStats)
   }
 
-  // Handle refresh
-  const handleRefresh = () => {
-    fetchOrders()
-    toast({
-      title: "Refreshed",
-      description: "Orders list has been updated.",
-    })
-  }
-
   // Get status badge styling
   const getStatusBadge = (status: string) => {
     const statusLower = status.toLowerCase()
     const configs: Record<string, { icon: React.ElementType; className: string }> = {
       pending: {
         icon: Clock,
+        className: "bg-yellow-50 text-yellow-700 border-yellow-200",
+      },
+      processing: {
+        icon: Package,
+        className: "bg-blue-50 text-blue-700 border-blue-200",
+      },
+      shipped: {
+        icon: TrendingUp,
+        className: "bg-purple-50 text-purple-700 border-purple-200",
+      },
+      delivered: {
+        icon: CheckCircle2,
+        className: "bg-green-50 text-green-700 border-green-200",
+      },
+      cancelled: {
+        icon: XCircle,
+        className: "bg-red-50 text-red-700 border-red-200",
+      },
+      canceled: {
+        icon: XCircle,
+        className: "bg-red-50 text-red-700 border-red-200",
+      },
+      returned: {
+        icon: RotateCcw,
+        className: "bg-orange-50 text-orange-700 border-orange-200",
+      },
+    }
+
+    const config = configs[statusLower] || configs["pending"]
+    const IconComponent = config.icon
+
+    return (
+      <Badge variant="outline" className={config.className}>
+        <IconComponent className="h-3 w-3 mr-1" />
+        {statusLower.charAt(0).toUpperCase() + statusLower.slice(1)}
+      </Badge>
+    )
+  }
+
+  // Filter orders based on active tab
+  const filteredOrders = useMemo(() => {
+    if (activeTab === "all") return orders
+    return orders.filter((order) => order.status.toLowerCase() === activeTab)
+  }, [orders, activeTab])
+
+  // Don't render anything while checking auth
+  if (!isAuthenticated && !authLoading) {
+    return null
+  }
+
+  // Render immediately - no loading state
+  return (
+    <div className="space-y-6 p-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">Order Management</h1>
+          <p className="mt-1 text-gray-600">Manage and track all customer orders</p>
+        </div>
+        <Button 
+          onClick={handleRefresh} 
+          variant="outline" 
+          size="icon" 
+          className="h-10 w-10"
+          disabled={isRefreshing}
+        >
+          <RefreshCw className={`h-5 w-5 ${isRefreshing ? 'animate-spin' : ''}`} />
+        </Button>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <ShoppingBag className="h-5 w-5 text-blue-600" />
+              <span className="text-2xl font-bold">{stats.total}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">Revenue</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <DollarSign className="h-5 w-5 text-green-600" />
+              <span className="text-2xl font-bold">{formatCurrency(stats.revenue)}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">Pending</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-yellow-600" />
+              <span className="text-2xl font-bold">{stats.pending}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">Processing</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <Package className="h-5 w-5 text-blue-600" />
+              <span className="text-2xl font-bold">{stats.processing}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-sm font-medium">Delivered</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-5 w-5 text-green-600" />
+              <span className="text-2xl font-bold">{stats.delivered}</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Orders Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Orders</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {/* Tabs for status filtering */}
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-6">
+            <TabsList>
+              <TabsTrigger value="all">All ({stats.total})</TabsTrigger>
+              <TabsTrigger value="pending">Pending ({stats.pending})</TabsTrigger>
+              <TabsTrigger value="processing">Processing ({stats.processing})</TabsTrigger>
+              <TabsTrigger value="shipped">Shipped ({stats.shipped})</TabsTrigger>
+              <TabsTrigger value="delivered">Delivered ({stats.delivered})</TabsTrigger>
+              <TabsTrigger value="cancelled">Cancelled ({stats.cancelled})</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          {/* Orders Table */}
+          <div className="overflow-x-auto">
+            {filteredOrders.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500">No orders found</p>
+              </div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Order ID</TableHead>
+                    <TableHead>Customer</TableHead>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Payment</TableHead>
+                    <TableHead className="text-right">Total</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredOrders.map((order) => (
+                    <TableRow key={order.id}>
+                      <TableCell className="font-medium">{order.order_number}</TableCell>
+                      <TableCell>
+                        <div>
+                          <p className="font-medium">{order.user?.name || order.customer_name}</p>
+                          <p className="text-sm text-gray-500">{order.user?.email || order.customer_email}</p>
+                        </div>
+                      </TableCell>
+                      <TableCell>{formatDate(order.created_at)}</TableCell>
+                      <TableCell>{getStatusBadge(order.status)}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className="capitalize">
+                          {order.payment_status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right font-medium">{formatCurrency(order.total_amount)}</TableCell>
+                      <TableCell className="text-right">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" className="h-8 w-8 p-0">
+                              <span className="sr-only">Open menu</span>
+                              <MoreHorizontal className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuItem
+                              onClick={() => router.push(`/admin/orders/${order.id}`)}
+                            >
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Details
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  )
+}
         className: "bg-gradient-to-r from-yellow-50 to-amber-50 text-yellow-700 border-yellow-200",
       },
       processing: {
