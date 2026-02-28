@@ -1166,37 +1166,98 @@ body {
   .touch-target {
     @apply min-h-[44px] min-w-[44px];
   }
-  /* Performance-optimized animations - GPU accelerated, smooth and fast */
-  .smooth-animation {
-    will-change: transform, opacity;
+  /* Apple-inspired smooth animations for header */
+  @keyframes appleIconHover {
+    from {
+      transform: translateY(0) translateZ(0);
+      opacity: 1;
+    }
+    to {
+      transform: translateY(-2px) translateZ(0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes appleFadeIn {
+    from {
+      opacity: 0;
+      transform: scale(0.95) translateZ(0);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1) translateZ(0);
+    }
+  }
+
+  /* Ultra-smooth button transitions */
+  .apple-button-hover {
+    @apply transition-all duration-150 ease-out;
+    will-change: background-color, color;
+    transform: translateZ(0);
+  }
+
+  /* Smooth icon appearance */
+  .apple-icon-smooth {
+    @apply stroke-[1.5] transition-colors duration-150;
+    will-change: color;
+  }
+
+  /* Profile avatar - smooth and professional */
+  .apple-avatar {
+    will-change: transform;
     transform: translateZ(0);
     backface-visibility: hidden;
   }
 
-  /* Fast, smooth button hover animations */
-  .smooth-hover {
-    @apply transition-all duration-150 ease-out;
-    will-change: background-color, border-color, color;
+  /* Header entrance animation */
+  @keyframes headerSlideDown {
+    from {
+      transform: translateY(-100%) translateZ(0);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0) translateZ(0);
+      opacity: 1;
+    }
   }
 
-  /* Smooth icon animations */
-  .smooth-icon {
-    @apply transition-colors duration-150;
+  .header-slide-down {
+    animation: headerSlideDown 0.25s ease-out forwards;
+    will-change: transform, opacity;
   }
 
-  /* Performance optimized dropdown animations */
-  .smooth-dropdown {
-    will-change: opacity, transform;
-    transform: translateZ(0);
+  /* Apple-style dropdown fade in */
+  @keyframes dropdownFadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-8px) translateZ(0);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) translateZ(0);
+    }
   }
 
-  /* Admin header specific optimizations */
-  .admin-header-motion {
-    @apply smooth-animation;
+  .dropdown-fade-in {
+    animation: dropdownFadeIn 0.15s ease-out;
   }
 
-  /* Badge pop animation - optimized spring */
-  @keyframes smoothBadgePop {
+  /* Apple search input smooth focus */
+  @keyframes searchFocus {
+    from {
+      background-color: rgb(243, 244, 246);
+    }
+    to {
+      background-color: rgb(255, 255, 255);
+    }
+  }
+
+  .apple-search-focus {
+    animation: searchFocus 0.15s ease-out;
+  }
+
+  /* Badge pop with subtle spring */
+  @keyframes badgePopSmooth {
     0% {
       opacity: 0;
       transform: scale(0.6) translateZ(0);
@@ -1207,19 +1268,18 @@ body {
     }
   }
 
-  /* Ultra-fast fade in */
-  @keyframes ultraFastFade {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
+  .badge-pop-smooth {
+    animation: badgePopSmooth 0.2s cubic-bezier(0.175, 0.885, 0.32, 1.275);
   }
 
-  .ultra-fast-fade {
-    animation: ultraFastFade 0.15s ease-out forwards;
-    will-change: opacity;
+  /* Smooth admin header styling */
+  .admin-header-clean {
+    @apply bg-white border-b border-gray-200;
+    will-change: box-shadow;
+  }
+
+  .admin-header-clean:hover {
+    @apply shadow-sm;
   }
 }
 
