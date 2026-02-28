@@ -28,41 +28,41 @@ import { useProductForm } from "@/hooks/use-product-form"
 import type { Product } from "@/types"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { websocketService } from "@/services/websocket"
-import { useProduct, useProductImages, useCategories, useBrands } from "@/hooks/use-swr-product"
 import { FormProvider } from "react-hook-form"
 import { NetworkDetector } from "@/components/network-detector"
 import { productService } from "@/services/product"
 
-// Function to check if productId is a valid number
-const isValidProductId = (productId: string): boolean => {
-  return !isNaN(Number(productId)) && Number(productId) > 0
+interface EditProductClientProps {
+  productId: string
+  initialProduct: Product
+  initialCategories: any[]
+  initialBrands: any[]
+  initialImages?: any[]
 }
 
-// Client component that receives the unwrapped productId as a prop
-export function EditProductClient({ productId }: { productId: string }) {
+export function EditProductClient({
+  productId,
+  initialProduct,
+  initialCategories,
+  initialBrands,
+  initialImages = [],
+}: EditProductClientProps) {
   const router = useRouter()
   const { isAuthenticated, isLoading: authLoading, logout, refreshAccessToken, getToken } = useAdminAuth()
 
-  const [isLoading, setIsLoading] = useState(true)
-  // Replace these state variables:
-  // const [product, setProduct] = useState<Product | null>(null)
-  // const [categories, setCategories] = useState<any[]>([])
-  // const [brands, setBrands] = useState<any[]>([])
-  // const [isLoadingCategories, setIsLoadingCategories] = useState(true)
-  // const [isLoadingBrands, setIsLoadingBrands] = useState(true)
-
-  // With SWR hooks:
-  const { product, isLoading: isLoadingProduct, isError: productError, mutate: mutateProduct } = useProduct(productId)
-  const { images: productImages, mutate: mutateImages } = useProductImages(
-    isValidProductId(productId) ? productId : undefined,
-  )
-  const {
-    categories,
-    isLoading: isLoadingCategories,
-    isError: categoriesError,
-    mutate: mutateCategories,
-  } = useCategories()
-  const { brands, isLoading: isLoadingBrands, isError: brandsError } = useBrands()
+  // Use initial data from server instead of SWR hooks
+  const [product, setProduct] = useState<Product | null>(initialProduct)
+  const [categories, setCategories] = useState<any[]>(initialCategories)
+  const [brands, setBrands] = useState<any[]>(initialBrands)
+  
+  const isLoadingProduct = false
+  const productError = !product
+  const isLoadingCategories = false
+  const categoriesError = false
+  const isLoadingBrands = false
+  const brandsError = false
+  
+  const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState("basic")
   const [unsavedChangesDialog, setUnsavedChangesDialog] = useState(false)
   const [navigateTo, setNavigateTo] = useState("")
