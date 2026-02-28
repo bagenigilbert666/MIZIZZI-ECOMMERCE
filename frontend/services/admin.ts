@@ -14,7 +14,7 @@ const CACHE_DURATION = 60 * 60 * 1000 // 1 hour
 // ENHANCED TYPE DEFINITIONS - Complete Dashboard & Analytics
 // ============================================================================
 
-interface AdminLoginResponse {
+export interface AdminLoginResponse {
   user: any
   access_token: string
   refresh_token?: string
@@ -22,7 +22,7 @@ interface AdminLoginResponse {
 }
 
 // Enhanced Dashboard Response with all features
-interface AdminDashboardResponse {
+export interface AdminDashboardResponse {
   // Core Counts
   counts: {
     users: number

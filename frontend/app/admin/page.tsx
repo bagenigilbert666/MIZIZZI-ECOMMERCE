@@ -26,11 +26,57 @@ import {
 } from "lucide-react"
 import { useAdminAuth } from "@/contexts/admin/auth-context"
 import { Loader } from "@/components/ui/loader"
-import { adminService } from "@/services/admin"
+import { adminService, type AdminDashboardResponse } from "@/services/admin"
 import { toast } from "@/components/ui/use-toast"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
-import type { AdminDashboardResponse } from "@/services/admin"
+
+// ============================================================================
+// TYPE DEFINITIONS FOR COMPONENTS
+// ============================================================================
+
+interface OrderData {
+  id: string
+  order_number: string
+  user_email: string
+  user_name: string
+  total_amount: number
+  status: string
+  payment_status: string
+  created_at: string
+  items_count: number
+}
+
+interface UserData {
+  id: number | string
+  name: string
+  username: string
+  email: string
+  created_at: string
+  total_spent: number
+  orders_count: number
+  is_premium: boolean
+}
+
+interface ActivityData {
+  id: string | number
+  message: string
+  description: string
+  type: string
+  timestamp: string
+  user_id?: string
+  severity: "info" | "success" | "warning" | "error"
+}
+
+interface ProductData {
+  id: number | string
+  name: string
+  sku?: string
+  sales_count?: number
+  revenue?: number
+  rating?: number
+  stock?: number
+}
 
 export default function AdminDashboardPage() {
   const router = useRouter()
@@ -335,7 +381,7 @@ export default function AdminDashboardPage() {
                   </CardHeader>
                   <CardContent className="p-6">
                     <div className="space-y-3">
-                      {data.recent_orders.slice(0, 4).map((order) => (
+                      {data.recent_orders.slice(0, 4).map((order: OrderData) => (
                         <OrderItem key={order.id} order={order} />
                       ))}
                     </div>
@@ -368,7 +414,7 @@ export default function AdminDashboardPage() {
                   </CardHeader>
                   <CardContent className="p-6">
                     <div className="space-y-3">
-                      {data.low_stock_products.slice(0, 4).map((product) => (
+                      {data.low_stock_products.slice(0, 4).map((product: any) => (
                         <div key={product.id} className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-100">
                           <div className="min-w-0">
                             <p className="font-medium text-sm truncate">{product.name}</p>
@@ -408,7 +454,7 @@ export default function AdminDashboardPage() {
                   </CardHeader>
                   <CardContent className="p-6">
                     <div className="space-y-3">
-                      {data.recent_users.slice(0, 4).map((user) => (
+                      {data.recent_users.slice(0, 4).map((user: UserData) => (
                         <div key={user.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
                           <div className="min-w-0">
                             <p className="font-medium text-sm">{user.name}</p>
@@ -436,7 +482,7 @@ export default function AdminDashboardPage() {
                   </CardHeader>
                   <CardContent className="p-6">
                     <div className="space-y-3">
-                      {data.recent_activities.slice(0, 4).map((activity) => (
+                      {data.recent_activities.slice(0, 4).map((activity: ActivityData) => (
                         <div key={activity.id} className="flex gap-3 pb-3 border-b border-gray-100 last:border-0">
                           <div className={`flex-shrink-0 w-2 h-2 rounded-full mt-2 ${
                             activity.severity === "warning" ? "bg-yellow-500" :
@@ -467,7 +513,7 @@ export default function AdminDashboardPage() {
                 </CardHeader>
                 <CardContent className="p-6">
                     <div className="space-y-3">
-                      {data.best_selling_products.slice(0, 5).map((product) => (
+                      {data.best_selling_products.slice(0, 5).map((product: ProductData) => (
                         <div key={product.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
                           <div className="min-w-0 flex-1">
                             <p className="font-medium text-sm">{product.name}</p>
@@ -488,7 +534,7 @@ export default function AdminDashboardPage() {
                           </div>
                         </div>
                       ))}
-                  </div>
+                    </div>
                 </CardContent>
               </Card>
             )}
@@ -573,7 +619,7 @@ export default function AdminDashboardPage() {
                 </CardHeader>
                 <CardContent className="p-6">
                   <div className="space-y-3">
-                    {data.payment_methods.map((method) => (
+                    {data.payment_methods.map((method: any) => (
                       <div key={method.method} className="flex items-center gap-4">
                         <div className="flex-1">
                           <div className="flex items-center justify-between mb-1">
@@ -687,7 +733,7 @@ function TrendIndicator({ value }: { value: number }) {
   )
 }
 
-function OrderItem({ order }: { order: any }) {
+function OrderItem({ order }: { order: OrderData }) {
   const statusColors: Record<string, string> = {
     pending: "bg-yellow-100 text-yellow-800",
     processing: "bg-blue-100 text-blue-800",
