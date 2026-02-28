@@ -13,15 +13,9 @@ const websocketService = {
   },
 }
 
-async function prefetchData(url: string, params: any): Promise<boolean> {
-  try {
-    const response = await api.get(url, { params })
-    return response.status === 200
-  } catch (error) {
-    console.error(`Error prefetching data from ${url}:`, error)
-    return false
-  }
-}
+// Explicit re-export of types to ensure proper module resolution
+export type { AdminDashboardResponse, AdminLoginResponse }
+
 
 // Define the base URL for admin API endpoints
 const ADMIN_API_BASE = "/api/admin"
@@ -1185,12 +1179,19 @@ export const adminService = {
       })
 
       if (!response.ok) {
+        const errorData = await response.text()
+        console.error("[v0] Orders API error:", {
+          status: response.status,
+          statusText: response.statusText,
+          body: errorData,
+          url: url.toString(),
+        })
         throw new Error(`Orders request failed with status: ${response.status}`)
       }
 
       return await response.json()
     } catch (error) {
-      console.error("Error fetching orders:", error)
+      console.error("[v0] Error fetching orders:", error)
       throw error
     }
   },
