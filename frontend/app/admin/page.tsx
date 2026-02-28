@@ -202,8 +202,8 @@ export default function AdminDashboardPage() {
   } as const
 
   // Calculate growth - with safe defaults
-  const salesGrowth = safeData.sales?.yesterday ? 
-    Math.round(((safeData.sales.today - safeData.sales.yesterday) / safeData.sales.yesterday) * 100)
+  const salesGrowth = (safeData.sales.yesterday || 0) > 0
+    ? Math.round(((safeData.sales.today - safeData.sales.yesterday) / safeData.sales.yesterday) * 100)
     : 0
 
   return (
