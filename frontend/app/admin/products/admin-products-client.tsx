@@ -704,38 +704,44 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
     console.log("[v0] Setting up WebSocket listener for product updates...")
 
     const handleWebSocketProductUpdate = async (data: any) => {
-      console.log("[v0] Received WebSocket product_update event:", data)
-
       const productId = data.product_id || data.productId
+      const eventType = data.type || data.event_type || data.action
+
+      // Skip refetch for delete events — already handled client-side by handleDeleteProductFromList
+      if (eventType === "delete" || eventType === "deleted" || eventType === "product_deleted") {
+        if (productId) {
+          setProductImages((prev) => {
+            const updated = { ...prev }
+            delete updated[productId]
+            return updated
+          })
+          imageBatchService.invalidateCache(productId)
+        }
+        return
+      }
 
       if (productId) {
-        console.log("[v0] Clearing cached image for product:", productId)
-
         setProductImages((prev) => {
           const updated = { ...prev }
           delete updated[productId]
           return updated
         })
 
-        // Also invalidate the image batch service cache
         imageBatchService.invalidateCache(productId)
 
         if (typeof localStorage !== "undefined") {
           try {
             localStorage.removeItem(`product_images_${productId}`)
-            console.log("[v0] Cleared localStorage cache for product:", productId)
           } catch (error) {
-            console.error("[v0] Error clearing localStorage:", error)
+            // Ignore localStorage errors
           }
         }
       }
 
       // Wait a moment for backend to finish processing
-      console.log("[v0] Waiting 500ms for backend to process...")
       await new Promise((resolve) => setTimeout(resolve, 500))
 
       // Refetch all products to get updated data
-      console.log("[v0] Refetching products with fresh data...")
       await fetchProducts()
     }
 

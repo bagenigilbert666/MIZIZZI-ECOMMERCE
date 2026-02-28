@@ -1029,63 +1029,6 @@ export const adminService = {
       throw error
     }
   },
-      const headers = {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      }
-
-      // Add a timeout to ensure the request doesn't hang
-      const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 15000) // 15 second timeout
-
-      try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/admin/products/${id}`, {
-          method: "DELETE",
-          headers: headers,
-          signal: controller.signal,
-          credentials: "include", // Add credentials: include to ensure cookies are sent
-        })
-
-        clearTimeout(timeoutId)
-
-        // Check if the response is ok
-        if (!response.ok) {
-          // Handle 401 Unauthorized specifically
-          if (response.status === 401) {
-            throw new Error("Authentication failed. Your session has expired. Please log in again.")
-          }
-
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.message || `Failed to delete product. Status: ${response.status}`)
-        }
-
-        // Parse the response
-        const responseData = await response.json()
-        console.log("Delete product response:", responseData)
-
-        // Notify about product deletion
-        try {
-          this.notifyProductUpdate(id)
-        } catch (notifyError) {
-          console.warn("Failed to notify about product deletion:", notifyError)
-        }
-
-        return responseData || { success: true, message: "Product deleted successfully" }
-      } catch (fetchError: any) {
-        clearTimeout(timeoutId)
-
-        if (fetchError.name === "AbortError") {
-          console.error("Delete request timed out")
-          throw new Error("Request timed out. The product may or may not have been deleted.")
-        }
-
-        throw fetchError
-      }
-    } catch (error: any) {
-      console.error("Error deleting product:", error)
-      throw error
-    }
-  },
 
   // Create a product
   async createProduct(data: ProductCreatePayload): Promise<Product> {
