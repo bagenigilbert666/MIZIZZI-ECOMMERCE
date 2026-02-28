@@ -1369,20 +1369,34 @@ export const adminService = {
 
       const url = `${baseUrl}/api/admin/categories${queryParams.toString() ? `?${queryParams.toString()}` : ""}`
 
-      const response = await fetch(url, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        credentials: "include",
-      })
+      const makeRequest = async (currentToken: string) => {
+        const response = await fetch(url, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${currentToken}`,
+          },
+          credentials: "include",
+        })
 
-      if (!response.ok) {
-        throw new Error(`Categories request failed with status: ${response.status}`)
+        if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error(`Categories request failed with status: 401 - Token expired`)
+          }
+          throw new Error(`Categories request failed with status: ${response.status}`)
+        }
+
+        return response.json()
       }
 
-      return await response.json()
+      try {
+        return await makeRequest(token)
+      } catch (error: any) {
+        if (error.message?.includes("401")) {
+          return this.handleAuthError(error, () => makeRequest(token))
+        }
+        throw error
+      }
     } catch (error) {
       console.error("Error fetching categories:", error)
       throw error
@@ -1531,45 +1545,11 @@ export const adminService = {
       // Handle token expiration
       if (!response.ok && response.status === 401) {
         const errorText = await response.text()
-        let errorData
+        const error = new Error(`Brands request failed with status: 401 - ${errorText}`)
         try {
-          errorData = JSON.parse(errorText)
-        } catch (e) {
-          errorData = { error: errorText }
-        }
-
-        console.error("[v0] Brands request failed:", {
-          status: response.status,
-          statusText: response.statusText,
-          body: errorText,
-        })
-
-        // Check if it's a token expiration error
-        if (errorData.code === "token_expired") {
-          console.log("[v0] Token expired, attempting refresh...")
-          const refreshSuccess = await this.refreshTokenAndRetry()
-
-          if (refreshSuccess) {
-            // Retry with new token
-            const newToken = localStorage.getItem("admin_token") || localStorage.getItem("mizizzi_token")
-            if (newToken) {
-              console.log("[v0] Retrying brands request with refreshed token...")
-              response = await makeRequest(newToken)
-
-              if (!response.ok) {
-                const retryErrorText = await response.text()
-                throw new Error(
-                  `Brands request failed after token refresh with status: ${response.status} - ${retryErrorText}`,
-                )
-              }
-            } else {
-              throw new Error("Token refresh succeeded but no new token found")
-            }
-          } else {
-            throw new Error(`Brands request failed with status: ${response.status} - ${errorText}`)
-          }
-        } else {
-          throw new Error(`Brands request failed with status: ${response.status} - ${errorText}`)
+          return await this.handleAuthError(error, () => makeRequest(token).then(r => r.json()))
+        } catch (retryError) {
+          throw retryError
         }
       } else if (!response.ok) {
         const errorText = await response.text()
@@ -1586,6 +1566,35 @@ export const adminService = {
       console.error("[v0] Error fetching brands:", error)
       throw error
     }
+  },
+
+  // Helper function to handle 401 responses with automatic token refresh
+  private async handleAuthError(error: any, retryFn: () => Promise<any>, retryCount = 1): Promise<any> {
+    if (retryCount > 2) {
+      throw error // Don't retry more than twice
+    }
+
+    const errorMsg = error?.message || ""
+    const isAuthError = errorMsg.includes("401") || errorMsg.includes("token_expired") || errorMsg.includes("expired")
+
+    if (isAuthError) {
+      console.log(`[v0] Auth error detected, attempting token refresh (attempt ${retryCount})...`)
+      const refreshSuccess = await this.refreshTokenAndRetry()
+
+      if (refreshSuccess) {
+        console.log("[v0] Token refreshed successfully, retrying request...")
+        try {
+          return await retryFn()
+        } catch (retryError) {
+          return this.handleAuthError(retryError, retryFn, retryCount + 1)
+        }
+      } else {
+        console.log("[v0] Token refresh failed, giving up")
+        throw error
+      }
+    }
+
+    throw error
   },
 
   // Get all brands (no pagination) for dropdowns
@@ -2239,44 +2248,54 @@ export const adminService = {
         throw new Error("Authentication token not found. Please log in again.")
       }
 
-      // Use local API route to proxy the request (avoids CORS issues)
-      const endpoint = `/api/admin/products/${productId}/images`
+      const makeRequest = async (currentToken: string) => {
+        const endpoint = `/api/admin/products/${productId}/images`
 
-      const response = await fetch(endpoint, {
-        method: "GET",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-      })
+        const response = await fetch(endpoint, {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${currentToken}`,
+          },
+        })
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error("Authentication failed. Your session has expired. Please log in again.")
-        } else if (response.status === 404) {
-          console.log("[v0] No images found for product:", productId)
-          return []
-        } else {
-          const errorData = await response.json().catch(() => ({}))
-          throw new Error(errorData.message || `Failed to fetch product images. Status: ${response.status}`)
+        if (!response.ok) {
+          if (response.status === 401) {
+            throw new Error(`Authentication failed with status: 401 - Token expired`)
+          } else if (response.status === 404) {
+            console.log("[v0] No images found for product:", productId)
+            return [] as ProductImage[]
+          } else {
+            const errorData = await response.json().catch(() => ({}))
+            throw new Error(errorData.message || `Failed to fetch product images. Status: ${response.status}`)
+          }
         }
+
+        const data = await response.json()
+        console.log("[v0] Product images response:", data)
+
+        // Handle different response formats
+        let images: ProductImage[] = []
+        if (Array.isArray(data)) {
+          images = data
+        } else if (data.images && Array.isArray(data.images)) {
+          images = data.images
+        } else if (data.data && Array.isArray(data.data)) {
+          images = data.data
+        }
+
+        console.log("[v0] Parsed product images:", images.length)
+        return images
       }
 
-      const data = await response.json()
-      console.log("[v0] Product images response:", data)
-
-      // Handle different response formats
-      let images: ProductImage[] = []
-      if (Array.isArray(data)) {
-        images = data
-      } else if (data.images && Array.isArray(data.images)) {
-        images = data.images
-      } else if (data.data && Array.isArray(data.data)) {
-        images = data.data
+      try {
+        return await makeRequest(token)
+      } catch (error: any) {
+        if (error.message?.includes("401")) {
+          return this.handleAuthError(error, () => makeRequest(token))
+        }
+        throw error
       }
-
-      console.log("[v0] Parsed product images:", images.length)
-      return images
     } catch (error) {
       console.error("[v0] Error fetching product images:", error)
       throw error

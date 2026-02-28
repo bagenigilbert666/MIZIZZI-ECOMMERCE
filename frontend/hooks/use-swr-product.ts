@@ -117,48 +117,12 @@ const fetcher = async (url: string): Promise<any> => {
         }
       } else if (url.includes("/categories")) {
         console.log("Fetching categories using adminService")
-        try {
-          const response = await adminService.getCategories()
-          data = response?.items || []
-        } catch (error: any) {
-          console.error("[v0] Error fetching categories:", error)
-          // If token expired, try to refresh and retry once
-          if (error.message?.includes("401") || error.message?.includes("expired")) {
-            console.log("[v0] Attempting token refresh and retry for categories...")
-            try {
-              await adminService.refreshTokenAndRetry()
-              const retryResponse = await adminService.getCategories()
-              data = retryResponse?.items || []
-            } catch (retryError) {
-              console.error("[v0] Categories fetch failed even after token refresh:", retryError)
-              return [] as any
-            }
-          } else {
-            return [] as any
-          }
-        }
+        const response = await adminService.getCategories()
+        data = response?.items || []
       } else if (url.includes("/brands")) {
         console.log("Fetching brands using adminService")
-        try {
-          const response = await adminService.getBrands()
-          data = response?.items || []
-        } catch (error: any) {
-          console.error("[v0] Error fetching brands:", error)
-          // If token expired, try to refresh and retry once
-          if (error.message?.includes("401") || error.message?.includes("expired")) {
-            console.log("[v0] Attempting token refresh and retry for brands...")
-            try {
-              await adminService.refreshTokenAndRetry()
-              const retryResponse = await adminService.getBrands()
-              data = retryResponse?.items || []
-            } catch (retryError) {
-              console.error("[v0] Brands fetch failed even after token refresh:", retryError)
-              return [] as any
-            }
-          } else {
-            return [] as any
-          }
-        }
+        const response = await adminService.getBrands()
+        data = response?.items || []
       }
 
       // Cache the result
