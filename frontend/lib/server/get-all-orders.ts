@@ -1,5 +1,18 @@
 import type { Order } from "@/types"
-import { orderService } from "@/services/orders"
+
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
+
+function extractOrders(payload: any): Order[] {
+  const data = payload?.data ?? payload
+
+  // Try different response formats
+  if (Array.isArray(data?.orders)) return data.orders
+  if (Array.isArray(data?.items)) return data.items
+  if (Array.isArray(data)) return data
+  if (data?.data && Array.isArray(data.data)) return data.data
+
+  return []
+}
 
 function calculateOrderStats(orders: Order[]): {
   total: number
@@ -32,16 +45,35 @@ export async function getAllOrders(
   includeStats = true
 ): Promise<{ orders: Order[]; stats: any; pagination: any }> {
   try {
-    console.log("[v0] getAllOrders: Fetching orders from service")
-    
-    // Fetch orders using the order service (which connects to the backend)
-    const orders = await orderService.getOrders({
-      per_page: limit,
-      page: page,
-      include_items: true,
+    console.log("[v0] getAllOrders: Fetching orders from backend at", API_BASE_URL)
+
+    // Fetch from the backend orders API endpoint
+    const url = new URL(`${API_BASE_URL}/api/orders`)
+    url.searchParams.append("per_page", String(limit))
+    url.searchParams.append("page", String(page))
+    url.searchParams.append("include_items", "true")
+
+    const response = await fetch(url.toString(), {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      next: {
+        revalidate: 60, // ISR: revalidate every 60 seconds
+        tags: ["all-orders"],
+      },
     })
 
-    console.log("[v0] getAllOrders: Received", orders.length, "orders")
+    if (!response.ok) {
+      console.error("[v0] getAllOrders: API returned status", response.status)
+      throw new Error(`API returned status ${response.status}`)
+    }
+
+    const data = await response.json()
+    console.log("[v0] getAllOrders: API response:", data)
+
+    const orders = extractOrders(data)
+    console.log("[v0] getAllOrders: Extracted", orders.length, "orders")
 
     // Calculate stats from the orders
     const stats = calculateOrderStats(orders)
