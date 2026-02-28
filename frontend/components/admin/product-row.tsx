@@ -80,9 +80,9 @@ const ProductRow = memo(function ProductRow({
   const handleConfirmDelete = useCallback(async () => {
     setIsDeleting(true)
     try {
-      const result = await adminService.deleteProduct(String(product.id))
+      await adminService.deleteProduct(String(product.id))
       
-      // Show success state in dialog (API returns successfully if no error thrown)
+      // Immediately show success state
       setDeleteSuccess(true)
       
       // Show toast notification
@@ -93,13 +93,16 @@ const ProductRow = memo(function ProductRow({
         duration: 3000,
       })
       
-      // Close dialog after showing success state, then remove from list
-      setTimeout(() => {
+      // After 1.5 seconds, close dialog and remove from list
+      const timeoutId = setTimeout(() => {
         setShowDeleteDialog(false)
-        setDeleteSuccess(false)
         setIsDeleting(false)
+        setDeleteSuccess(false)
         onDelete?.(String(product.id))
       }, 1500)
+      
+      // Cleanup timeout if component unmounts
+      return () => clearTimeout(timeoutId)
     } catch (error: any) {
       const errorMessage = error?.message || "Failed to delete product"
       toast({
@@ -109,8 +112,9 @@ const ProductRow = memo(function ProductRow({
         duration: 4000,
       })
       setIsDeleting(false)
+      setDeleteSuccess(false)
     }
-  }, [product.id, product.name, onDelete])
+  }, [product.id, product.name, onDelete, toast])
 
   // Close menu when clicking outside
   useEffect(() => {
