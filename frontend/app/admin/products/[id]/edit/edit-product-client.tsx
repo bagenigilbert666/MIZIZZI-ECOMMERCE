@@ -26,44 +26,39 @@ import { ProductSeoTab } from "@/components/admin/products/product-seo-tab"
 import { ProductSpecificationsHighlightsTab } from "@/components/admin/products/product-specifications-highlights-tab"
 import { useProductForm } from "@/hooks/use-product-form"
 import type { Product } from "@/types"
+import { useProduct, useProductImages, useCategories, useBrands } from "@/hooks/use-swr-product"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { websocketService } from "@/services/websocket"
 import { FormProvider } from "react-hook-form"
 import { NetworkDetector } from "@/components/network-detector"
 import { productService } from "@/services/product"
 
-// Client component that receives server-fetched data as props
+// Client component that receives the product ID and fetches data client-side
 interface EditProductClientProps {
   productId: string
-  initialProduct: Product
-  initialCategories: any[]
-  initialBrands: any[]
-  initialImages: any[]
 }
 
-export function EditProductClient({ 
-  productId, 
-  initialProduct,
-  initialCategories,
-  initialBrands,
-  initialImages,
-}: EditProductClientProps) {
+// Function to check if productId is a valid number
+const isValidProductId = (productId: string): boolean => {
+  return !isNaN(Number(productId)) && Number(productId) > 0
+}
+
+export function EditProductClient({ productId }: EditProductClientProps) {
   const router = useRouter()
   const { isAuthenticated, isLoading: authLoading, logout, refreshAccessToken, getToken } = useAdminAuth()
 
-  // Initialize state with server-fetched data for instant display
-  const [product, setProduct] = useState<Product | null>(initialProduct)
-  const [categories, setCategories] = useState<any[]>(initialCategories)
-  const [brands, setBrands] = useState<any[]>(initialBrands)
-  const [productImages, setProductImages] = useState<any[]>(initialImages)
-
-  // No loading needed - data is already fetched server-side
-  const isLoadingProduct = false
-  const isLoadingCategories = false
-  const isLoadingBrands = false
-  const productError = !product
-  const categoriesError = false
-  const brandsError = false
+  // Use SWR hooks to fetch data client-side
+  const { product, isLoading: isLoadingProduct, isError: productError, mutate: mutateProduct } = useProduct(productId)
+  const { images: productImages, mutate: mutateImages } = useProductImages(
+    isValidProductId(productId) ? productId : undefined,
+  )
+  const {
+    categories,
+    isLoading: isLoadingCategories,
+    isError: categoriesError,
+    mutate: mutateCategories,
+  } = useCategories()
+  const { brands, isLoading: isLoadingBrands, isError: brandsError } = useBrands()
   
   const [isLoading, setIsLoading] = useState(false)
   const [activeTab, setActiveTab] = useState("basic")
@@ -114,6 +109,8 @@ export function EditProductClient({
       setTimeout(() => {
         setSaveSuccess(false)
       }, 3000)
+      mutateProduct()
+      mutateImages()
     },
     onError: (error: string) => {
       setApiError(error)
@@ -368,6 +365,8 @@ export function EditProductClient({
                   productService.invalidateProductCache(productId)
                   await new Promise((resolve) => setTimeout(resolve, 500))
 
+                  mutateProduct(undefined, { revalidate: true })
+                  mutateImages(undefined, { revalidate: true })
                   return true
                 }
               }
@@ -436,6 +435,9 @@ export function EditProductClient({
           productService.invalidateProductCache(productId)
           await new Promise((resolve) => setTimeout(resolve, 500))
 
+          mutateProduct(undefined, { revalidate: true })
+          mutateImages(undefined, { revalidate: true })
+
           return true
         } catch (fetchError: any) {
           clearTimeout(timeoutId)
@@ -484,6 +486,8 @@ export function EditProductClient({
       toast,
       resetForm,
       setFormChanged,
+      mutateProduct,
+      mutateImages,
     ],
   )
 
@@ -588,6 +592,7 @@ export function EditProductClient({
                     isLoadingBrands={isLoadingBrands}
                     brandError={brandError}
                     saveSectionChanges={saveSectionChanges}
+                    mutateCategories={mutateCategories}
                   />
                 </TabsContent>
 
