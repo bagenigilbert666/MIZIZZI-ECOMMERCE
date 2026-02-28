@@ -29,12 +29,8 @@ export default async function AdminInventoryPage() {
     initialInventory = response.items
     initialStats = response.stats
     
-    console.log("[v0] Inventory Page: Fetched", initialInventory.length, "items")
-    console.log("[v0] Inventory Page: Stats =", initialStats)
-    
     if (response.error) {
       error = response.error
-      console.warn("[v0] Inventory Page: API returned error:", error)
     }
   } catch (err: any) {
     console.error("Error fetching inventory:", err)
