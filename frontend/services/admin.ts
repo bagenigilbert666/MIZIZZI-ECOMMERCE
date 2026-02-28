@@ -239,10 +239,6 @@ export const adminService = {
       return false
     }
   },
-    localStorage.removeItem("admin_refresh_token")
-    localStorage.removeItem("user")
-    localStorage.removeItem("admin_user")
-  },
 
   // Dashboard data
   async getDashboardData(params?: { from_date?: string; to_date?: string }): Promise<AdminDashboardResponse> {
@@ -337,52 +333,6 @@ export const adminService = {
     } catch (error) {
       console.error("[v0] Error fetching dashboard data:", error)
       return this.getDefaultDashboardData()
-    }
-  },
-
-  async refreshToken(): Promise<void> {
-    const refreshToken = localStorage.getItem("mizizzi_refresh_token") || localStorage.getItem("admin_refresh_token")
-
-    if (!refreshToken) {
-      console.log("[v0] No refresh token available, clearing all tokens")
-      localStorage.removeItem("mizizzi_token")
-      localStorage.removeItem("admin_token")
-      localStorage.removeItem("mizizzi_refresh_token")
-      localStorage.removeItem("admin_refresh_token")
-      localStorage.removeItem("mizizzi_csrf_token")
-
-      // Redirect to login page
-      if (typeof window !== "undefined") {
-        window.location.href = "/admin/login"
-      }
-      return
-    }
-
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"
-
-    const response = await fetch(`${baseUrl}/api/admin/auth/refresh`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ refresh_token: refreshToken }),
-      credentials: "include",
-    })
-
-    if (!response.ok) {
-      throw new Error("Token refresh failed")
-    }
-
-    const data = await response.json()
-
-    // Update tokens in localStorage
-    if (data.access_token) {
-      localStorage.setItem("mizizzi_token", data.access_token)
-      localStorage.setItem("admin_token", data.access_token)
-    }
-    if (data.refresh_token) {
-      localStorage.setItem("mizizzi_refresh_token", data.refresh_token)
-      localStorage.setItem("admin_refresh_token", data.refresh_token)
     }
   },
 
