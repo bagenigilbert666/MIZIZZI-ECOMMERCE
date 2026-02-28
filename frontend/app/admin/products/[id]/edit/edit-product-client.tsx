@@ -32,7 +32,6 @@ import { useProduct, useProductImages, useCategories, useBrands } from "@/hooks/
 import { FormProvider } from "react-hook-form"
 import { NetworkDetector } from "@/components/network-detector"
 import { productService } from "@/services/product"
-import { updateProductAction, deleteProductImageAction, uploadProductImagesAction } from "./actions"
 
 // Function to check if productId is a valid number
 const isValidProductId = (productId: string): boolean => {

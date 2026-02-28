@@ -7,7 +7,6 @@ import * as z from "zod"
 import { adminService } from "@/services/admin"
 import { generateSlug } from "@/lib/utils"
 import type { Product, ProductVariant } from "@/types"
-import { updateProductAction } from "@/app/admin/products/[id]/edit/actions"
 
 // Helper function to validate product IDs
 function isValidProductId(id: string | undefined): boolean {
@@ -209,11 +208,11 @@ export function useProductForm({ productId, onSuccess, onError }: UseProductForm
     [setValue],
   )
 
-  // Handle form submission with SSR via Server Action
+  // Handle form submission with optimistic updates
   const handleSubmit = async (data: ProductFormValues) => {
     try {
       setIsSubmitting(true)
-      console.log("[v0] Form submission via Server Action:", data)
+      console.log("[v0] Form submission started:", data)
 
       // Prepare product data for submission
       const productData = {
@@ -228,28 +227,23 @@ export function useProductForm({ productId, onSuccess, onError }: UseProductForm
         productData.brand_id = null
       }
 
-      console.log("[v0] Submitting to Server Action:", productData)
+      console.log("[v0] Submitting product data:", productData)
 
-      // Call Server Action for instant SSR updates with cache revalidation
-      const result = await updateProductAction(productId, productData)
+      // Update the product via API
+      const updatedProduct = await adminService.updateProduct(productId, productData)
+      console.log("[v0] Product updated successfully:", updatedProduct)
 
-      if (result.success) {
-        console.log("[v0] Server Action success - data is instantly live", result.data)
+      // Call the success callback - this will trigger SWR revalidation
+      onSuccess(updatedProduct)
 
-        // Call the success callback
-        onSuccess(result.data)
-
-        // Update local storage to track last saved time
-        try {
-          localStorage.setItem(`product_${productId}_last_saved`, new Date().toISOString())
-        } catch (storageError) {
-          console.warn("Could not save to localStorage:", storageError)
-        }
-      } else {
-        throw new Error(result.error || "Failed to update product")
+      // Update local storage to track last saved time
+      try {
+        localStorage.setItem(`product_${productId}_last_saved`, new Date().toISOString())
+      } catch (storageError) {
+        console.warn("Could not save to localStorage:", storageError)
       }
     } catch (error: any) {
-      console.error("[v0] Server Action error:", error)
+      console.error("[v0] Failed to update product:", error)
       const errorMessage = error.message || "There was a problem updating the product. Please try again."
       onError(errorMessage)
     } finally {
