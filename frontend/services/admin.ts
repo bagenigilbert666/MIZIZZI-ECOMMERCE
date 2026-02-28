@@ -193,8 +193,51 @@ export const adminService = {
     localStorage.removeItem("mizizzi_csrf_token")
     localStorage.removeItem("admin_token")
     localStorage.removeItem("admin_refresh_token")
-    localStorage.removeItem("user")
     localStorage.removeItem("admin_user")
+    localStorage.removeItem("user")
+  },
+
+  async refreshToken(): Promise<boolean> {
+    try {
+      const refreshToken = localStorage.getItem("mizizzi_refresh_token") || localStorage.getItem("admin_refresh_token")
+      if (!refreshToken) {
+        console.log("[v0] No refresh token available")
+        return false
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/refresh`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${refreshToken}`,
+        },
+        credentials: "include",
+      })
+
+      if (!response.ok) {
+        console.log("[v0] Token refresh failed with status:", response.status)
+        return false
+      }
+
+      const data = await response.json()
+
+      // Store new access token
+      if (data.access_token) {
+        localStorage.setItem("mizizzi_token", data.access_token)
+        localStorage.setItem("admin_token", data.access_token)
+      }
+
+      // Store new refresh token if provided
+      if (data.refresh_token) {
+        localStorage.setItem("mizizzi_refresh_token", data.refresh_token)
+        localStorage.setItem("admin_refresh_token", data.refresh_token)
+      }
+
+      return true
+    } catch (error) {
+      console.error("[v0] Token refresh error:", error)
+      return false
+    }
   },
 
   // Dashboard data
@@ -290,52 +333,6 @@ export const adminService = {
     } catch (error) {
       console.error("[v0] Error fetching dashboard data:", error)
       return this.getDefaultDashboardData()
-    }
-  },
-
-  async refreshToken(): Promise<void> {
-    const refreshToken = localStorage.getItem("mizizzi_refresh_token") || localStorage.getItem("admin_refresh_token")
-
-    if (!refreshToken) {
-      console.log("[v0] No refresh token available, clearing all tokens")
-      localStorage.removeItem("mizizzi_token")
-      localStorage.removeItem("admin_token")
-      localStorage.removeItem("mizizzi_refresh_token")
-      localStorage.removeItem("admin_refresh_token")
-      localStorage.removeItem("mizizzi_csrf_token")
-
-      // Redirect to login page
-      if (typeof window !== "undefined") {
-        window.location.href = "/admin/login"
-      }
-      return
-    }
-
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"
-
-    const response = await fetch(`${baseUrl}/api/admin/auth/refresh`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ refresh_token: refreshToken }),
-      credentials: "include",
-    })
-
-    if (!response.ok) {
-      throw new Error("Token refresh failed")
-    }
-
-    const data = await response.json()
-
-    // Update tokens in localStorage
-    if (data.access_token) {
-      localStorage.setItem("mizizzi_token", data.access_token)
-      localStorage.setItem("admin_token", data.access_token)
-    }
-    if (data.refresh_token) {
-      localStorage.setItem("mizizzi_refresh_token", data.refresh_token)
-      localStorage.setItem("admin_refresh_token", data.refresh_token)
     }
   },
 
@@ -824,13 +821,15 @@ export const adminService = {
    */
   async updateProduct(id: string, data: any): Promise<Product> {
     try {
-      console.log("Updating product with data:", data)
+      console.log("[v0] Updating product with data:", data)
 
-      // Get the token from localStorage
-      const token = localStorage.getItem("admin_token")
+      // Get the token - check both mizizzi_token and admin_token
+      const token = localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
       if (!token) {
         throw new Error("Authentication token not found. Please log in again.")
       }
+
+      console.log("[v0] Using token for update:", token.substring(0, 20) + "...")
 
       // Set up headers with authentication
       const headers = {
@@ -843,8 +842,12 @@ export const adminService = {
       const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
 
       try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || ""
+        const endpoint = `${apiUrl}/api/admin/products/${id}`
+        console.log("[v0] Making PUT request to:", endpoint)
+
         // Make the API call with proper headers and timeout
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/admin/products/${id}`, {
+        const response = await fetch(endpoint, {
           method: "PUT",
           headers: headers,
           body: JSON.stringify(data),
@@ -853,21 +856,51 @@ export const adminService = {
 
         clearTimeout(timeoutId)
 
+        console.log("[v0] Response status:", response.status)
+
         // Check if the response is ok
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}))
-          console.error("API error response:", errorData)
+          console.error("[v0] API error response:", errorData)
+          
+          // Handle 401 specifically
+          if (response.status === 401) {
+            // Try to refresh token
+            console.log("[v0] Got 401, attempting to refresh token")
+            try {
+              await this.refreshToken()
+              // Retry the update with new token
+              const newToken = localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
+              if (newToken) {
+                headers.Authorization = `Bearer ${newToken}`
+                const retryResponse = await fetch(endpoint, {
+                  method: "PUT",
+                  headers: headers,
+                  body: JSON.stringify(data),
+                })
+                if (retryResponse.ok) {
+                  const responseData = await retryResponse.json()
+                  console.log("[v0] Product updated successfully after token refresh:", responseData)
+                  return responseData
+                }
+              }
+            } catch (refreshError) {
+              console.error("[v0] Token refresh failed:", refreshError)
+            }
+            throw new Error("Authentication failed. Your session has expired. Please log in again.")
+          }
+          
           throw new Error(errorData.message || `Failed to update product. Status: ${response.status}`)
         }
 
         // Parse the response
         const responseData = await response.json()
-        console.log("Product updated successfully:", responseData)
+        console.log("[v0] Product updated successfully:", responseData)
 
         // Notify about product update via WebSocket
         try {
           websocketService.send("product_updated", { id: id, timestamp: Date.now() })
-          console.log("WebSocket notification sent for product update")
+          console.log("[v0] WebSocket notification sent for product update")
 
           // Invalidate cache for this product
           this.invalidateProductCache(id)
@@ -876,10 +909,10 @@ export const adminService = {
           if (typeof window !== "undefined") {
             const event = new CustomEvent("product-updated", { detail: { id, product: responseData } })
             window.dispatchEvent(event)
-            console.log("Custom event dispatched for product update")
+            console.log("[v0] Custom event dispatched for product update")
           }
         } catch (notifyError) {
-          console.warn("Failed to notify about product update:", notifyError)
+          console.warn("[v0] Failed to notify about product update:", notifyError)
         }
 
         return responseData
@@ -887,20 +920,14 @@ export const adminService = {
         clearTimeout(timeoutId)
 
         if (fetchError.name === "AbortError") {
-          console.error("Update request timed out")
+          console.error("[v0] Update request timed out")
           throw new Error("Request timed out. Please try again.")
         }
 
         throw fetchError
       }
     } catch (error: any) {
-      console.error("Error updating product:", error)
-
-      // Check if this is an authentication error
-      if (error.response?.status === 401 || error.message?.includes("Authentication")) {
-        throw new Error("Authentication failed. Your session has expired. Please log in again.")
-      }
-
+      console.error("[v0] Error updating product:", error)
       throw error
     }
   },
@@ -908,10 +935,10 @@ export const adminService = {
   // Delete a product
   async deleteProduct(id: string): Promise<{ success: boolean; message: string }> {
     try {
-      console.log("Deleting product with ID:", id)
+      console.log("[v0] Deleting product with ID:", id)
 
-      // Get the token from localStorage
-      const token = localStorage.getItem("admin_token")
+      // Get the token - check both mizizzi_token and admin_token
+      const token = localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
       if (!token) {
         throw new Error("Authentication token not found. Please log in again.")
       }
@@ -922,55 +949,80 @@ export const adminService = {
         Authorization: `Bearer ${token}`,
       }
 
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || ""
+      const endpoint = `${apiUrl}/api/admin/products/${id}`
+      console.log("[v0] Making DELETE request to:", endpoint)
+
       // Add a timeout to ensure the request doesn't hang
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 15000) // 15 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
 
       try {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/admin/products/${id}`, {
+        // Make the API call with proper headers and timeout
+        const response = await fetch(endpoint, {
           method: "DELETE",
           headers: headers,
           signal: controller.signal,
-          credentials: "include", // Add credentials: include to ensure cookies are sent
         })
 
         clearTimeout(timeoutId)
 
+        console.log("[v0] Delete response status:", response.status)
+
         // Check if the response is ok
         if (!response.ok) {
-          // Handle 401 Unauthorized specifically
+          const errorData = await response.json().catch(() => ({}))
+          console.error("[v0] API error response:", errorData)
+          
+          // Handle 401 specifically
           if (response.status === 401) {
+            console.log("[v0] Got 401, attempting to refresh token")
+            try {
+              await this.refreshToken()
+              // Retry the delete with new token
+              const newToken = localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
+              if (newToken) {
+                headers.Authorization = `Bearer ${newToken}`
+                const retryResponse = await fetch(endpoint, {
+                  method: "DELETE",
+                  headers: headers,
+                })
+                if (retryResponse.ok) {
+                  const responseData = await retryResponse.json()
+                  console.log("[v0] Product deleted successfully after token refresh")
+                  this.invalidateProductCache(id)
+                  return responseData
+                }
+              }
+            } catch (refreshError) {
+              console.error("[v0] Token refresh failed:", refreshError)
+            }
             throw new Error("Authentication failed. Your session has expired. Please log in again.")
           }
-
-          const errorData = await response.json().catch(() => ({}))
+          
           throw new Error(errorData.message || `Failed to delete product. Status: ${response.status}`)
         }
 
         // Parse the response
         const responseData = await response.json()
-        console.log("Delete product response:", responseData)
+        console.log("[v0] Product deleted successfully:", responseData)
 
-        // Notify about product deletion
-        try {
-          this.notifyProductUpdate(id)
-        } catch (notifyError) {
-          console.warn("Failed to notify about product deletion:", notifyError)
-        }
+        // Invalidate cache for this product
+        this.invalidateProductCache(id)
 
-        return responseData || { success: true, message: "Product deleted successfully" }
+        return responseData
       } catch (fetchError: any) {
         clearTimeout(timeoutId)
 
         if (fetchError.name === "AbortError") {
-          console.error("Delete request timed out")
-          throw new Error("Request timed out. The product may or may not have been deleted.")
+          console.error("[v0] Delete request timed out")
+          throw new Error("Request timed out. Please try again.")
         }
 
         throw fetchError
       }
     } catch (error: any) {
-      console.error("Error deleting product:", error)
+      console.error("[v0] Error deleting product:", error)
       throw error
     }
   },

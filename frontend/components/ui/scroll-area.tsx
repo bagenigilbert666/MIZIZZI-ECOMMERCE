@@ -17,6 +17,10 @@ const ScrollArea = React.forwardRef<
 ))
 ScrollArea.displayName = ScrollAreaPrimitive.Root.displayName
 
+// Keep ScrollBar as a simple component to avoid forwarding `ref` into the
+// Radix primitive which can trigger React 19 dev-time warnings about
+// `element.ref` accessors. If a ref is required later, wrap explicitly where
+// it's needed.
 const ScrollBar = React.forwardRef<
   React.ElementRef<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>,
   React.ComponentPropsWithoutRef<typeof ScrollAreaPrimitive.ScrollAreaScrollbar>
@@ -35,7 +39,7 @@ const ScrollBar = React.forwardRef<
     <ScrollAreaPrimitive.ScrollAreaThumb className="relative flex-1 rounded-full bg-border" />
   </ScrollAreaPrimitive.ScrollAreaScrollbar>
 ))
-ScrollBar.displayName = ScrollAreaPrimitive.ScrollAreaScrollbar.displayName
+ScrollBar.displayName = "ScrollBar"
 
 export { ScrollArea, ScrollBar }
 
