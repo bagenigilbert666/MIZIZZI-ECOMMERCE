@@ -109,12 +109,8 @@ export default function OrdersPageContent({ initialData }: { initialData?: Order
     }
   }, [isAuthenticated, authLoading, router])
 
-  // Fetch orders immediately on mount - NO LOADING STATE
-  useEffect(() => {
-    if (isAuthenticated) {
-      fetchOrdersInstantly()
-    }
-  }, [isAuthenticated])
+  // Don't fetch on mount - data is already fetched server-side via initialData
+  // Only refresh manually via handleRefresh button
 
   // Instant fetch without loading state
   const fetchOrdersInstantly = async () => {

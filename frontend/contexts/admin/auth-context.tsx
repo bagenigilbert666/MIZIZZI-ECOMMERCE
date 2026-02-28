@@ -59,6 +59,26 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
     return token
   }
 
+  // Helper to also store token in cookies for SSR
+  const storeTokenInCookie = (token: string) => {
+    if (typeof window === "undefined") return
+    // Store in cookie via server action - this will make it accessible server-side
+    fetch("/api/auth/set-cookie", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    }).catch((e) => console.log("[v0] Failed to set cookie:", e))
+  }
+
+  const storeRefreshTokenInCookie = (token: string) => {
+    if (typeof window === "undefined") return
+    fetch("/api/auth/set-refresh-cookie", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    }).catch((e) => console.log("[v0] Failed to set refresh cookie:", e))
+  }
+
   const refreshToken = async (): Promise<boolean> => {
     try {
       if (isRefreshing) {
@@ -113,6 +133,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
       if (data.access_token) {
         localStorage.setItem("admin_token", data.access_token)
         localStorage.setItem("mizizzi_token", data.access_token)
+        storeTokenInCookie(data.access_token)
         console.log("[v0] New access token stored")
       } else {
         console.log("[v0] Warning: No access token in refresh response")
@@ -126,6 +147,7 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
       if (data.refresh_token) {
         localStorage.setItem("admin_refresh_token", data.refresh_token)
         localStorage.setItem("mizizzi_refresh_token", data.refresh_token)
+        storeRefreshTokenInCookie(data.refresh_token)
       }
 
       setIsRefreshing(false)
@@ -404,10 +426,12 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
       if (responseData.access_token) {
         localStorage.setItem("admin_token", responseData.access_token)
         localStorage.setItem("mizizzi_token", responseData.access_token)
+        storeTokenInCookie(responseData.access_token)
       }
       if (responseData.refresh_token) {
         localStorage.setItem("admin_refresh_token", responseData.refresh_token)
         localStorage.setItem("mizizzi_refresh_token", responseData.refresh_token)
+        storeRefreshTokenInCookie(responseData.refresh_token)
       }
       if (responseData.csrf_token) {
         localStorage.setItem("mizizzi_csrf_token", responseData.csrf_token)
