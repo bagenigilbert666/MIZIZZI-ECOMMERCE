@@ -82,26 +82,24 @@ const ProductRow = memo(function ProductRow({
     try {
       const result = await adminService.deleteProduct(String(product.id))
       
-      if (result.success) {
-        // Show success state in dialog first
-        setDeleteSuccess(true)
-        setIsDeleting(false)
-        
-        // Show toast notification
-        toast({
-          title: "Success",
-          description: `"${product.name}" has been deleted successfully`,
-          variant: "success",
-          duration: 3000,
-        })
-        
-        // Close dialog after showing success state, then remove from list
-        setTimeout(() => {
-          setShowDeleteDialog(false)
-          setDeleteSuccess(false)
-          onDelete?.(String(product.id))
-        }, 1500)
-      }
+      // Show success state in dialog (API returns successfully if no error thrown)
+      setDeleteSuccess(true)
+      setIsDeleting(false)
+      
+      // Show toast notification
+      toast({
+        title: "Success",
+        description: `"${product.name}" has been deleted successfully`,
+        variant: "success",
+        duration: 3000,
+      })
+      
+      // Close dialog after showing success state, then remove from list
+      setTimeout(() => {
+        setShowDeleteDialog(false)
+        setDeleteSuccess(false)
+        onDelete?.(String(product.id))
+      }, 1500)
     } catch (error: any) {
       const errorMessage = error?.message || "Failed to delete product"
       toast({

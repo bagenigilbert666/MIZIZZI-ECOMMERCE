@@ -211,6 +211,7 @@ export const adminService = {
   // Delete a product
   async deleteProduct(id: string): Promise<{ success: boolean; message: string }> {
     try {
+
       // Get the token - check both mizizzi_token and admin_token
       const token = localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
       if (!token) {
@@ -225,10 +226,11 @@ export const adminService = {
 
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || ""
       const endpoint = `${apiUrl}/api/admin/products/${id}`
+      console.log("[v0] Making DELETE request to:", endpoint)
 
       // Add a timeout to ensure the request doesn't hang
       const controller = new AbortController()
-      const timeoutId = setTimeout(() => controller.abort(), 60000) // 60 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 30000) // 30 second timeout
 
       try {
         // Make the API call with proper headers and timeout
@@ -244,9 +246,6 @@ export const adminService = {
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}))
           
-          // Handle 401 specifically
-          if (response.status === 401) {
-            console.log("[v0] Got 401, attempting to refresh token")
             try {
               await this.refreshToken()
               // Retry the delete with new token
@@ -259,7 +258,6 @@ export const adminService = {
                 })
                 if (retryResponse.ok) {
                   const responseData = await retryResponse.json()
-                  console.log("[v0] Product deleted successfully after token refresh")
                   this.invalidateProductCache(id)
                   return responseData
                 }
@@ -284,12 +282,14 @@ export const adminService = {
         clearTimeout(timeoutId)
 
         if (fetchError.name === "AbortError") {
+          console.error("[v0] Delete request timed out")
           throw new Error("Request timed out. Please try again.")
         }
 
         throw fetchError
       }
     } catch (error: any) {
+      console.error("[v0] Error deleting product:", error)
       throw error
     }
   },
