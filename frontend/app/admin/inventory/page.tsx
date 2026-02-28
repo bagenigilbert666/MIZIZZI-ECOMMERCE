@@ -1043,23 +1043,23 @@ export default function InventoryPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
-            className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+            className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-blue-100 text-sm font-medium">Total Items</p>
+                <p className="text-slate-600 dark:text-slate-400 text-sm font-medium">Total Items</p>
                 <motion.p
-                  className="text-3xl font-bold mt-1"
+                  className="text-3xl font-bold text-slate-900 dark:text-slate-100 mt-1"
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ duration: 0.5, delay: 0.3 }}
                 >
                   {stats?.total_items ?? 0}
                 </motion.p>
-                <p className="text-blue-200 text-xs mt-1">Items tracked</p>
+                <p className="text-slate-500 dark:text-slate-500 text-xs mt-1">Items tracked</p>
               </div>
-              <div className="bg-blue-400/30 p-3 rounded-lg">
-                <Package className="h-6 w-6" />
+              <div className="bg-blue-100 dark:bg-blue-900/30 p-3 rounded-lg">
+                <Package className="h-6 w-6 text-blue-600 dark:text-blue-400" />
               </div>
             </div>
           </motion.div>
@@ -1068,23 +1068,23 @@ export default function InventoryPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+            className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-green-100 text-sm font-medium">In Stock</p>
+                <p className="text-slate-600 dark:text-slate-400 text-sm font-medium">In Stock</p>
                 <motion.p
-                  className="text-3xl font-bold mt-1"
+                  className="text-3xl font-bold text-slate-900 dark:text-slate-100 mt-1"
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ duration: 0.5, delay: 0.4 }}
                 >
                   {stats?.in_stock ?? 0}
                 </motion.p>
-                <p className="text-green-200 text-xs mt-1">Items available</p>
+                <p className="text-slate-500 dark:text-slate-500 text-xs mt-1">Items available</p>
               </div>
-              <div className="bg-green-400/30 p-3 rounded-lg">
-                <CheckCircle className="h-6 w-6" />
+              <div className="bg-green-100 dark:bg-green-900/30 p-3 rounded-lg">
+                <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
               </div>
             </div>
           </motion.div>
@@ -1093,72 +1093,48 @@ export default function InventoryPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.3 }}
-            className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 relative overflow-hidden"
+            className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300"
           >
-            <div className="flex items-center justify-between relative z-10">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-orange-100 text-sm font-medium">Low Stock</p>
+                <p className="text-slate-600 dark:text-slate-400 text-sm font-medium">Low Stock</p>
                 <motion.p
-                  className="text-3xl font-bold mt-1"
+                  className="text-3xl font-bold text-slate-900 dark:text-slate-100 mt-1"
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ duration: 0.5, delay: 0.5 }}
                 >
                   {stats?.low_stock ?? 0}
                 </motion.p>
-                <p className="text-orange-200 text-xs mt-1">Need restocking</p>
+                <p className="text-slate-500 dark:text-slate-500 text-xs mt-1">Need restocking</p>
               </div>
-              <div className="bg-orange-400/30 p-3 rounded-lg">
-                <motion.div
-                  animate={{
-                    rotate: [0, -10, 10, -10, 0],
-                    scale: [1, 1.1, 1],
-                  }}
-                  transition={{
-                    duration: 2,
-                    repeat: Number.POSITIVE_INFINITY,
-                    repeatDelay: 3,
-                  }}
-                >
-                  <AlertTriangle className="h-6 w-6" />
-                </motion.div>
+              <div className="bg-orange-100 dark:bg-orange-900/30 p-3 rounded-lg">
+                <AlertTriangle className="h-6 w-6 text-orange-600 dark:text-orange-400" />
               </div>
             </div>
-            <motion.div
-              className="absolute inset-0 bg-gradient-to-r from-orange-400/20 to-red-400/20"
-              animate={{
-                opacity: [0.3, 0.6, 0.3],
-                scale: [1, 1.02, 1],
-              }}
-              transition={{
-                duration: 2,
-                repeat: Number.POSITIVE_INFINITY,
-                ease: "easeInOut",
-              }}
-            />
           </motion.div>
 
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.4 }}
-            className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+            className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-red-100 text-sm font-medium">Out of Stock</p>
+                <p className="text-slate-600 dark:text-slate-400 text-sm font-medium">Out of Stock</p>
                 <motion.p
-                  className="text-3xl font-bold mt-1"
+                  className="text-3xl font-bold text-slate-900 dark:text-slate-100 mt-1"
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ duration: 0.5, delay: 0.6 }}
                 >
                   {stats?.out_of_stock ?? 0}
                 </motion.p>
-                <p className="text-red-200 text-xs mt-1">Unavailable</p>
+                <p className="text-slate-500 dark:text-slate-500 text-xs mt-1">Unavailable</p>
               </div>
-              <div className="bg-red-400/30 p-3 rounded-lg">
-                <XCircle className="h-6 w-6" />
+              <div className="bg-red-100 dark:bg-red-900/30 p-3 rounded-lg">
+                <XCircle className="h-6 w-6 text-red-600 dark:text-red-400" />
               </div>
             </div>
           </motion.div>
@@ -1167,23 +1143,23 @@ export default function InventoryPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.5 }}
-            className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+            className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-indigo-100 text-sm font-medium">Reserved</p>
+                <p className="text-slate-600 dark:text-slate-400 text-sm font-medium">Reserved</p>
                 <motion.p
-                  className="text-3xl font-bold mt-1"
+                  className="text-3xl font-bold text-slate-900 dark:text-slate-100 mt-1"
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ duration: 0.5, delay: 0.7 }}
                 >
                   {stats?.reserved_quantity ?? 0}
                 </motion.p>
-                <p className="text-indigo-200 text-xs mt-1">Items reserved</p>
+                <p className="text-slate-500 dark:text-slate-500 text-xs mt-1">Items reserved</p>
               </div>
-              <div className="bg-indigo-400/30 p-3 rounded-lg">
-                <Clock className="h-6 w-6" />
+              <div className="bg-indigo-100 dark:bg-indigo-900/30 p-3 rounded-lg">
+                <Clock className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
               </div>
             </div>
           </motion.div>
@@ -1192,23 +1168,23 @@ export default function InventoryPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.6 }}
-            className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+            className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-6 shadow-sm hover:shadow-md transition-all duration-300"
           >
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-purple-100 text-sm font-medium">Total Value</p>
+                <p className="text-slate-600 dark:text-slate-400 text-sm font-medium">Total Value</p>
                 <motion.p
-                  className="text-2xl font-bold mt-1"
+                  className="text-2xl font-bold text-slate-900 dark:text-slate-100 mt-1"
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ duration: 0.5, delay: 0.8 }}
                 >
                   KSh {(stats?.total_value ?? 0).toLocaleString()}
                 </motion.p>
-                <p className="text-purple-200 text-xs mt-1">Inventory value</p>
+                <p className="text-slate-500 dark:text-slate-500 text-xs mt-1">Inventory value</p>
               </div>
-              <div className="bg-purple-400/30 p-3 rounded-lg">
-                <DollarSign className="h-6 w-6" />
+              <div className="bg-slate-100 dark:bg-slate-700 p-3 rounded-lg">
+                <DollarSign className="h-6 w-6 text-slate-700 dark:text-slate-300" />
               </div>
             </div>
           </motion.div>
