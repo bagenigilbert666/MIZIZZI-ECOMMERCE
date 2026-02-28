@@ -46,7 +46,7 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACK
 
 /**
  * Fetch admin orders from the backend using server-side authentication
- * Uses React cache to deduplicate requests during a single render
+ * This requires a token to be passed from the client since auth is client-side managed
  */
 export const getAdminOrders = cache(
   async (params?: {
@@ -59,15 +59,15 @@ export const getAdminOrders = cache(
     date_to?: string
     min_amount?: number
     max_amount?: number
+    token?: string
   }): Promise<OrdersResponse> => {
     try {
-      // Get auth cookie (if stored there) or token from environment
-      const cookieStore = await cookies()
-      let token = process.env.ADMIN_API_TOKEN
+      // Get token from params (passed from client) or environment
+      const token = params?.token || process.env.ADMIN_API_TOKEN
 
       if (!token) {
-        console.log("[v0] getAdminOrders: No admin token available in environment or cookies")
-        // Return empty response instead of failing
+        console.log("[v0] getAdminOrders: No admin token available - returning empty orders")
+        // Return empty response instead of failing - client will fetch with auth
         return {
           items: [],
           pagination: {
@@ -83,10 +83,10 @@ export const getAdminOrders = cache(
       url.searchParams.append("include_items", "true")
       url.searchParams.append("with_items", "true")
 
-      // Add query parameters if provided
+      // Add query parameters if provided (exclude token from params)
       if (params) {
         Object.entries(params).forEach(([key, value]) => {
-          if (value !== undefined) {
+          if (value !== undefined && key !== "token") {
             url.searchParams.append(key, value.toString())
           }
         })
@@ -150,3 +150,4 @@ export const getAdminOrders = cache(
     }
   },
 )
+

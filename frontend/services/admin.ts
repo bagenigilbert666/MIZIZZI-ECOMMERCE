@@ -1145,9 +1145,6 @@ export const adminService = {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"
       const url = new URL(`${baseUrl}/api/admin/orders`)
 
-      url.searchParams.append("include_items", "true")
-      url.searchParams.append("with_items", "true")
-
       // Add query parameters if provided
       if (params) {
         Object.entries(params).forEach(([key, value]) => {
