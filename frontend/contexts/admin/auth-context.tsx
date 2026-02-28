@@ -59,41 +59,6 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
     return token
   }
 
-  // Helper to store token in cookies via API route (server-side)
-  const storeTokenInCookie = (token: string) => {
-    if (typeof window === "undefined") return
-    // Call API route to set cookie on the server
-    fetch("/api/auth/store-token", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ token }),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success) {
-          console.log("[v0] Token stored in cookie successfully")
-        }
-      })
-      .catch((e) => console.error("[v0] Failed to store token in cookie:", e))
-  }
-
-  const storeRefreshTokenInCookie = (token: string) => {
-    if (typeof window === "undefined") return
-    // Call API route to set cookie on the server
-    fetch("/api/auth/store-token", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ refreshToken: token }),
-    })
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success) {
-          console.log("[v0] Refresh token stored in cookie successfully")
-        }
-      })
-      .catch((e) => console.error("[v0] Failed to store refresh token in cookie:", e))
-  }
-
   const refreshToken = async (): Promise<boolean> => {
     try {
       if (isRefreshing) {
@@ -148,7 +113,6 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
       if (data.access_token) {
         localStorage.setItem("admin_token", data.access_token)
         localStorage.setItem("mizizzi_token", data.access_token)
-        storeTokenInCookie(data.access_token)
         console.log("[v0] New access token stored")
       } else {
         console.log("[v0] Warning: No access token in refresh response")
@@ -162,7 +126,6 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
       if (data.refresh_token) {
         localStorage.setItem("admin_refresh_token", data.refresh_token)
         localStorage.setItem("mizizzi_refresh_token", data.refresh_token)
-        storeRefreshTokenInCookie(data.refresh_token)
       }
 
       setIsRefreshing(false)
@@ -441,12 +404,10 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
       if (responseData.access_token) {
         localStorage.setItem("admin_token", responseData.access_token)
         localStorage.setItem("mizizzi_token", responseData.access_token)
-        storeTokenInCookie(responseData.access_token)
       }
       if (responseData.refresh_token) {
         localStorage.setItem("admin_refresh_token", responseData.refresh_token)
         localStorage.setItem("mizizzi_refresh_token", responseData.refresh_token)
-        storeRefreshTokenInCookie(responseData.refresh_token)
       }
       if (responseData.csrf_token) {
         localStorage.setItem("mizizzi_csrf_token", responseData.csrf_token)
