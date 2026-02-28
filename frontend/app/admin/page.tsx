@@ -6,6 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import {
+  BarChart3,
   Users,
   ShoppingCart,
   Package,
@@ -17,13 +18,11 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   DollarSign,
-  Eye,
-  AlertCircle,
-  BarChart3,
-  PieChart,
-  Star,
-  Zap,
+  Truck,
+  MessageSquare,
   ArrowRight,
+  Clock,
+  AlertCircle,
 } from "lucide-react"
 import { useAdminAuth } from "@/contexts/admin/auth-context"
 import { Loader } from "@/components/ui/loader"
@@ -47,6 +46,8 @@ interface AdminDashboardResponse {
     orders_in_transit: number
     pending_payments: number
     low_stock_count: number
+    total_active_sessions?: number
+    total_sales_channels?: number
   }
   sales: {
     today: number
@@ -56,6 +57,8 @@ interface AdminDashboardResponse {
     yearly: number
     total_revenue: number
     pending_amount: number
+    average_order_value?: number
+    net_profit?: number
   }
   order_status: Record<string, number>
   recent_orders: any[]
@@ -77,33 +80,17 @@ export default function AdminDashboardPage() {
   const router = useRouter()
   const { user, isLoading, isAuthenticated } = useAdminAuth()
   const [dashboardData, setDashboardData] = useState<AdminDashboardResponse | null>(null)
-  const [healthData, setHealthData] = useState<any>(null)
-  const [productStats, setProductStats] = useState<any>(null)
   const [isLoadingData, setIsLoadingData] = useState(true)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchAllData = async () => {
+  // Fetch dashboard data
+  const fetchDashboardData = async () => {
     try {
       setIsRefreshing(true)
       setError(null)
-
-      const dashData = await adminService.getDashboardData()
-      setDashboardData(dashData)
-
-      try {
-        const health = await adminService.getDashboardHealth()
-        setHealthData(health)
-      } catch (err) {
-        console.warn("Failed to fetch health data:", err)
-      }
-
-      try {
-        const prodStats = await adminService.getProductStats()
-        setProductStats(prodStats)
-      } catch (err) {
-        console.warn("Failed to fetch product stats:", err)
-      }
+      const data = await adminService.getDashboardData()
+      setDashboardData(data)
     } catch (err: any) {
       const errorMsg = err.message || "Failed to load dashboard data"
       setError(errorMsg)
@@ -119,18 +106,20 @@ export default function AdminDashboardPage() {
     }
   }
 
+  // Load data when authenticated
   useEffect(() => {
     if (isAuthenticated && !isLoading) {
-      fetchAllData()
+      fetchDashboardData()
     }
   }, [isAuthenticated, isLoading])
 
+  // Redirect if not authenticated
   if (isLoading) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-black">
+      <div className="flex h-screen items-center justify-center bg-white">
         <div className="text-center">
           <Loader />
-          <p className="mt-4 text-sm text-gray-300">Initializing dashboard...</p>
+          <p className="mt-2 text-sm text-gray-600">Loading admin panel...</p>
         </div>
       </div>
     )
@@ -138,340 +127,315 @@ export default function AdminDashboardPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="flex h-screen items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-black">
+      <div className="flex h-screen items-center justify-center bg-white">
         <div className="text-center">
-          <AlertCircle className="h-12 w-12 text-red-400 mx-auto mb-4" />
-          <p className="text-sm text-gray-300">Redirecting to login...</p>
+          <AlertCircle className="h-8 w-8 text-red-500 mx-auto" />
+          <p className="mt-2 text-sm text-gray-600">Redirecting to login...</p>
         </div>
       </div>
     )
   }
 
   const data = dashboardData || adminService.getDefaultDashboardData()
-  const salesGrowth = data.sales.yesterday > 0 ? Math.round(((data.sales.today - data.sales.yesterday) / data.sales.yesterday) * 100) : 0
-  const isSystemHealthy = !error && healthData?.status === "healthy"
+
+  // Calculate growth
+  const salesGrowth = data.sales.yesterday > 0 
+    ? Math.round(((data.sales.today - data.sales.yesterday) / data.sales.yesterday) * 100)
+    : 0
+
+  // Get order status counts
+  const orderStatusEntries = Object.entries(data.order_status || {}).map(([status, count]) => ({
+    status,
+    count: count as number,
+  }))
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black p-4 sm:p-6 lg:p-8">
-      <div className="max-w-7xl mx-auto space-y-8">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-6 mb-8">
-          <div>
-            <h1 className="text-4xl sm:text-5xl font-bold bg-gradient-to-r from-white to-gray-300 bg-clip-text text-transparent mb-2">
-              Dashboard
-            </h1>
-            <p className="text-gray-400 text-lg">Welcome back, {user?.name || "Admin"}</p>
-            <div className="flex items-center gap-3 mt-3">
-              <div className={`h-2.5 w-2.5 rounded-full ${isSystemHealthy ? "bg-emerald-500" : "bg-red-500"}`}></div>
-              <span className="text-sm text-gray-400">System {isSystemHealthy ? "healthy" : "attention needed"}</span>
+    <div className="min-h-screen bg-white w-full">
+      <div className="w-full p-3 sm:p-4 md:p-6 lg:p-8 space-y-6 md:space-y-8">
+        {/* Header Section */}
+        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+          <div className="flex-1">
+            <h1 className="text-3xl md:text-4xl font-bold text-gray-900 tracking-tight">Dashboard</h1>
+            <p className="text-sm md:text-base text-gray-600 mt-2 font-medium">
+              Welcome back, {user?.name || "Admin"}. Here's your store overview.
+            </p>
+            <div className="flex flex-wrap items-center gap-3 md:gap-4 text-xs md:text-sm text-gray-500 mt-3">
+              <div className="flex items-center gap-1.5">
+                <div className={`w-2 h-2 rounded-full ${error ? "bg-red-500" : "bg-green-500"}`}></div>
+                <span className="font-medium">System {error ? "error" : "healthy"}</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <Clock className="h-3.5 w-3.5" />
+                <span>{new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
+              </div>
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row gap-3">
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
             <Button
               variant="outline"
-              size="lg"
-              onClick={fetchAllData}
+              size="sm"
+              onClick={fetchDashboardData}
               disabled={isRefreshing}
-              className="rounded-xl border-gray-600 text-gray-300 hover:bg-gray-800 hover:text-white font-semibold"
+              className="rounded-lg text-xs h-8 sm:h-9 md:h-10 border-gray-300 hover:bg-gray-50 font-medium"
             >
-              <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
-              Refresh
+              <RefreshCw className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${isRefreshing ? "animate-spin" : ""}`} />
+              <span className="ml-1 hidden sm:inline">Refresh</span>
             </Button>
             <Button
-              size="lg"
+              size="sm"
               onClick={() => router.push("/admin/reports")}
-              className="rounded-xl bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-semibold shadow-lg"
+              className="rounded-lg bg-gray-900 hover:bg-gray-800 text-white text-xs h-8 sm:h-9 md:h-10 font-medium"
             >
-              <Download className="h-4 w-4 mr-2" />
-              Export Report
+              <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+              <span className="ml-1 hidden sm:inline">Export</span>
             </Button>
           </div>
         </div>
 
+        {/* Error Alert */}
         {error && (
-          <Alert className="border-red-900 bg-red-950/50 rounded-xl">
-            <AlertCircle className="h-5 w-5 text-red-400" />
-            <AlertDescription className="text-red-200 ml-3">
-              {error}
+          <Alert className="border-red-200 bg-red-50 rounded-lg">
+            <AlertCircle className="h-4 w-4 text-red-600 flex-shrink-0" />
+            <AlertDescription className="text-red-800 text-sm ml-3">
+              <strong>Error:</strong> {error}
             </AlertDescription>
           </Alert>
         )}
 
+        {/* Loading State */}
         {isLoadingData ? (
           <div className="flex h-96 items-center justify-center">
             <div className="text-center">
               <Loader />
-              <p className="mt-4 text-sm text-gray-400">Loading metrics...</p>
+              <p className="mt-3 text-sm text-gray-600 font-medium">Loading dashboard data...</p>
             </div>
           </div>
         ) : (
-          <div className="space-y-8">
-            {/* Primary KPI Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 rounded-2xl overflow-hidden group hover:border-blue-600/50 transition-all duration-300 shadow-xl">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardDescription className="text-gray-400 font-semibold">Total Revenue</CardDescription>
-                    <div className="bg-gradient-to-br from-blue-500/20 to-blue-600/20 p-3 rounded-xl group-hover:from-blue-500/30 group-hover:to-blue-600/30 transition-all">
-                      <DollarSign className="h-5 w-5 text-blue-400" />
+          <div className="space-y-6 md:space-y-8">
+            {/* Primary KPI Cards - Responsive Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+              {/* Total Revenue Card */}
+              <Card className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-gray-300 transition-all duration-200">
+                <CardHeader className="p-4 md:p-5">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <CardDescription className="text-gray-600 text-xs md:text-sm font-bold uppercase tracking-wider">
+                        Total Revenue
+                      </CardDescription>
+                      <CardTitle className="text-2xl md:text-3xl font-bold text-gray-900 mt-2">
+                        ${(data.sales.total_revenue / 1000000).toFixed(1)}M
+                      </CardTitle>
+                    </div>
+                    <div className="bg-blue-50 p-2.5 md:p-3 rounded-lg flex-shrink-0 ml-3">
+                      <DollarSign className="h-5 w-5 md:h-6 md:w-6 text-blue-600" />
                     </div>
                   </div>
+                  {data.sales.pending_amount > 0 && (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <p className="text-xs text-gray-600">Pending: ${(data.sales.pending_amount / 1000).toFixed(1)}K</p>
+                    </div>
+                  )}
                 </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-white mb-2">
-                    ${(data.sales.total_revenue / 1000000).toFixed(1)}M
-                  </div>
-                  <div className="text-sm text-gray-400">
-                    All-time cumulative
-                  </div>
-                </CardContent>
               </Card>
 
-              <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 rounded-2xl overflow-hidden group hover:border-emerald-600/50 transition-all duration-300 shadow-xl">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardDescription className="text-gray-400 font-semibold">Today's Sales</CardDescription>
-                    <div className="bg-gradient-to-br from-emerald-500/20 to-emerald-600/20 p-3 rounded-xl group-hover:from-emerald-500/30 group-hover:to-emerald-600/30 transition-all">
-                      <TrendingUp className="h-5 w-5 text-emerald-400" />
+              {/* Today's Sales Card */}
+              <Card className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-gray-300 transition-all duration-200">
+                <CardHeader className="p-4 md:p-5">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <CardDescription className="text-gray-600 text-xs md:text-sm font-bold uppercase tracking-wider">
+                        Today's Sales
+                      </CardDescription>
+                      <CardTitle className="text-2xl md:text-3xl font-bold text-gray-900 mt-2">
+                        ${(data.sales.today / 1000).toFixed(1)}K
+                      </CardTitle>
+                    </div>
+                    <div className="bg-green-50 p-2.5 md:p-3 rounded-lg flex-shrink-0 ml-3">
+                      <TrendingUp className="h-5 w-5 md:h-6 md:w-6 text-green-600" />
                     </div>
                   </div>
+                  {salesGrowth !== 0 && (
+                    <div className={`flex items-center gap-1.5 mt-3 pt-3 border-t border-gray-200 text-xs font-semibold ${salesGrowth >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      {salesGrowth >= 0 ? <ArrowUpRight className="h-3.5 w-3.5" /> : <ArrowDownRight className="h-3.5 w-3.5" />}
+                      <span>{Math.abs(salesGrowth)}% vs yesterday</span>
+                    </div>
+                  )}
                 </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-white mb-2">
-                    ${(data.sales.today / 1000).toFixed(1)}K
-                  </div>
-                  <div className={`text-sm font-semibold flex items-center gap-1 ${salesGrowth >= 0 ? "text-emerald-400" : "text-red-400"}`}>
-                    {salesGrowth >= 0 ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
-                    {Math.abs(salesGrowth)}% vs yesterday
-                  </div>
-                </CardContent>
               </Card>
 
-              <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 rounded-2xl overflow-hidden group hover:border-orange-600/50 transition-all duration-300 shadow-xl">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardDescription className="text-gray-400 font-semibold">Active Orders</CardDescription>
-                    <div className="bg-gradient-to-br from-orange-500/20 to-orange-600/20 p-3 rounded-xl group-hover:from-orange-500/30 group-hover:to-orange-600/30 transition-all">
-                      <ShoppingCart className="h-5 w-5 text-orange-400" />
+              {/* Total Orders Card */}
+              <Card className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-gray-300 transition-all duration-200">
+                <CardHeader className="p-4 md:p-5">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <CardDescription className="text-gray-600 text-xs md:text-sm font-bold uppercase tracking-wider">
+                        Total Orders
+                      </CardDescription>
+                      <CardTitle className="text-2xl md:text-3xl font-bold text-gray-900 mt-2">
+                        {data.counts.orders.toLocaleString()}
+                      </CardTitle>
+                    </div>
+                    <div className="bg-orange-50 p-2.5 md:p-3 rounded-lg flex-shrink-0 ml-3">
+                      <ShoppingCart className="h-5 w-5 md:h-6 md:w-6 text-orange-600" />
                     </div>
                   </div>
+                  {data.counts.orders_in_transit > 0 && (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <p className="text-xs text-orange-600 font-medium">{data.counts.orders_in_transit} in transit</p>
+                    </div>
+                  )}
                 </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-white mb-2">
-                    {data.counts.orders_in_transit}
-                  </div>
-                  <div className="text-sm text-gray-400">
-                    Orders in transit
-                  </div>
-                </CardContent>
               </Card>
 
-              <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 rounded-2xl overflow-hidden group hover:border-purple-600/50 transition-all duration-300 shadow-xl">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardDescription className="text-gray-400 font-semibold">Total Customers</CardDescription>
-                    <div className="bg-gradient-to-br from-purple-500/20 to-purple-600/20 p-3 rounded-xl group-hover:from-purple-500/30 group-hover:to-purple-600/30 transition-all">
-                      <Users className="h-5 w-5 text-purple-400" />
+              {/* Total Customers Card */}
+              <Card className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-gray-300 transition-all duration-200">
+                <CardHeader className="p-4 md:p-5">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <CardDescription className="text-gray-600 text-xs md:text-sm font-bold uppercase tracking-wider">
+                        Total Customers
+                      </CardDescription>
+                      <CardTitle className="text-2xl md:text-3xl font-bold text-gray-900 mt-2">
+                        {data.counts.users.toLocaleString()}
+                      </CardTitle>
+                    </div>
+                    <div className="bg-purple-50 p-2.5 md:p-3 rounded-lg flex-shrink-0 ml-3">
+                      <Users className="h-5 w-5 md:h-6 md:w-6 text-purple-600" />
                     </div>
                   </div>
+                  {data.counts.new_signups_today > 0 && (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <p className="text-xs text-purple-600 font-medium">+{data.counts.new_signups_today} new today</p>
+                    </div>
+                  )}
                 </CardHeader>
-                <CardContent>
-                  <div className="text-3xl font-bold text-white mb-2">
-                    {data.counts.users.toLocaleString()}
-                  </div>
-                  <div className="text-sm text-gray-400">
-                    +{data.counts.new_signups_today} today
-                  </div>
-                </CardContent>
               </Card>
             </div>
 
-            {/* Secondary KPIs */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
-              <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 rounded-xl shadow-lg">
-                <CardContent className="pt-6">
-                  <div className="text-2xl font-bold text-white mb-1">{data.counts.products}</div>
-                  <p className="text-xs text-gray-400 font-medium">Products</p>
-                </CardContent>
+            {/* Secondary Metrics - 4 Column Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+              {/* Products */}
+              <Card className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200">
+                <CardHeader className="p-4 md:p-5">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <CardDescription className="text-gray-600 text-xs md:text-sm font-bold uppercase tracking-wider">
+                        Products
+                      </CardDescription>
+                      <CardTitle className="text-2xl md:text-3xl font-bold text-gray-900 mt-2">
+                        {data.counts.products.toLocaleString()}
+                      </CardTitle>
+                    </div>
+                    <div className="bg-cyan-50 p-2.5 md:p-3 rounded-lg flex-shrink-0 ml-3">
+                      <Package className="h-5 w-5 md:h-6 md:w-6 text-cyan-600" />
+                    </div>
+                  </div>
+                  {data.counts.low_stock_count > 0 && (
+                    <div className="mt-3 pt-3 border-t border-gray-200">
+                      <Badge className="text-xs font-medium bg-red-100 text-red-700 border-0">{data.counts.low_stock_count} low stock</Badge>
+                    </div>
+                  )}
+                </CardHeader>
               </Card>
 
-              <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 rounded-xl shadow-lg">
-                <CardContent className="pt-6">
-                  <div className="text-2xl font-bold text-white mb-1">{data.counts.categories}</div>
-                  <p className="text-xs text-gray-400 font-medium">Categories</p>
-                </CardContent>
+              {/* Categories */}
+              <Card className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200">
+                <CardHeader className="p-4 md:p-5">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <CardDescription className="text-gray-600 text-xs md:text-sm font-bold uppercase tracking-wider">
+                        Categories
+                      </CardDescription>
+                      <CardTitle className="text-2xl md:text-3xl font-bold text-gray-900 mt-2">
+                        {data.counts.categories}
+                      </CardTitle>
+                    </div>
+                    <div className="bg-emerald-50 p-2.5 md:p-3 rounded-lg flex-shrink-0 ml-3">
+                      <BarChart3 className="h-5 w-5 md:h-6 md:w-6 text-emerald-600" />
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <p className="text-xs text-gray-600 font-medium">{data.counts.brands} brands</p>
+                  </div>
+                </CardHeader>
               </Card>
 
-              <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 rounded-xl shadow-lg">
-                <CardContent className="pt-6">
-                  <div className="flex items-center justify-between">
+              {/* Pending Orders */}
+              <Card className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200">
+                <CardHeader className="p-4 md:p-5">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <CardDescription className="text-gray-600 text-xs md:text-sm font-bold uppercase tracking-wider">
+                        Pending
+                      </CardDescription>
+                      <CardTitle className="text-2xl md:text-3xl font-bold text-gray-900 mt-2">
+                        {data.counts.pending_payments}
+                      </CardTitle>
+                    </div>
+                    <div className="bg-red-50 p-2.5 md:p-3 rounded-lg flex-shrink-0 ml-3">
+                      <AlertTriangle className="h-5 w-5 md:h-6 md:w-6 text-red-600" />
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <p className="text-xs text-red-600 font-medium">Needs attention</p>
+                  </div>
+                </CardHeader>
+              </Card>
+
+              {/* Newsletter Subscribers */}
+              <Card className="bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md transition-all duration-200">
+                <CardHeader className="p-4 md:p-5">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <CardDescription className="text-gray-600 text-xs md:text-sm font-bold uppercase tracking-wider">
+                        Subscribers
+                      </CardDescription>
+                      <CardTitle className="text-2xl md:text-3xl font-bold text-gray-900 mt-2">
+                        {(data.counts.newsletter_subscribers / 1000).toFixed(1)}K
+                      </CardTitle>
+                    </div>
+                    <div className="bg-yellow-50 p-2.5 md:p-3 rounded-lg flex-shrink-0 ml-3">
+                      <MessageSquare className="h-5 w-5 md:h-6 md:w-6 text-yellow-600" />
+                    </div>
+                  </div>
+                  <div className="mt-3 pt-3 border-t border-gray-200">
+                    <p className="text-xs text-gray-600">+{data.counts.new_signups_week} this week</p>
+                  </div>
+                </CardHeader>
+              </Card>
+            </div>
+
+            {/* Recent Orders Section */}
+            {data.recent_orders && data.recent_orders.length > 0 && (
+              <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                <CardHeader className="p-4 md:p-5 border-b border-gray-200">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
-                      <div className="text-2xl font-bold text-orange-400 mb-1">{data.counts.low_stock_count}</div>
-                      <p className="text-xs text-gray-400 font-medium">Low Stock</p>
+                      <CardTitle className="text-lg md:text-xl font-bold text-gray-900">Recent Orders</CardTitle>
+                      <CardDescription className="text-xs md:text-sm text-gray-600 mt-1">Latest customer transactions</CardDescription>
                     </div>
-                    <AlertTriangle className="h-5 w-5 text-orange-400" />
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => router.push("/admin/orders")}
+                      className="text-xs h-8 md:h-9 text-gray-700 hover:bg-gray-100 font-medium w-full sm:w-auto"
+                    >
+                      View All
+                      <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                    </Button>
                   </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 rounded-xl shadow-lg">
-                <CardContent className="pt-6">
-                  <div className="text-2xl font-bold text-red-400 mb-1">{data.counts.pending_payments}</div>
-                  <p className="text-xs text-gray-400 font-medium">Pending</p>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 rounded-xl shadow-lg">
-                <CardContent className="pt-6">
-                  <div className="text-2xl font-bold text-yellow-400 mb-1">{data.counts.reviews}</div>
-                  <p className="text-xs text-gray-400 font-medium">Reviews</p>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 rounded-xl shadow-lg">
-                <CardContent className="pt-6">
-                  <div className="text-2xl font-bold text-blue-400 mb-1">{data.counts.newsletter_subscribers}</div>
-                  <p className="text-xs text-gray-400 font-medium">Subscribers</p>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Sales Breakdown */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 rounded-2xl lg:col-span-2 shadow-xl">
-                <CardHeader>
-                  <CardTitle className="text-xl text-white flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5 text-blue-400" />
-                    Sales Performance
-                  </CardTitle>
-                  <CardDescription className="text-gray-400">Daily, weekly, and monthly breakdown</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-5">
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-gray-300 font-medium">Today</span>
-                      <span className="font-semibold text-white">${(data.sales.today / 1000).toFixed(1)}K</span>
-                    </div>
-                    <Progress value={Math.min((data.sales.today / (data.sales.monthly / 30)) * 100, 100)} className="h-2.5 bg-gray-700" />
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-gray-300 font-medium">This Week</span>
-                      <span className="font-semibold text-white">${(data.sales.weekly / 1000).toFixed(1)}K</span>
-                    </div>
-                    <Progress value={Math.min((data.sales.weekly / (data.sales.monthly / 4)) * 100, 100)} className="h-2.5 bg-gray-700" />
-                  </div>
-                  <div>
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-gray-300 font-medium">This Month</span>
-                      <span className="font-semibold text-white">${(data.sales.monthly / 1000).toFixed(1)}K</span>
-                    </div>
-                    <Progress value={100} className="h-2.5 bg-gray-700" />
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 rounded-2xl shadow-xl">
-                <CardHeader>
-                  <CardTitle className="text-xl text-white flex items-center gap-2">
-                    <PieChart className="h-5 w-5 text-purple-400" />
-                    Quick Insights
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
-                    <p className="text-xs text-gray-400">Yearly Revenue</p>
-                    <p className="text-2xl font-bold text-white mt-1">${(data.sales.yearly / 1000000).toFixed(1)}M</p>
-                  </div>
-                  <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
-                    <p className="text-xs text-gray-400">Pending Amount</p>
-                    <p className="text-2xl font-bold text-orange-400 mt-1">${(data.sales.pending_amount / 1000).toFixed(1)}K</p>
-                  </div>
-                  <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700">
-                    <p className="text-xs text-gray-400">New Signups</p>
-                    <p className="text-2xl font-bold text-emerald-400 mt-1">+{data.counts.new_signups_week}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Recent Orders */}
-            {data.recent_orders?.length > 0 && (
-              <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 rounded-2xl shadow-xl">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-                  <div>
-                    <CardTitle className="text-xl text-white flex items-center gap-2">
-                      <ShoppingCart className="h-5 w-5 text-orange-400" />
-                      Recent Orders
-                    </CardTitle>
-                    <CardDescription className="text-gray-400">Latest 8 transactions</CardDescription>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => router.push("/admin/orders")}
-                    className="text-blue-400 hover:bg-gray-700 font-semibold"
-                  >
-                    View All <ArrowRight className="ml-1 h-4 w-4" />
-                  </Button>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {data.recent_orders.slice(0, 8).map((order, idx) => (
-                      <div key={order.id || idx} className="flex items-center justify-between p-4 bg-gray-900/40 rounded-xl hover:bg-gray-900/60 transition-colors border border-gray-700/50">
-                        <div className="min-w-0 flex-1">
-                          <p className="font-semibold text-white text-sm">{order.order_number || `Order #${order.id}`}</p>
-                          <p className="text-xs text-gray-400">{order.user_email || "Customer"}</p>
-                        </div>
-                        <div className="flex items-center gap-3 ml-2">
-                          <span className="font-bold text-white">${parseFloat(order.total_amount || 0).toFixed(2)}</span>
-                          <Badge className="bg-blue-900 text-blue-200 text-xs font-semibold">{order.status || "pending"}</Badge>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Low Stock Products */}
-            {data.low_stock_products?.length > 0 && (
-              <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-orange-900/50 rounded-2xl shadow-xl">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-                  <div>
-                    <CardTitle className="text-xl text-white flex items-center gap-2">
-                      <AlertTriangle className="h-5 w-5 text-orange-400" />
-                      Low Stock Products
-                    </CardTitle>
-                    <CardDescription className="text-gray-400">{data.counts.low_stock_count} products need attention</CardDescription>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => router.push("/admin/inventory")}
-                    className="text-orange-400 hover:bg-orange-950/40 font-semibold"
-                  >
-                    Manage <ArrowRight className="ml-1 h-4 w-4" />
-                  </Button>
-                </CardHeader>
-                <CardContent>
+                <CardContent className="p-4 md:p-5">
                   <div className="space-y-2">
-                    {data.low_stock_products.slice(0, 6).map((product, idx) => (
-                      <div key={product.id || idx} className="flex items-center justify-between p-4 bg-orange-950/20 rounded-xl border border-orange-900/30 hover:bg-orange-950/30 transition-colors">
+                    {data.recent_orders.slice(0, 5).map((order) => (
+                      <div key={order.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 md:p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors gap-2">
                         <div className="min-w-0 flex-1">
-                          <p className="font-semibold text-white text-sm truncate">{product.name}</p>
-                          <p className="text-xs text-gray-400">SKU: {product.sku}</p>
+                          <p className="font-semibold text-sm md:text-base text-gray-900 truncate">{order.order_number || order.id}</p>
+                          <p className="text-xs text-gray-600 truncate mt-1">{order.user_email || "Customer"}</p>
                         </div>
-                        <div className="text-right ml-2">
-                          <p className="font-bold text-orange-400 text-sm">{product.stock} units</p>
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => router.push(`/admin/inventory?id=${product.id}`)}
-                            className="mt-2 h-7 text-xs border-orange-700 text-orange-400 hover:bg-orange-950 font-semibold"
-                          >
-                            Restock
-                          </Button>
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          <span className="font-bold text-sm md:text-base text-gray-900">${parseFloat(order.total_amount || 0).toFixed(2)}</span>
+                          <Badge variant="outline" className="text-xs capitalize bg-white">{order.status || "pending"}</Badge>
                         </div>
                       </div>
                     ))}
@@ -480,27 +444,78 @@ export default function AdminDashboardPage() {
               </Card>
             )}
 
-            {/* Best Selling Products */}
-            {data.best_selling_products?.length > 0 && (
-              <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 rounded-2xl shadow-xl">
-                <CardHeader>
-                  <CardTitle className="text-xl text-white flex items-center gap-2">
-                    <Star className="h-5 w-5 text-yellow-400" />
-                    Best Selling Products
-                  </CardTitle>
-                  <CardDescription className="text-gray-400">Top 6 performers</CardDescription>
+            {/* Recent Customers Section */}
+            {data.recent_users && data.recent_users.length > 0 && (
+              <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                <CardHeader className="p-4 md:p-5 border-b border-gray-200">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div>
+                      <CardTitle className="text-lg md:text-xl font-bold text-gray-900">Recent Customers</CardTitle>
+                      <CardDescription className="text-xs md:text-sm text-gray-600 mt-1">New registrations</CardDescription>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => router.push("/admin/customers")}
+                      className="text-xs h-8 md:h-9 text-gray-700 hover:bg-gray-100 font-medium w-full sm:w-auto"
+                    >
+                      View All
+                      <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {data.best_selling_products.slice(0, 6).map((product, idx) => (
-                      <div key={product.id || idx} className="p-4 bg-gray-900/40 rounded-xl border border-gray-700 hover:border-yellow-900/50 transition-all hover:shadow-lg">
-                        <div className="flex items-start justify-between mb-3">
-                          <div className="text-3xl font-bold text-yellow-400">#{idx + 1}</div>
-                          <Star className="h-5 w-5 text-yellow-400 fill-yellow-400" />
+                <CardContent className="p-4 md:p-5">
+                  <div className="space-y-2">
+                    {data.recent_users.slice(0, 5).map((user) => (
+                      <div key={user.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 md:p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-sm md:text-base text-gray-900 truncate">{user.name || user.username}</p>
+                          <p className="text-xs text-gray-600 truncate mt-1">{user.email}</p>
                         </div>
-                        <p className="font-semibold text-white text-sm mb-1 truncate">{product.name}</p>
-                        <p className="text-xs text-gray-400 mb-3">{product.sales_count || 0} sales</p>
-                        <p className="text-lg font-bold text-emerald-400">${parseFloat(product.revenue || 0).toFixed(0)}</p>
+                        <Badge variant="outline" className="text-xs bg-white flex-shrink-0">Customer</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Low Stock Products Alert */}
+            {data.low_stock_products && data.low_stock_products.length > 0 && (
+              <Card className="bg-white border border-orange-200 rounded-xl shadow-sm">
+                <CardHeader className="p-4 md:p-5 border-b border-orange-200 bg-orange-50">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                      <AlertTriangle className="h-5 w-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <CardTitle className="text-lg md:text-xl font-bold text-gray-900">Low Stock Alert</CardTitle>
+                        <CardDescription className="text-xs md:text-sm text-gray-600 mt-1">{data.counts.low_stock_count} products need restocking</CardDescription>
+                      </div>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => router.push("/admin/inventory")}
+                      className="text-xs h-8 md:h-9 text-orange-700 hover:bg-orange-100 font-medium"
+                    >
+                      Manage Inventory
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4 md:p-5">
+                  <div className="space-y-2">
+                    {data.low_stock_products.slice(0, 5).map((product) => (
+                      <div key={product.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 md:p-4 bg-orange-50 hover:bg-orange-100 rounded-lg transition-colors border border-orange-200 gap-2">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-sm md:text-base text-gray-900 truncate">{product.name}</p>
+                          <p className="text-xs text-gray-600 mt-1">SKU: {product.sku}</p>
+                        </div>
+                        <div className="flex items-center gap-3 flex-shrink-0 text-right">
+                          <div>
+                            <p className="font-bold text-sm md:text-base text-orange-600">{product.stock || 0}</p>
+                            <p className="text-xs text-gray-600">in stock</p>
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -509,26 +524,30 @@ export default function AdminDashboardPage() {
             )}
 
             {/* Recent Activity */}
-            {data.recent_activities?.length > 0 && (
-              <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 rounded-2xl shadow-xl">
-                <CardHeader>
-                  <CardTitle className="text-xl text-white flex items-center gap-2">
-                    <Activity className="h-5 w-5 text-blue-400" />
-                    Recent Activity
-                  </CardTitle>
-                  <CardDescription className="text-gray-400">Store events and updates</CardDescription>
+            {data.recent_activities && data.recent_activities.length > 0 && (
+              <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                <CardHeader className="p-4 md:p-5 border-b border-gray-200">
+                  <div className="flex items-start gap-3">
+                    <Activity className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <CardTitle className="text-lg md:text-xl font-bold text-gray-900">Recent Activity</CardTitle>
+                      <CardDescription className="text-xs md:text-sm text-gray-600 mt-1">Live feed of store events</CardDescription>
+                    </div>
+                  </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-4 md:p-5">
                   <div className="space-y-3">
-                    {data.recent_activities.slice(0, 10).map((activity, idx) => (
-                      <div key={activity.id || idx} className="flex items-start gap-3 pb-3 border-b border-gray-700 last:border-0 last:pb-0">
-                        <div className="bg-blue-950/40 p-2 rounded-lg flex-shrink-0 mt-1 border border-blue-900/50">
-                          <Activity className="h-4 w-4 text-blue-400" />
+                    {data.recent_activities.slice(0, 8).map((activity, idx) => (
+                      <div key={activity.id || idx} className={`flex items-start gap-3 pb-3 ${idx < data.recent_activities.length - 1 ? "border-b border-gray-200" : ""}`}>
+                        <div className="bg-blue-100 p-2 rounded-lg flex-shrink-0 mt-0.5">
+                          <Activity className="h-4 w-4 text-blue-600" />
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm text-gray-200">{activity.message || activity.description}</p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {activity.timestamp ? new Date(activity.timestamp).toLocaleString() : activity.time || "Just now"}
+                          <p className="text-sm font-medium text-gray-900">{activity.message || activity.description}</p>
+                          <p className="text-xs text-gray-600 mt-1">
+                            {activity.timestamp 
+                              ? new Date(activity.timestamp).toLocaleString()
+                              : activity.time || "Just now"}
                           </p>
                         </div>
                       </div>
@@ -539,27 +558,21 @@ export default function AdminDashboardPage() {
             )}
 
             {/* Order Status Distribution */}
-            {Object.keys(data.order_status || {}).length > 0 && (
-              <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 rounded-2xl shadow-xl">
-                <CardHeader>
-                  <CardTitle className="text-xl text-white flex items-center gap-2">
-                    <BarChart3 className="h-5 w-5 text-purple-400" />
-                    Order Status Distribution
-                  </CardTitle>
-                  <CardDescription className="text-gray-400">Current order breakdown</CardDescription>
+            {orderStatusEntries.length > 0 && (
+              <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                <CardHeader className="p-4 md:p-5 border-b border-gray-200">
+                  <CardTitle className="text-lg md:text-xl font-bold text-gray-900">Order Status Distribution</CardTitle>
+                  <CardDescription className="text-xs md:text-sm text-gray-600 mt-1">Current order breakdown by status</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="p-4 md:p-5">
                   <div className="space-y-4">
-                    {Object.entries(data.order_status || {}).map(([status, count]) => (
+                    {orderStatusEntries.map(({ status, count }) => (
                       <div key={status}>
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium text-gray-300 capitalize">{status}</span>
-                          <span className="text-sm font-bold text-white">{count as number}</span>
+                          <span className="text-sm font-semibold text-gray-700 capitalize">{status.replace(/_/g, " ")}</span>
+                          <span className="text-sm font-bold text-gray-900">{count}</span>
                         </div>
-                        <Progress 
-                          value={Math.min(((count as number) / data.counts.orders) * 100, 100)} 
-                          className="h-2.5 bg-gray-700"
-                        />
+                        <Progress value={Math.min((count / (data.counts.orders || 1)) * 100, 100)} className="h-2 bg-gray-200" />
                       </div>
                     ))}
                   </div>
@@ -567,40 +580,39 @@ export default function AdminDashboardPage() {
               </Card>
             )}
 
-            {/* Recent Customers */}
-            {data.recent_users?.length > 0 && (
-              <Card className="bg-gradient-to-br from-gray-800 to-gray-900 border-gray-700 rounded-2xl shadow-xl">
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-                  <div>
-                    <CardTitle className="text-xl text-white flex items-center gap-2">
-                      <Users className="h-5 w-5 text-purple-400" />
-                      Recent Customers
-                    </CardTitle>
-                    <CardDescription className="text-gray-400">New registrations and activity</CardDescription>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => router.push("/admin/customers")}
-                    className="text-purple-400 hover:bg-gray-700 font-semibold"
-                  >
-                    View All <ArrowRight className="ml-1 h-4 w-4" />
-                  </Button>
+            {/* Best Selling Products */}
+            {data.best_selling_products && data.best_selling_products.length > 0 && (
+              <Card className="bg-white border border-gray-200 rounded-xl shadow-sm">
+                <CardHeader className="p-4 md:p-5 border-b border-gray-200">
+                  <CardTitle className="text-lg md:text-xl font-bold text-gray-900">Top Selling Products</CardTitle>
+                  <CardDescription className="text-xs md:text-sm text-gray-600 mt-1">Your best performers this period</CardDescription>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-3">
-                    {data.recent_users.slice(0, 8).map((user, idx) => (
-                      <div key={user.id || idx} className="flex items-center justify-between p-4 bg-gray-900/40 rounded-xl hover:bg-gray-900/60 transition-colors border border-gray-700/50">
+                <CardContent className="p-4 md:p-5">
+                  <div className="space-y-2">
+                    {data.best_selling_products.slice(0, 5).map((product, idx) => (
+                      <div key={product.id || idx} className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-3 md:p-4 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors gap-2">
                         <div className="min-w-0 flex-1">
-                          <p className="font-semibold text-white text-sm">{user.name || user.username}</p>
-                          <p className="text-xs text-gray-400">{user.email}</p>
+                          <p className="font-semibold text-sm md:text-base text-gray-900 truncate">{product.name}</p>
+                          <p className="text-xs text-gray-600 mt-1">{product.sales_count || 0} sales</p>
                         </div>
-                        <Badge className="bg-purple-900 text-purple-200 text-xs font-semibold">Customer</Badge>
+                        <div className="text-right flex-shrink-0">
+                          <p className="font-bold text-sm md:text-base text-gray-900">${parseFloat(product.revenue || 0).toFixed(0)}</p>
+                        </div>
                       </div>
                     ))}
                   </div>
                 </CardContent>
               </Card>
+            )}
+
+            {/* No Data Message */}
+            {!dashboardData && (
+              <Alert className="border-yellow-200 bg-yellow-50 rounded-lg">
+                <AlertCircle className="h-4 w-4 text-yellow-600 flex-shrink-0" />
+                <AlertDescription className="text-yellow-800 text-sm ml-3">
+                  <strong>Note:</strong> Using default data. Please refresh to load live API data.
+                </AlertDescription>
+              </Alert>
             )}
           </div>
         )}
