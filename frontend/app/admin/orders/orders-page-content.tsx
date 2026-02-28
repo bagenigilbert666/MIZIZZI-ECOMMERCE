@@ -112,11 +112,22 @@ export default function OrdersPageContent({ initialData }: { initialData?: Order
     }
   }, [isAuthenticated, authLoading, router])
 
-  // Fetch orders
+  // Fetch orders with proper error handling and auth token
   const fetchOrders = async () => {
     try {
       setIsLoading(true)
-      // Note: Filtering is done client-side because the backend has issues with status parameter
+
+      // Get the admin token from localStorage
+      const token =
+        typeof window !== "undefined"
+          ? localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
+          : null
+
+      if (!token) {
+        throw new Error("No authentication token available. Please log in again.")
+      }
+
+      // Use the admin service which handles token refresh and retries
       const response = await adminService.getOrders({
         page: currentPage,
         per_page: 20,
@@ -132,7 +143,10 @@ export default function OrdersPageContent({ initialData }: { initialData?: Order
       console.error("Failed to fetch orders:", error)
       toast({
         title: "Error",
-        description: "Failed to load orders. Please try again.",
+        description:
+          error instanceof Error && error.message.includes("authentication")
+            ? "Authentication failed. Please log in again."
+            : "Failed to load orders. Please try again.",
         variant: "destructive",
       })
     } finally {
@@ -145,7 +159,14 @@ export default function OrdersPageContent({ initialData }: { initialData?: Order
     if (isAuthenticated && !initialData) {
       fetchOrders()
     }
-  }, [isAuthenticated, currentPage, statusFilter, searchQuery])
+  }, [isAuthenticated, currentPage, searchQuery])
+
+  // Ensure we have stats even with initial data
+  useEffect(() => {
+    if (initialData?.items) {
+      calculateStats(initialData.items)
+    }
+  }, [initialData])
 
   // Calculate statistics from orders
   const calculateStats = (ordersList: Order[]) => {
@@ -233,6 +254,18 @@ export default function OrdersPageContent({ initialData }: { initialData?: Order
 
   if (!isAuthenticated && !authLoading) {
     return null
+  }
+
+  // Show authentication loading state
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-500">Checking authentication...</p>
+        </div>
+      </div>
+    )
   }
 
   return (
