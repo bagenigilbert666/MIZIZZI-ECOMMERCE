@@ -13,8 +13,62 @@ const websocketService = {
   },
 }
 
+/**
+ * Prefetch helper used by adminService.prefetch* methods.
+ * Performs a simple GET request, stores the response under a swr-key in localStorage and returns success boolean.
+ */
+async function prefetchData(path: string, params: Record<string, any> = {}): Promise<boolean> {
+  try {
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || ""
+    const url = `${baseUrl}${path}`
+
+    const queryParams = new URLSearchParams()
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null) {
+        queryParams.append(key, String(value))
+      }
+    })
+
+    const fullUrl = queryParams.toString() ? `${url}?${queryParams.toString()}` : url
+    const token = (typeof localStorage !== "undefined" && (localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token"))) || ""
+
+    const response = await fetch(fullUrl, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: token ? `Bearer ${token}` : "",
+      },
+      credentials: "include",
+    })
+
+    if (!response.ok) {
+      console.warn(`[prefetchData] Request to ${fullUrl} failed with status ${response.status}`)
+      return false
+    }
+
+    // try to parse JSON; if it fails, still treat as success but don't cache
+    const data = await response.json().catch(() => null)
+    try {
+      if (typeof localStorage !== "undefined") {
+        const cacheKey = `swr-key:${path}${queryParams.toString() ? `?${queryParams.toString()}` : ""}`
+        localStorage.setItem(cacheKey, JSON.stringify(data))
+      }
+    } catch (e) {
+      // ignore localStorage failures
+      console.warn("[prefetchData] Failed to write to localStorage:", e)
+    }
+
+    return true
+  } catch (error) {
+    console.warn("[prefetchData] Error prefetching", error)
+    return false
+  }
+}
+
 // Explicit re-export of types to ensure proper module resolution
-export type { AdminDashboardResponse, AdminLoginResponse }
+// Re-export the imported admin types instead of the locally defined interfaces
+// to avoid duplicate export declarations for AdminDashboardResponse/AdminLoginResponse.
+export type { AdminPaginatedResponse, ProductCreatePayload }
 
 
 // Define the base URL for admin API endpoints
@@ -2333,7 +2387,7 @@ export const adminService = {
       active_users: [],
       sales_data: [],
     }
-  }
+  },
 
   getDefaultPerformanceMetrics() {
     return {
@@ -2346,7 +2400,7 @@ export const adminService = {
       uptime: 99.9,
       request_count: 50000,
     }
-  }
+  },
 
   getDefaultSystemStatus() {
     return {
@@ -2359,7 +2413,7 @@ export const adminService = {
       services_total: 12,
       alerts: 0,
     }
-  }
+  },
 
   async getUsers(params = {}): Promise<AdminPaginatedResponse<any>> {
     try {

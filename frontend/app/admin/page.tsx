@@ -181,7 +181,7 @@ export default function AdminDashboardPage() {
       today_trend: data?.sales?.today_trend || 0,
       weekly_trend: data?.sales?.weekly_trend || 0,
       monthly_trend: data?.sales?.monthly_trend || 0,
-    },
+    } as const,
     customer_analytics: {
       total_customers: data?.customer_analytics?.total_customers || 0,
       new_customers_today: data?.customer_analytics?.new_customers_today || 0,
@@ -190,7 +190,7 @@ export default function AdminDashboardPage() {
       average_customer_lifetime_value: data?.customer_analytics?.average_customer_lifetime_value || 0,
       customer_satisfaction_score: data?.customer_analytics?.customer_satisfaction_score || 0,
       churn_rate: data?.customer_analytics?.churn_rate || 0,
-    },
+    } as const,
     recent_orders: data?.recent_orders || [],
     recent_users: data?.recent_users || [],
     recent_activities: data?.recent_activities || [],
@@ -199,11 +199,11 @@ export default function AdminDashboardPage() {
     payment_methods: data?.payment_methods || [],
     performance_metrics: data?.performance_metrics || adminService.getDefaultPerformanceMetrics(),
     system_health: data?.system_health || adminService.getDefaultSystemStatus(),
-  }
+  } as const
 
-  // Calculate growth
-  const salesGrowth = safeData.sales.yesterday > 0 
-    ? Math.round(((safeData.sales.today - safeData.sales.yesterday) / safeData.sales.yesterday) * 100)
+  // Calculate growth - with safe defaults
+  const salesGrowth = safeData.sales?.yesterday ? 
+    Math.round(((safeData.sales.today - safeData.sales.yesterday) / safeData.sales.yesterday) * 100)
     : 0
 
   return (
@@ -377,7 +377,7 @@ export default function AdminDashboardPage() {
                   </div>
                   <div className="pt-4">
                     <p className="text-sm text-gray-600 mb-2">Average Order Value</p>
-                    <p className="text-2xl font-semibold">${(safeData.sales.average_order_value || 0).toFixed(2)}</p>
+                    <p className="text-2xl font-semibold">${(safeData.sales?.average_order_value || 0).toFixed(2)}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -391,9 +391,9 @@ export default function AdminDashboardPage() {
                 <CardContent className="p-6 space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Retention Rate</span>
-                    <span className="font-semibold">{safeData.customer_analytics.customer_retention_rate}%</span>
+                    <span className="font-semibold">{safeData.customer_analytics?.customer_retention_rate || 0}%</span>
                   </div>
-                  <Progress value={safeData.customer_analytics.customer_retention_rate} className="rounded-full h-2" />
+                  <Progress value={safeData.customer_analytics?.customer_retention_rate || 0} className="rounded-full h-2" />
 
                   <div className="flex items-center justify-between pt-2">
                     <span className="text-sm text-gray-600">Satisfaction Score</span>
@@ -414,7 +414,7 @@ export default function AdminDashboardPage() {
 
                   <div className="pt-4 border-t border-gray-100">
                     <p className="text-sm text-gray-600 mb-1">Repeat Customers</p>
-                    <p className="text-2xl font-semibold">{safeData.customer_analytics.repeat_customers}</p>
+                    <p className="text-2xl font-semibold">{safeData.customer_analytics?.repeat_customers || 0}</p>
                   </div>
                 </CardContent>
               </Card>
