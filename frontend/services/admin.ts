@@ -49,6 +49,13 @@ export interface AdminDashboardResponse {
     orders_in_transit: number
     pending_payments: number
     low_stock_count: number
+    total_active_sessions?: number
+    total_sales_channels?: number
+    refunds_pending?: number
+    support_tickets_open?: number
+    total_wishlist_items?: number
+    active_coupons?: number
+    returning_customers?: number
   }
   sales: {
     today: number
@@ -58,6 +65,24 @@ export interface AdminDashboardResponse {
     yearly: number
     total_revenue: number
     pending_amount: number
+    average_order_value?: number
+    net_profit?: number
+    gross_profit?: number
+    refunded_amount?: number
+    tax_collected?: number
+    shipping_revenue?: number
+    today_trend?: number
+    weekly_trend?: number
+    monthly_trend?: number
+  }
+  customer_analytics?: {
+    total_customers?: number
+    new_customers_today?: number
+    repeat_customers?: number
+    customer_retention_rate?: number
+    average_customer_lifetime_value?: number
+    customer_satisfaction_score?: number
+    churn_rate?: number
   }
   order_status: Record<string, number>
   recent_orders: any[]
@@ -73,6 +98,9 @@ export interface AdminDashboardResponse {
   revenue_vs_refunds: any[]
   active_users: any[]
   sales_data: any[]
+  payment_methods?: any[]
+  performance_metrics?: any
+  system_health?: any
 }
 
 interface ProductImage {
