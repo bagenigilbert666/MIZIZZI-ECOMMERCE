@@ -27,6 +27,7 @@ import {
   X,
   Search,
   Boxes,
+  ShoppingCart,
   Sliders,
   Palette,
   Layout,
@@ -169,6 +170,17 @@ const menuItems: MenuItem[] = [
       { title: "Addresses", path: "/admin/addresses" },
       { title: "Verification", path: "/admin/customers/verification" },
       { title: "Customer Profiles", path: "/admin/customers/profiles" },
+    ],
+  },
+  {
+    title: "Cart & Wishlist",
+    icon: <ShoppingCart size={20} />,
+    path: "/admin/cart-wishlist",
+    submenu: [
+      { title: "Cart Items", path: "/admin/cart-wishlist/cart-items" },
+      { title: "Abandoned Carts", path: "/admin/cart-wishlist/abandoned-carts", badge: 7 },
+      { title: "Wishlist Items", path: "/admin/cart-wishlist/wishlist-items" },
+      { title: "Dashboard", path: "/admin/cart-wishlist" },
     ],
   },
   {
