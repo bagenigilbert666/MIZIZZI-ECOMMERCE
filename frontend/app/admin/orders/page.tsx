@@ -33,11 +33,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { formatDate, formatCurrency } from "@/lib/utils"
 import { Checkbox } from "@/components/ui/checkbox"
+import { getAllOrders } from "@/lib/server/get-all-orders"
 
 export const metadata: Metadata = {
   title: "Order Management | Admin Dashboard",
   description: "Manage and track all customer orders",
 }
+
+export const revalidate = 60 // ISR: revalidate every 60 seconds
 
 interface Order {
   id: number | string
@@ -57,138 +60,6 @@ interface Order {
     quantity: number
     price: number
   }>
-}
-
-interface ApiResponse {
-  items: Order[]
-  pagination: {
-    total_items: number
-    total_pages: number
-    current_page: number
-  }
-  stats?: {
-    total: number
-    pending: number
-    processing: number
-    shipped: number
-    delivered: number
-    cancelled: number
-    revenue: number
-  }
-}
-
-// Mock data for demonstration - Replace with actual API call
-const mockOrders: Order[] = [
-  {
-    id: 1,
-    order_number: "363105797",
-    user_id: "user1",
-    customer_name: "GILBERT BAGENI",
-    customer_email: "bagenilbert@gmail.com",
-    created_at: "2026-02-25T10:30:00Z",
-    updated_at: "2026-02-25T10:30:00Z",
-    status: "pending",
-    payment_status: "pending",
-    payment_method: "card",
-    total_amount: 5200,
-    items: [
-      {
-        id: 1,
-        product_name: "Product 1",
-        quantity: 1,
-        price: 5200,
-      },
-    ],
-  },
-  {
-    id: 2,
-    order_number: "365968128",
-    user_id: "user2",
-    customer_name: "GILBERT BAGENI",
-    customer_email: "bagenilbert@gmail.com",
-    created_at: "2026-02-25T09:15:00Z",
-    updated_at: "2026-02-25T09:15:00Z",
-    status: "pending",
-    payment_status: "pending",
-    payment_method: "card",
-    total_amount: 1000,
-    items: [
-      {
-        id: 2,
-        product_name: "Product 2",
-        quantity: 1,
-        price: 1000,
-      },
-    ],
-  },
-  {
-    id: 3,
-    order_number: "338716273",
-    user_id: "user3",
-    customer_name: "GILBERT BAGENI",
-    customer_email: "bagenilbert@gmail.com",
-    created_at: "2026-02-25T08:00:00Z",
-    updated_at: "2026-02-25T08:00:00Z",
-    status: "pending",
-    payment_status: "pending",
-    payment_method: "card",
-    total_amount: 1000,
-    items: [
-      {
-        id: 3,
-        product_name: "Product 3",
-        quantity: 1,
-        price: 1000,
-      },
-    ],
-  },
-]
-
-const mockStats = {
-  total: 36,
-  pending: 11,
-  processing: 0,
-  shipped: 1,
-  delivered: 2,
-  cancelled: 2,
-  revenue: 39800,
-}
-
-// Server-side function to fetch orders
-async function fetchOrdersData() {
-  try {
-    // Replace with actual API call if needed
-    // const response = await fetch(`${process.env.API_BASE_URL}/api/admin/orders`, {
-    //   headers: {
-    //     Authorization: `Bearer ${process.env.ADMIN_API_KEY}`,
-    //   },
-    //   next: { revalidate: 60 } // ISR: revalidate every 60 seconds
-    // })
-    // const data = await response.json()
-    // return data
-
-    // For now, using mock data
-    return {
-      items: mockOrders,
-      pagination: {
-        total_items: mockStats.total,
-        total_pages: 2,
-        current_page: 1,
-      },
-      stats: mockStats,
-    }
-  } catch (error) {
-    console.error("Failed to fetch orders:", error)
-    return {
-      items: mockOrders,
-      pagination: {
-        total_items: mockStats.total,
-        total_pages: 2,
-        current_page: 1,
-      },
-      stats: mockStats,
-    }
-  }
 }
 
 function StatCard({ icon: Icon, label, value, color }: any) {
@@ -256,9 +127,17 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default async function OrderManagementPage() {
-  const data = await fetchOrdersData()
-  const orders = data.items || []
-  const stats = data.stats || mockStats
+  const data = await getAllOrders(100, 1, true)
+  const orders = data.orders || []
+  const stats = data.stats || {
+    total: 0,
+    pending: 0,
+    processing: 0,
+    shipped: 0,
+    delivered: 0,
+    cancelled: 0,
+    revenue: 0,
+  }
 
   return (
     <div className="w-full">
