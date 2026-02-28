@@ -140,9 +140,71 @@ export default function AdminDashboardPage() {
 
   const data = dashboardData || adminService.getDefaultDashboardData()
 
+  // Ensure all data properties have defaults to prevent undefined errors
+  const safeData = {
+    ...data,
+    counts: {
+      users: data?.counts?.users || 0,
+      products: data?.counts?.products || 0,
+      orders: data?.counts?.orders || 0,
+      categories: data?.counts?.categories || 0,
+      brands: data?.counts?.brands || 0,
+      reviews: data?.counts?.reviews || 0,
+      pending_reviews: data?.counts?.pending_reviews || 0,
+      newsletter_subscribers: data?.counts?.newsletter_subscribers || 0,
+      new_signups_today: data?.counts?.new_signups_today || 0,
+      new_signups_week: data?.counts?.new_signups_week || 0,
+      orders_in_transit: data?.counts?.orders_in_transit || 0,
+      pending_payments: data?.counts?.pending_payments || 0,
+      low_stock_count: data?.counts?.low_stock_count || 0,
+      total_active_sessions: data?.counts?.total_active_sessions || 0,
+      total_sales_channels: data?.counts?.total_sales_channels || 0,
+      refunds_pending: data?.counts?.refunds_pending || 0,
+      support_tickets_open: data?.counts?.support_tickets_open || 0,
+      total_wishlist_items: data?.counts?.total_wishlist_items || 0,
+      active_coupons: data?.counts?.active_coupons || 0,
+      returning_customers: data?.counts?.returning_customers || 0,
+    },
+    sales: {
+      today: data?.sales?.today || 0,
+      yesterday: data?.sales?.yesterday || 0,
+      weekly: data?.sales?.weekly || 0,
+      monthly: data?.sales?.monthly || 0,
+      yearly: data?.sales?.yearly || 0,
+      total_revenue: data?.sales?.total_revenue || 0,
+      pending_amount: data?.sales?.pending_amount || 0,
+      average_order_value: data?.sales?.average_order_value || 0,
+      net_profit: data?.sales?.net_profit || 0,
+      gross_profit: data?.sales?.gross_profit || 0,
+      refunded_amount: data?.sales?.refunded_amount || 0,
+      tax_collected: data?.sales?.tax_collected || 0,
+      shipping_revenue: data?.sales?.shipping_revenue || 0,
+      today_trend: data?.sales?.today_trend || 0,
+      weekly_trend: data?.sales?.weekly_trend || 0,
+      monthly_trend: data?.sales?.monthly_trend || 0,
+    },
+    customer_analytics: {
+      total_customers: data?.customer_analytics?.total_customers || 0,
+      new_customers_today: data?.customer_analytics?.new_customers_today || 0,
+      repeat_customers: data?.customer_analytics?.repeat_customers || 0,
+      customer_retention_rate: data?.customer_analytics?.customer_retention_rate || 0,
+      average_customer_lifetime_value: data?.customer_analytics?.average_customer_lifetime_value || 0,
+      customer_satisfaction_score: data?.customer_analytics?.customer_satisfaction_score || 0,
+      churn_rate: data?.customer_analytics?.churn_rate || 0,
+    },
+    recent_orders: data?.recent_orders || [],
+    recent_users: data?.recent_users || [],
+    recent_activities: data?.recent_activities || [],
+    low_stock_products: data?.low_stock_products || [],
+    best_selling_products: data?.best_selling_products || [],
+    payment_methods: data?.payment_methods || [],
+    performance_metrics: data?.performance_metrics || adminService.getDefaultPerformanceMetrics(),
+    system_health: data?.system_health || adminService.getDefaultSystemStatus(),
+  }
+
   // Calculate growth
-  const salesGrowth = data.sales.yesterday > 0 
-    ? Math.round(((data.sales.today - data.sales.yesterday) / data.sales.yesterday) * 100)
+  const salesGrowth = safeData.sales.yesterday > 0 
+    ? Math.round(((safeData.sales.today - safeData.sales.yesterday) / safeData.sales.yesterday) * 100)
     : 0
 
   return (
@@ -204,9 +266,9 @@ export default function AdminDashboardPage() {
               <AppleCard
                 icon={<DollarSign className="h-5 w-5 text-blue-600" />}
                 title="Total Revenue"
-                value={`$${((data.sales?.total_revenue || 0) / 1000000).toFixed(1)}M`}
+                value={`$${((safeData.sales?.total_revenue || 0) / 1000000).toFixed(1)}M`}
                 subtitle="All-time revenue"
-                trend={data.sales?.today_trend}
+                trend={safeData.sales?.today_trend}
                 bgColor="bg-blue-50"
               />
 
@@ -214,7 +276,7 @@ export default function AdminDashboardPage() {
               <AppleCard
                 icon={<TrendingUp className="h-5 w-5 text-green-600" />}
                 title="Today's Sales"
-                value={`$${((data.sales?.today || 0) / 1000).toFixed(1)}K`}
+                value={`$${((safeData.sales?.today || 0) / 1000).toFixed(1)}K`}
                 subtitle={`${Math.abs(salesGrowth)}% ${salesGrowth >= 0 ? "increase" : "decrease"} vs yesterday`}
                 trend={salesGrowth}
                 bgColor="bg-green-50"
@@ -224,8 +286,8 @@ export default function AdminDashboardPage() {
               <AppleCard
                 icon={<ShoppingCart className="h-5 w-5 text-orange-600" />}
                 title="Total Orders"
-                value={data.counts.orders.toString()}
-                subtitle={`${data.counts.pending_payments} pending`}
+                value={safeData.counts.orders.toString()}
+                subtitle={`${safeData.counts.pending_payments} pending`}
                 bgColor="bg-orange-50"
               />
 
@@ -233,8 +295,8 @@ export default function AdminDashboardPage() {
               <AppleCard
                 icon={<Users className="h-5 w-5 text-purple-600" />}
                 title="Total Customers"
-                value={data.counts.users.toString()}
-                subtitle={`${data.counts.new_signups_today} new today`}
+                value={safeData.counts.users.toString()}
+                subtitle={`${safeData.counts.new_signups_today} new today`}
                 bgColor="bg-purple-50"
               />
             </div>
@@ -244,8 +306,8 @@ export default function AdminDashboardPage() {
               {/* Products */}
               <MetricCard
                 label="Products"
-                value={data.counts.products}
-                sublabel={`${data.counts.low_stock_count} low stock`}
+                value={safeData.counts.products}
+                sublabel={`${safeData.counts.low_stock_count} low stock`}
                 icon={<Package className="h-4 w-4" />}
                 color="blue"
               />
@@ -253,7 +315,7 @@ export default function AdminDashboardPage() {
               {/* Categories */}
               <MetricCard
                 label="Categories"
-                value={data.counts.categories}
+                value={safeData.counts.categories}
                 sublabel="Product categories"
                 icon={<BarChart3 className="h-4 w-4" />}
                 color="green"
@@ -262,7 +324,7 @@ export default function AdminDashboardPage() {
               {/* Orders in Transit */}
               <MetricCard
                 label="In Transit"
-                value={data.counts.orders_in_transit}
+                value={safeData.counts.orders_in_transit}
                 sublabel="Active shipments"
                 icon={<ShoppingCart className="h-4 w-4" />}
                 color="orange"
@@ -271,7 +333,7 @@ export default function AdminDashboardPage() {
               {/* Pending Payments */}
               <MetricCard
                 label="Pending"
-                value={data.counts.pending_payments}
+                value={safeData.counts.pending_payments}
                 sublabel="Awaiting payment"
                 icon={<AlertTriangle className="h-4 w-4" />}
                 color="red"
@@ -280,7 +342,7 @@ export default function AdminDashboardPage() {
               {/* Newsletter */}
               <MetricCard
                 label="Subscribers"
-                value={data.counts.newsletter_subscribers}
+                value={safeData.counts.newsletter_subscribers}
                 sublabel="Newsletter list"
                 icon={<Users className="h-4 w-4" />}
                 color="purple"
@@ -300,23 +362,23 @@ export default function AdminDashboardPage() {
                     <div>
                       <p className="text-sm text-gray-600">Weekly Revenue</p>
                       <p className="text-2xl font-semibold mt-1">
-                        ${((data.sales?.weekly || 0) / 1000).toFixed(1)}K
+                        ${((safeData.sales?.weekly || 0) / 1000).toFixed(1)}K
                       </p>
                     </div>
-                    <TrendIndicator value={data.sales?.weekly_trend || 0} />
+                    <TrendIndicator value={safeData.sales?.weekly_trend || 0} />
                   </div>
                   <div className="flex items-end justify-between pt-4 border-t border-gray-100">
                     <div>
                       <p className="text-sm text-gray-600">Monthly Revenue</p>
                       <p className="text-2xl font-semibold mt-1">
-                        ${((data.sales?.monthly || 0) / 1000000).toFixed(2)}M
+                        ${((safeData.sales?.monthly || 0) / 1000000).toFixed(2)}M
                       </p>
                     </div>
-                    <TrendIndicator value={data.sales?.monthly_trend || 0} />
+                    <TrendIndicator value={safeData.sales?.monthly_trend || 0} />
                   </div>
                   <div className="pt-4">
                     <p className="text-sm text-gray-600 mb-2">Average Order Value</p>
-                    <p className="text-2xl font-semibold">${(data.sales.average_order_value || 0).toFixed(2)}</p>
+                    <p className="text-2xl font-semibold">${(safeData.sales.average_order_value || 0).toFixed(2)}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -330,20 +392,20 @@ export default function AdminDashboardPage() {
                 <CardContent className="p-6 space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Retention Rate</span>
-                    <span className="font-semibold">{data.customer_analytics.customer_retention_rate}%</span>
+                    <span className="font-semibold">{safeData.customer_analytics.customer_retention_rate}%</span>
                   </div>
-                  <Progress value={data.customer_analytics.customer_retention_rate} className="rounded-full h-2" />
+                  <Progress value={safeData.customer_analytics.customer_retention_rate} className="rounded-full h-2" />
 
                   <div className="flex items-center justify-between pt-2">
                     <span className="text-sm text-gray-600">Satisfaction Score</span>
-                    <span className="font-semibold">{(data.customer_analytics?.customer_satisfaction_score || 0).toFixed(1)}/5</span>
+                    <span className="font-semibold">{(safeData.customer_analytics?.customer_satisfaction_score || 0).toFixed(1)}/5</span>
                   </div>
                   <div className="flex gap-1">
                     {[...Array(5)].map((_, i) => (
                       <div
                         key={i}
                         className={`h-2 flex-1 rounded-full ${
-                          i < Math.floor(data.customer_analytics?.customer_satisfaction_score || 0)
+                          i < Math.floor(safeData.customer_analytics?.customer_satisfaction_score || 0)
                             ? "bg-yellow-400"
                             : "bg-gray-200"
                         }`}
@@ -353,7 +415,7 @@ export default function AdminDashboardPage() {
 
                   <div className="pt-4 border-t border-gray-100">
                     <p className="text-sm text-gray-600 mb-1">Repeat Customers</p>
-                    <p className="text-2xl font-semibold">{data.customer_analytics.repeat_customers}</p>
+                    <p className="text-2xl font-semibold">{safeData.customer_analytics.repeat_customers}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -362,7 +424,7 @@ export default function AdminDashboardPage() {
             {/* Recent Orders & Low Stock */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Recent Orders */}
-              {data.recent_orders && data.recent_orders.length > 0 && (
+              {safeData.recent_orders && safeData.recent_orders.length > 0 && (
                 <Card className="bg-white border border-gray-200 rounded-2xl shadow-sm">
                   <CardHeader className="p-6 border-b border-gray-100 flex flex-row items-center justify-between">
                     <div>
@@ -381,7 +443,7 @@ export default function AdminDashboardPage() {
                   </CardHeader>
                   <CardContent className="p-6">
                     <div className="space-y-3">
-                      {data.recent_orders.slice(0, 4).map((order: OrderData) => (
+                      {safeData.recent_orders.slice(0, 4).map((order: OrderData) => (
                         <OrderItem key={order.id} order={order} />
                       ))}
                     </div>
@@ -390,7 +452,7 @@ export default function AdminDashboardPage() {
               )}
 
               {/* Low Stock Alert */}
-              {data.low_stock_products && data.low_stock_products.length > 0 && (
+              {safeData.low_stock_products && safeData.low_stock_products.length > 0 && (
                 <Card className="bg-white border border-yellow-200 rounded-2xl shadow-sm">
                   <CardHeader className="p-6 border-b border-yellow-100">
                     <div className="flex items-center justify-between">
@@ -399,7 +461,7 @@ export default function AdminDashboardPage() {
                           <AlertTriangle className="h-5 w-5 text-yellow-600" />
                           Low Stock Alert
                         </CardTitle>
-                        <CardDescription>{data.counts.low_stock_count} products</CardDescription>
+                        <CardDescription>{safeData.counts.low_stock_count} products</CardDescription>
                       </div>
                       <Button
                         variant="ghost"
@@ -414,7 +476,7 @@ export default function AdminDashboardPage() {
                   </CardHeader>
                   <CardContent className="p-6">
                     <div className="space-y-3">
-                      {data.low_stock_products.slice(0, 4).map((product: any) => (
+                      {safeData.low_stock_products.slice(0, 4).map((product: any) => (
                         <div key={product.id} className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg border border-yellow-100">
                           <div className="min-w-0">
                             <p className="font-medium text-sm truncate">{product.name}</p>
@@ -435,7 +497,7 @@ export default function AdminDashboardPage() {
             {/* Recent Customers & Activities */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Recent Customers */}
-              {data.recent_users && data.recent_users.length > 0 && (
+              {safeData.recent_users && safeData.recent_users.length > 0 && (
                 <Card className="bg-white border border-gray-200 rounded-2xl shadow-sm">
                   <CardHeader className="p-6 border-b border-gray-100 flex flex-row items-center justify-between">
                     <div>
@@ -454,7 +516,7 @@ export default function AdminDashboardPage() {
                   </CardHeader>
                   <CardContent className="p-6">
                     <div className="space-y-3">
-                      {data.recent_users.slice(0, 4).map((user: UserData) => (
+                      {safeData.recent_users.slice(0, 4).map((user: UserData) => (
                         <div key={user.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
                           <div className="min-w-0">
                             <p className="font-medium text-sm">{user.name}</p>
@@ -471,7 +533,7 @@ export default function AdminDashboardPage() {
               )}
 
               {/* Recent Activity */}
-              {data.recent_activities && data.recent_activities.length > 0 && (
+              {safeData.recent_activities && safeData.recent_activities.length > 0 && (
                 <Card className="bg-white border border-gray-200 rounded-2xl shadow-sm">
                   <CardHeader className="p-6 border-b border-gray-100">
                     <CardTitle className="text-lg font-semibold flex items-center gap-2">
@@ -482,7 +544,7 @@ export default function AdminDashboardPage() {
                   </CardHeader>
                   <CardContent className="p-6">
                     <div className="space-y-3">
-                      {data.recent_activities.slice(0, 4).map((activity: ActivityData) => (
+                      {safeData.recent_activities.slice(0, 4).map((activity: ActivityData) => (
                         <div key={activity.id} className="flex gap-3 pb-3 border-b border-gray-100 last:border-0">
                           <div className={`flex-shrink-0 w-2 h-2 rounded-full mt-2 ${
                             activity.severity === "warning" ? "bg-yellow-500" :
@@ -505,36 +567,36 @@ export default function AdminDashboardPage() {
             </div>
 
             {/* Best Selling Products */}
-            {data.best_selling_products && data.best_selling_products.length > 0 && (
+            {safeData.best_selling_products && safeData.best_selling_products.length > 0 && (
               <Card className="bg-white border border-gray-200 rounded-2xl shadow-sm">
                 <CardHeader className="p-6 border-b border-gray-100">
                   <CardTitle className="text-lg font-semibold">Best Sellers</CardTitle>
                   <CardDescription>Top performing products</CardDescription>
                 </CardHeader>
                 <CardContent className="p-6">
-                    <div className="space-y-3">
-                      {data.best_selling_products.slice(0, 5).map((product: ProductData) => (
-                        <div key={product.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
-                          <div className="min-w-0 flex-1">
-                            <p className="font-medium text-sm">{product.name}</p>
-                            <p className="text-xs text-gray-600">{product.sales_count} sales • ${((product.revenue || 0) / 1000).toFixed(1)}K revenue</p>
-                          </div>
-                          <div className="flex items-center gap-2 ml-4">
-                            <div className="flex gap-0.5">
-                              {[...Array(5)].map((_, i) => (
-                                <div
-                                  key={i}
-                                  className={`h-2 w-2 rounded-full ${
-                                    i < Math.floor(product.rating || 0) ? "bg-yellow-400" : "bg-gray-300"
-                                  }`}
-                                />
-                              ))}
-                            </div>
-                            <span className="text-xs font-medium">{(product.rating || 0).toFixed(1)}</span>
-                          </div>
+                  <div className="space-y-3">
+                    {safeData.best_selling_products.slice(0, 5).map((product: ProductData) => (
+                      <div key={product.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                        <div className="min-w-0 flex-1">
+                          <p className="font-medium text-sm">{product.name}</p>
+                          <p className="text-xs text-gray-600">{product.sales_count} sales • ${((product.revenue || 0) / 1000).toFixed(1)}K revenue</p>
                         </div>
-                      ))}
-                    </div>
+                        <div className="flex items-center gap-2 ml-4">
+                          <div className="flex gap-0.5">
+                            {[...Array(5)].map((_, i) => (
+                              <div
+                                key={i}
+                                className={`h-2 w-2 rounded-full ${
+                                  i < Math.floor(product.rating || 0) ? "bg-yellow-400" : "bg-gray-300"
+                                }`}
+                              />
+                            ))}
+                          </div>
+                          <span className="text-xs font-medium">{(product.rating || 0).toFixed(1)}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </CardContent>
               </Card>
             )}
@@ -710,7 +772,7 @@ function MetricCard({
       <div className="flex items-center justify-between">
         <div>
           <p className="text-xs font-medium text-gray-600 uppercase">{label}</p>
-          <p className="text-2xl font-semibold text-gray-900 mt-1">{value}</p>
+          <p className="text-2xl font-semibold text-gray-900 mt-1">{value || 0}</p>
           <p className="text-xs text-gray-600 mt-1">{sublabel}</p>
         </div>
         <div className="flex-shrink-0 text-lg">{icon}</div>
