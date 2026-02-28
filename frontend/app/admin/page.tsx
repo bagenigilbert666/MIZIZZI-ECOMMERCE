@@ -619,33 +619,33 @@ export default function AdminDashboardPage() {
                 <CardContent className="p-6 space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">API Health</span>
-                    <span className="font-semibold">{data.system_health.api_health}%</span>
+                    <span className="font-semibold">{safeData.system_health.api_health}%</span>
                   </div>
-                  <Progress value={data.system_health.api_health} className="rounded-full h-2" />
+                  <Progress value={safeData.system_health.api_health} className="rounded-full h-2" />
 
                   <div className="grid grid-cols-3 gap-4 pt-4 border-t border-gray-100">
                     <div>
                       <p className="text-xs text-gray-600">Memory</p>
-                      <p className="text-lg font-semibold">{data.system_health.memory_usage}%</p>
+                        <p className="text-lg font-semibold">{safeData.system_health.memory_usage}%</p>
                     </div>
                     <div>
                       <p className="text-xs text-gray-600">CPU</p>
-                      <p className="text-lg font-semibold">{data.system_health.cpu_usage}%</p>
+                      <p className="text-lg font-semibold">{safeData.system_health.cpu_usage}%</p>
                     </div>
                     <div>
                       <p className="text-xs text-gray-600">Disk</p>
-                      <p className="text-lg font-semibold">{data.system_health.disk_usage}%</p>
+                      <p className="text-lg font-semibold">{safeData.system_health.disk_usage}%</p>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-2 pt-4 border-t border-gray-100">
                     <div className={`h-2 w-2 rounded-full ${
-                      data.system_health.status === "healthy" ? "bg-green-500" :
-                      data.system_health.status === "warning" ? "bg-yellow-500" :
+                      safeData.system_health.status === "healthy" ? "bg-green-500" :
+                      safeData.system_health.status === "warning" ? "bg-yellow-500" :
                       "bg-red-500"
                     }`} />
                     <span className="text-sm text-gray-600">
-                      Status: <span className="font-semibold capitalize">{data.system_health.status}</span>
+                      Status: <span className="font-semibold capitalize">{safeData.system_health.status}</span>
                     </span>
                   </div>
                 </CardContent>
@@ -659,26 +659,26 @@ export default function AdminDashboardPage() {
                 <CardContent className="p-6 space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Page Load Time</span>
-                    <span className="font-semibold text-green-600">{data.performance_metrics.page_load_time}s</span>
+                    <span className="font-semibold text-green-600">{safeData.performance_metrics.page_load_time}s</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">API Response Time</span>
-                    <span className="font-semibold text-green-600">{data.performance_metrics.api_response_time}s</span>
+                    <span className="font-semibold text-green-600">{safeData.performance_metrics.api_response_time}s</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-sm text-gray-600">Cache Hit Rate</span>
-                    <span className="font-semibold">{data.performance_metrics.cache_hit_rate}%</span>
+                    <span className="font-semibold">{safeData.performance_metrics.cache_hit_rate}%</span>
                   </div>
                   <div className="flex items-center justify-between pt-4 border-t border-gray-100">
                     <span className="text-sm text-gray-600">Uptime</span>
-                    <span className="font-semibold text-green-600">{data.performance_metrics.uptime_percentage}%</span>
+                    <span className="font-semibold text-green-600">{safeData.performance_metrics.uptime_percentage}%</span>
                   </div>
                 </CardContent>
               </Card>
             </div>
 
             {/* Payment Methods Distribution */}
-            {data.payment_methods && data.payment_methods.length > 0 && (
+            {safeData.payment_methods && safeData.payment_methods.length > 0 && (
               <Card className="bg-white border border-gray-200 rounded-2xl shadow-sm">
                 <CardHeader className="p-6 border-b border-gray-100">
                   <CardTitle className="text-lg font-semibold">Payment Methods</CardTitle>
@@ -686,7 +686,7 @@ export default function AdminDashboardPage() {
                 </CardHeader>
                 <CardContent className="p-6">
                   <div className="space-y-3">
-                    {data.payment_methods.map((method: any) => (
+                    {safeData.payment_methods.map((method: any) => (
                       <div key={method.method} className="flex items-center gap-4">
                         <div className="flex-1">
                           <div className="flex items-center justify-between mb-1">
