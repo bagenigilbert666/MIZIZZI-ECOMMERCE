@@ -1128,12 +1128,14 @@ export const adminService = {
     max_amount?: number
   }): Promise<any> {
     try {
-      const token = localStorage.getItem("mizizzi_token")
+      const token = localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
       if (!token) {
+        console.log("[v0] getOrders: No authentication token available")
         throw new Error("No authentication token available")
       }
 
-      const url = new URL(`${process.env.NEXT_PUBLIC_API_URL}/api/admin/orders`)
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:5000"
+      const url = new URL(`${baseUrl}/api/admin/orders`)
 
       url.searchParams.append("include_items", "true")
       url.searchParams.append("with_items", "true")
@@ -1147,6 +1149,8 @@ export const adminService = {
         })
       }
 
+      console.log("[v0] getOrders: Fetching orders from backend at", url.toString())
+
       const response = await fetch(url.toString(), {
         method: "GET",
         headers: {
@@ -1156,13 +1160,47 @@ export const adminService = {
         credentials: "include",
       })
 
+      console.log("[v0] getOrders: Response status:", response.status)
+
       if (!response.ok) {
-        throw new Error(`Orders request failed with status: ${response.status}`)
+        // Handle 401 Unauthorized - attempt token refresh
+        if (response.status === 401) {
+          console.log("[v0] getOrders: Received 401, attempting token refresh...")
+          try {
+            const refreshSuccess = await this.refreshToken()
+            if (refreshSuccess) {
+              // Retry the request with new token
+              const newToken = localStorage.getItem("mizizzi_token") || localStorage.getItem("admin_token")
+              if (newToken) {
+                console.log("[v0] getOrders: Retrying with refreshed token")
+                const retryResponse = await fetch(url.toString(), {
+                  method: "GET",
+                  headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${newToken}`,
+                  },
+                  credentials: "include",
+                })
+
+                if (retryResponse.ok) {
+                  const data = await retryResponse.json()
+                  console.log("[v0] getOrders: Orders retrieved successfully after token refresh")
+                  return data
+                }
+              }
+            }
+          } catch (refreshError) {
+            console.error("[v0] getOrders: Token refresh failed:", refreshError)
+          }
+        }
+
+        console.error("[v0] getOrders: API returned status", response.status)
+        throw new Error(`API returned status ${response.status}`)
       }
 
       return await response.json()
     } catch (error) {
-      console.error("Error fetching orders:", error)
+      console.error("[v0] getOrders: Error fetching orders:", error)
       throw error
     }
   },
