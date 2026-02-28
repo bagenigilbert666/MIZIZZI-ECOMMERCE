@@ -285,8 +285,8 @@ export function AdminSidebar({ isCollapsed, toggleSidebar }: AdminSidebarProps) 
           className={cn(
             "flex items-center rounded-md cursor-pointer transition-colors duration-200",
             isActive(item.path) || isSubmenuActive(item)
-              ? "bg-orange-500/30 text-orange-400 dark:bg-orange-500/30 dark:text-orange-300 border border-orange-400/30"
-              : "text-slate-400 hover:bg-white/10 hover:text-orange-300 dark:text-slate-400 dark:hover:bg-white/10 dark:hover:text-orange-300 border border-transparent",
+              ? "bg-cherry-50 text-cherry-600 dark:bg-cherry-900/20 dark:text-cherry-400"
+              : "text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800/50 dark:hover:text-slate-300",
             isCollapsed ? "justify-center py-2 px-0" : "py-2 px-3",
           )}
           onClick={() => (item.submenu ? toggleSubmenu(item.title) : router.push(item.path))}
@@ -360,7 +360,7 @@ export function AdminSidebar({ isCollapsed, toggleSidebar }: AdminSidebarProps) 
         <Button
           variant="ghost"
           size="icon"
-          className="fixed top-3 left-3 z-50 md:hidden h-9 w-9 rounded-md admin-glass-sm border border-white/10 text-white hover:bg-orange-500/20 hover:text-orange-400 shadow-md"
+          className="fixed top-3 left-3 z-50 md:hidden h-9 w-9 rounded-md bg-white shadow-md border border-gray-200 dark:bg-gray-900 dark:border-gray-800"
           onClick={() => setIsMobileMenuOpen(true)}
         >
           <Menu size={20} />
@@ -379,15 +379,15 @@ export function AdminSidebar({ isCollapsed, toggleSidebar }: AdminSidebarProps) 
               />
               <motion.div
                 ref={sidebarRef}
-                className="fixed inset-y-0 left-0 w-[280px] admin-glass-lg border-r border-white/10 shadow-xl z-50 flex flex-col"
+                className="fixed inset-y-0 left-0 w-[280px] bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 shadow-xl z-50 flex flex-col"
                 initial={{ x: "-100%" }}
                 animate={{ x: 0 }}
                 exit={{ x: "-100%" }}
                 transition={{ type: "spring", damping: 25, stiffness: 300 }}
               >
-                <div className="flex h-16 items-center justify-between px-4 border-b border-white/10">
+                <div className="flex h-16 items-center justify-between px-4 border-b border-gray-200 dark:border-gray-800">
                   <div className="flex items-center">
-                    <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-md bg-orange-500/20 dark:bg-orange-500/30 p-1 shadow-sm border border-orange-400/30 dark:border-orange-400/40">
+                    <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-md bg-white dark:bg-slate-800 p-1 shadow-sm border border-slate-200 dark:border-slate-700">
                       <Image
                         src="/images/screenshot-20from-202025-02-18-2013-30-22.png"
                         alt="Mizizzi Logo"
@@ -396,9 +396,9 @@ export function AdminSidebar({ isCollapsed, toggleSidebar }: AdminSidebarProps) 
                         className="h-full w-full object-contain"
                       />
                     </div>
-                    <span className="ml-2 text-lg font-bold text-white">
+                    <span className="ml-2 text-lg font-bold">
                       Mizizzi{" "}
-                      <span className="text-xs bg-gradient-to-r from-orange-400 to-orange-600 text-white px-1.5 py-0.5 rounded-sm font-medium">
+                      <span className="text-xs bg-gradient-to-r from-orange-600 to-orange-700 text-white px-1.5 py-0.5 rounded-sm font-medium">
                         Admin
                       </span>
                     </span>
@@ -406,7 +406,7 @@ export function AdminSidebar({ isCollapsed, toggleSidebar }: AdminSidebarProps) 
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 rounded-md text-white hover:bg-orange-500/20"
+                    className="h-8 w-8 rounded-md"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     <X size={18} />
@@ -415,21 +415,21 @@ export function AdminSidebar({ isCollapsed, toggleSidebar }: AdminSidebarProps) 
 
                 <div className="px-3 py-2">
                   <div className="relative">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-white/40" />
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
                     <input
                       type="text"
                       placeholder="Search..."
-                      className="w-full rounded-md border border-white/10 bg-white/5 py-2 pl-8 pr-3 text-sm placeholder:text-white/30 text-white focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-white/10 dark:bg-white/5 dark:placeholder:text-white/30"
+                      className="w-full rounded-md border border-gray-200 bg-gray-50 py-2 pl-8 pr-3 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-gray-700 dark:bg-gray-800 dark:placeholder:text-gray-500"
                     />
                   </div>
                 </div>
 
                 <ScrollArea className="flex-1 px-3 py-2">{renderMenuItems()}</ScrollArea>
 
-                <div className="mt-auto border-t border-white/10 p-3">
+                <div className="mt-auto border-t border-gray-200 dark:border-gray-800 p-3">
                   <Button
                     variant="ghost"
-                    className="w-full justify-start text-white hover:bg-orange-500/20 hover:text-orange-400 dark:text-white dark:hover:bg-orange-500/20"
+                    className="w-full justify-start text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
                     onClick={handleLogout}
                   >
                     <LogOut size={18} className="mr-2" />
@@ -448,18 +448,18 @@ export function AdminSidebar({ isCollapsed, toggleSidebar }: AdminSidebarProps) 
   return (
     <TooltipProvider>
       <motion.div
-        className="fixed inset-y-0 left-0 z-40 flex flex-col border-r border-white/10 admin-glass-lg"
+        className="fixed inset-y-0 left-0 z-40 flex flex-col border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm"
         initial={false}
         animate={isCollapsed ? "collapsed" : "expanded"}
         variants={sidebarVariants}
         transition={{ duration: 0.2 }}
       >
-        <div className="flex h-16 items-center px-4 border-b border-white/10">
+        <div className="flex h-16 items-center px-4 border-b border-gray-200 dark:border-gray-800">
           <div
             className={cn("flex items-center cursor-pointer", isCollapsed ? "justify-center w-full" : "")}
             onClick={toggleSidebar}
           >
-            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-md bg-orange-500/20 dark:bg-orange-500/30 p-1 shadow-sm border border-orange-400/30 dark:border-orange-400/40">
+            <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-md bg-white dark:bg-slate-800 p-1 shadow-sm border border-slate-200 dark:border-slate-700">
               <Image
                 src="/images/screenshot-20from-202025-02-18-2013-30-22.png"
                 alt="Mizizzi Logo"
@@ -469,18 +469,18 @@ export function AdminSidebar({ isCollapsed, toggleSidebar }: AdminSidebarProps) 
               />
             </div>
 
-            {!isCollapsed && <span className="ml-2 text-lg font-bold text-white">Mizizzi Admin</span>}
+            {!isCollapsed && <span className="ml-2 text-lg font-bold">Mizizzi Admin</span>}
           </div>
         </div>
 
         {!isCollapsed && (
           <div className="px-3 py-2">
             <div className="relative">
-              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-white/40" />
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
               <input
                 type="text"
                 placeholder="Search..."
-                className="w-full rounded-md border border-white/10 bg-white/5 py-2 pl-8 pr-3 text-sm placeholder:text-white/30 text-white focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-white/10 dark:bg-white/5 dark:placeholder:text-white/30"
+                className="w-full rounded-md border border-gray-200 bg-gray-50 py-2 pl-8 pr-3 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-gray-700 dark:bg-gray-800 dark:placeholder:text-gray-500"
               />
             </div>
           </div>
@@ -488,11 +488,11 @@ export function AdminSidebar({ isCollapsed, toggleSidebar }: AdminSidebarProps) 
 
         <ScrollArea className="flex-1 px-3 py-2">{renderMenuItems()}</ScrollArea>
 
-        <div className="mt-auto border-t border-white/10 p-3">
+        <div className="mt-auto border-t border-gray-200 dark:border-gray-800 p-3">
           {isCollapsed ? (
             <Tooltip>
               <TooltipTrigger asChild>
-                <Button variant="ghost" size="icon" className="w-full h-9 justify-center hover:bg-orange-500/20 text-white hover:text-orange-400" onClick={handleLogout}>
+                <Button variant="ghost" size="icon" className="w-full h-9 justify-center" onClick={handleLogout}>
                   <LogOut size={18} />
                 </Button>
               </TooltipTrigger>

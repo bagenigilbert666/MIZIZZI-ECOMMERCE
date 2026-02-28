@@ -575,12 +575,12 @@ export default function AdminDashboard() {
             transition={{ duration: 0.3, delay: 0.2 }}
             className="mt-6"
           >
-            <div className="admin-glass-card overflow-hidden rounded-xl p-4">
+            <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl p-4">
               <div className="mb-2">
-                <h2 className="text-lg font-semibold text-white">Quick Actions</h2>
+                <h2 className="text-lg font-semibold">Quick Actions</h2>
               </div>
               <QuickActions />
-            </div>
+            </Card>
           </motion.div>
 
           <motion.div
@@ -589,13 +589,13 @@ export default function AdminDashboard() {
             transition={{ duration: 0.3, delay: 0.3 }}
             className="grid grid-cols-1 lg:grid-cols-3 gap-6"
           >
-            <div className="lg:col-span-2 admin-glass-card overflow-hidden rounded-xl min-h-[400px]">
+            <Card className="lg:col-span-2 border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl min-h-[400px]">
               <SalesOverviewChart salesData={dashboardData?.sales_data || []} />
-            </div>
+            </Card>
 
-            <div className="admin-glass-card overflow-hidden rounded-xl min-h-[400px]">
+            <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl min-h-[400px]">
               <OrderStatusChart data={dashboardData?.order_status || {}} />
-            </div>
+            </Card>
           </motion.div>
 
           <motion.div
@@ -604,13 +604,13 @@ export default function AdminDashboard() {
             transition={{ duration: 0.3, delay: 0.4 }}
             className="grid grid-cols-1 lg:grid-cols-3 gap-6"
           >
-            <div className="lg:col-span-2 admin-glass-card overflow-hidden rounded-xl">
+            <Card className="lg:col-span-2 border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl">
               <RecentOrders orders={dashboardData?.recent_orders || []} />
-            </div>
+            </Card>
 
-            <div className="admin-glass-card overflow-hidden rounded-xl">
+            <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl">
               <RecentSales />
-            </div>
+            </Card>
           </motion.div>
 
           <motion.div
@@ -619,84 +619,84 @@ export default function AdminDashboard() {
             transition={{ duration: 0.3, delay: 0.5 }}
           >
             <Tabs defaultValue="overview" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-4 bg-white/10 rounded-lg border border-white/10">
-                <TabsTrigger value="overview" className="text-white data-[state=active]:text-orange-400">Overview</TabsTrigger>
-                <TabsTrigger value="products" className="text-white data-[state=active]:text-orange-400">Products</TabsTrigger>
-                <TabsTrigger value="sales" className="text-white data-[state=active]:text-orange-400">Sales</TabsTrigger>
-                <TabsTrigger value="customers" className="text-white data-[state=active]:text-orange-400">Customers</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-4 bg-muted/50 rounded-lg">
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="products">Products</TabsTrigger>
+                <TabsTrigger value="sales">Sales</TabsTrigger>
+                <TabsTrigger value="customers">Customers</TabsTrigger>
               </TabsList>
 
               <TabsContent value="overview" className="space-y-6">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="admin-glass-card overflow-hidden rounded-xl min-h-[400px]">
+                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl min-h-[400px]">
                     <Overview salesData={dashboardData?.sales_data || []} />
-                  </div>
+                  </Card>
 
-                  <div className="admin-glass-card overflow-hidden rounded-xl min-h-[400px]">
+                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl min-h-[400px]">
                     <SalesByCategoryChart data={dashboardData?.sales_by_category || []} />
-                  </div>
+                  </Card>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="admin-glass-card overflow-hidden rounded-xl">
+                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl">
                     <RecentActivity activities={dashboardData?.recent_activities || []} />
-                  </div>
+                  </Card>
 
-                  <div className="admin-glass-card overflow-hidden rounded-xl">
+                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl">
                     <NotificationsPanel notifications={dashboardData?.notifications || []} />
-                  </div>
+                  </Card>
                 </div>
               </TabsContent>
 
               <TabsContent value="products" className="space-y-6">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="admin-glass-card overflow-hidden rounded-xl">
+                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl">
                     <LowStockProducts products={dashboardData?.low_stock_products || []} />
-                  </div>
+                  </Card>
 
-                  <div className="admin-glass-card overflow-hidden rounded-xl">
+                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl">
                     <BestSellingProducts products={dashboardData?.best_selling_products || []} />
-                  </div>
+                  </Card>
                 </div>
               </TabsContent>
 
               <TabsContent value="sales" className="space-y-6">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="admin-glass-card overflow-hidden rounded-xl min-h-[400px]">
+                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl min-h-[400px]">
                     <OrderStatusDistribution data={dashboardData?.order_status || {}} />
-                  </div>
+                  </Card>
 
-                  <div className="admin-glass-card overflow-hidden rounded-xl min-h-[400px]">
+                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl min-h-[400px]">
                     <RevenueVsRefundsChart data={dashboardData?.revenue_vs_refunds || []} />
-                  </div>
+                  </Card>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="admin-glass-card overflow-hidden rounded-xl min-h-[400px]">
+                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl min-h-[400px]">
                     <TrafficSourcesChart data={dashboardData?.traffic_sources || []} />
-                  </div>
+                  </Card>
 
-                  <div className="admin-glass-card overflow-hidden rounded-xl min-h-[400px]">
+                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl min-h-[400px]">
                     <ActiveUsersChart data={dashboardData?.active_users || []} />
-                  </div>
+                  </Card>
                 </div>
               </TabsContent>
 
               <TabsContent value="customers" className="space-y-6">
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="admin-glass-card overflow-hidden rounded-xl">
+                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl">
                     <RecentCustomers customers={dashboardData?.recent_users || []} />
-                  </div>
+                  </Card>
 
-                  <div className="admin-glass-card overflow-hidden rounded-xl">
+                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl">
                     <UsersByRegionMap data={dashboardData?.users_by_region || []} />
-                  </div>
+                  </Card>
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <div className="admin-glass-card overflow-hidden rounded-xl">
+                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl">
                     <UpcomingEvents events={dashboardData?.upcoming_events || []} />
-                  </div>
+                  </Card>
                 </div>
               </TabsContent>
             </Tabs>
