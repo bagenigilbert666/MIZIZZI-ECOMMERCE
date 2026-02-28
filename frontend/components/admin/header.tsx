@@ -373,7 +373,7 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
         "sticky top-0 z-30 flex h-16 items-center gap-2 px-4 md:px-6",
         "glass-elevated",
         "border-b glass-border",
-        "shadow-2xl shadow-black/30",
+        "shadow-lg shadow-black/10",
       )}
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
@@ -387,7 +387,7 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
             className={cn(
               "md:hidden rounded-lg",
               "glass-button",
-              "text-glass-text-primary hover:text-glass-blue",
+              "text-glass-text-primary hover:text-cherry-700 hover:bg-cherry-50",
             )}
             onClick={toggleSidebar}
           >
@@ -402,7 +402,7 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
             className={cn(
               "hidden md:flex rounded-lg",
               "glass-button",
-              "text-glass-text-primary hover:text-glass-blue",
+              "text-glass-text-primary hover:text-cherry-700 hover:bg-cherry-50",
             )}
             onClick={toggleSidebar}
           >
@@ -429,12 +429,12 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: i * 0.1, duration: 0.2 }}
           >
-            {i > 0 && <ChevronRight className="h-3 w-3 mx-1 text-glass-text-muted" />}
+            {i > 0 && <ChevronRight className="h-3 w-3 mx-1 text-gray-400" />}
             <Link
               href={crumb.href}
               className={cn(
                 "transition-all duration-200 px-2 py-1 rounded-lg",
-                "hover:glass-button hover:text-glass-blue",
+                "hover:glass-button hover:text-cherry-700",
                 i === breadcrumbs.length - 1
                   ? "font-medium text-glass-text-primary glass-surface"
                   : "text-glass-text-secondary",

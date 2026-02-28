@@ -148,31 +148,31 @@ body {
     --spacing-xl: 2rem;
     --spacing-2xl: 3rem;
 
-    /* Liquid Glass Theme Colors - Admin Dark Mode */
-    --glass-bg-primary: #0a0e27;
-    --glass-bg-secondary: #1a1f3a;
-    --glass-surface: rgba(255, 255, 255, 0.08);
-    --glass-surface-elevated: rgba(255, 255, 255, 0.12);
-    --glass-surface-hover: rgba(255, 255, 255, 0.15);
-    --glass-border: rgba(255, 255, 255, 0.12);
-    --glass-border-light: rgba(255, 255, 255, 0.08);
+    /* Liquid Glass Theme Colors - White Theme with Cherry Red */
+    --glass-bg-primary: #ffffff;
+    --glass-bg-secondary: #f8f9fa;
+    --glass-surface: rgba(139, 0, 0, 0.06);
+    --glass-surface-elevated: rgba(139, 0, 0, 0.08);
+    --glass-surface-hover: rgba(139, 0, 0, 0.10);
+    --glass-border: rgba(139, 0, 0, 0.12);
+    --glass-border-light: rgba(139, 0, 0, 0.08);
     
-    /* Glass Accent Colors */
-    --glass-blue: #0ea5e9;
-    --glass-purple: #a78bfa;
+    /* Glass Accent Colors - Cherry Red Focus */
+    --glass-blue: #8b0000;
+    --glass-purple: #c41e3a;
     --glass-green: #10b981;
     --glass-orange: #f97316;
-    --glass-red: #ef4444;
+    --glass-red: #8b0000;
     
-    /* Glass Text Colors */
-    --glass-text-primary: #f0f4f8;
-    --glass-text-secondary: #cbd5e1;
-    --glass-text-muted: #94a3b8;
+    /* Glass Text Colors - Light Theme */
+    --glass-text-primary: #1a1a1a;
+    --glass-text-secondary: #4a4a4a;
+    --glass-text-muted: #757575;
     
-    /* Glow Effect Colors */
-    --glass-glow-blue: rgba(14, 165, 233, 0.15);
-    --glass-glow-purple: rgba(167, 139, 250, 0.15);
-    --glass-glow-green: rgba(16, 185, 129, 0.15);
+    /* Glow Effect Colors - Cherry Red Themed */
+    --glass-glow-blue: rgba(139, 0, 0, 0.12);
+    --glass-glow-purple: rgba(196, 30, 58, 0.12);
+    --glass-glow-green: rgba(16, 185, 129, 0.12);
   }
 
   .dark {
@@ -1217,7 +1217,7 @@ body {
 
   .glass-surface:hover {
     background: var(--glass-surface-hover);
-    border-color: rgba(255, 255, 255, 0.16);
+    border-color: rgba(139, 0, 0, 0.16);
   }
 
   .glass-elevated {
@@ -1247,9 +1247,9 @@ body {
 
   .glass-card:hover {
     background: var(--glass-surface-hover);
-    border-color: rgba(255, 255, 255, 0.16);
+    border-color: rgba(139, 0, 0, 0.16);
     transform: translateY(-4px);
-    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.08);
   }
 
   .glass-border {
@@ -1329,13 +1329,13 @@ body {
 
   .glass-button-primary {
     background: var(--glass-blue);
-    border: 1px solid rgba(14, 165, 233, 0.3);
+    border: 1px solid rgba(139, 0, 0, 0.3);
     color: white;
     box-shadow: 0 0 20px var(--glass-glow-blue);
   }
 
   .glass-button-primary:hover {
-    background: rgba(14, 165, 233, 0.9);
+    background: #a50000;
     box-shadow: 0 0 30px var(--glass-glow-blue);
     transform: translateY(-2px);
   }

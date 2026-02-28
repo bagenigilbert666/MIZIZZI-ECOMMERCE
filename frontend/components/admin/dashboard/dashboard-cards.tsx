@@ -317,31 +317,31 @@ export function DashboardCards({ data, sales }: DashboardCardsProps) {
           <TabsList className="glass-elevated p-1.5 rounded-lg w-full flex justify-between">
             <TabsTrigger
               value="main"
-              className="text-sm font-medium rounded-lg py-2.5 px-4 glass-button data-[state=active]:glass-surface-elevated data-[state=active]:text-glass-blue data-[state=active]:box-shadow-lg"
+              className="text-sm font-medium rounded-lg py-2.5 px-4 glass-button data-[state=active]:glass-surface-elevated data-[state=active]:text-cherry-700 data-[state=active]:box-shadow-lg"
             >
               Main
             </TabsTrigger>
             <TabsTrigger
               value="customers"
-              className="text-sm font-medium rounded-lg py-2.5 px-4 glass-button data-[state=active]:glass-surface-elevated data-[state=active]:text-glass-blue data-[state=active]:box-shadow-lg"
+              className="text-sm font-medium rounded-lg py-2.5 px-4 glass-button data-[state=active]:glass-surface-elevated data-[state=active]:text-cherry-700 data-[state=active]:box-shadow-lg"
             >
               Customers
             </TabsTrigger>
             <TabsTrigger
               value="orders"
-              className="text-sm font-medium rounded-lg py-2.5 px-4 glass-button data-[state=active]:glass-surface-elevated data-[state=active]:text-glass-blue data-[state=active]:box-shadow-lg"
+              className="text-sm font-medium rounded-lg py-2.5 px-4 glass-button data-[state=active]:glass-surface-elevated data-[state=active]:text-cherry-700 data-[state=active]:box-shadow-lg"
             >
               Orders
             </TabsTrigger>
             <TabsTrigger
               value="analytics"
-              className="text-sm font-medium rounded-lg py-2.5 px-4 glass-button data-[state=active]:glass-surface-elevated data-[state=active]:text-glass-blue data-[state=active]:box-shadow-lg"
+              className="text-sm font-medium rounded-lg py-2.5 px-4 glass-button data-[state=active]:glass-surface-elevated data-[state=active]:text-cherry-700 data-[state=active]:box-shadow-lg"
             >
               Analytics
             </TabsTrigger>
             <TabsTrigger
               value="platform"
-              className="text-sm font-medium rounded-lg py-2.5 px-4 glass-button data-[state=active]:glass-surface-elevated data-[state=active]:text-glass-blue data-[state=active]:box-shadow-lg"
+              className="text-sm font-medium rounded-lg py-2.5 px-4 glass-button data-[state=active]:glass-surface-elevated data-[state=active]:text-cherry-700 data-[state=active]:box-shadow-lg"
             >
               Platform
             </TabsTrigger>

@@ -429,7 +429,7 @@ export function AdminSidebar({ isCollapsed, toggleSidebar }: AdminSidebarProps) 
                 <div className="mt-auto glass-border-lg border-t p-3">
                   <Button
                     variant="ghost"
-                    className="w-full justify-start glass-button text-glass-text-primary hover:text-glass-blue"
+                    className="w-full justify-start glass-button text-glass-text-primary hover:text-cherry-700 hover:bg-cherry-50"
                     onClick={handleLogout}
                   >
                     <LogOut size={18} className="mr-2" />
@@ -454,7 +454,7 @@ export function AdminSidebar({ isCollapsed, toggleSidebar }: AdminSidebarProps) 
         variants={sidebarVariants}
         transition={{ duration: 0.2 }}
       >
-        <div className="flex h-16 items-center px-4 border-b border-gray-200 dark:border-gray-800">
+        <div className="flex h-16 items-center px-4 border-b glass-border">
           <div
             className={cn("flex items-center cursor-pointer", isCollapsed ? "justify-center w-full" : "")}
             onClick={toggleSidebar}
