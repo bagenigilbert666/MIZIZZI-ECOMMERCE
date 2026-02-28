@@ -86,7 +86,8 @@ export function RichDescriptionEditor({ value, onChange, productName = "Product"
         if (block.type === "text") {
           return `<p>${block.content.replace(/\n/g, "<br>")}</p>`
         } else {
-          return `<img src="${block.content}" alt="${productName}" style="width: 100%; max-width: 800px; height: auto; margin: 20px 0; border-radius: 8px;" />`
+          // Wrap image in a figure tag for better semantic HTML and styling
+          return `<figure style="width: 100%; margin: 2rem 0; display: block; clear: both;"><img src="${block.content}" alt="${productName}" style="width: 100%; height: auto; border-radius: 8px;" /></figure>`
         }
       })
       .join("\n")

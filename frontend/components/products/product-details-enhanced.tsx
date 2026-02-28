@@ -1486,7 +1486,7 @@ export default function ProductDetailsEnhanced({
             </div>
 
             {/* Tab Content */}
-            <div className="p-6">
+            <div className="p-6 w-full overflow-hidden">
               <AnimatePresence mode="wait">
                 {activeTab === "details" && (
                   <motion.div
@@ -1494,9 +1494,16 @@ export default function ProductDetailsEnhanced({
                     initial={{ opacity: 0, y: 10 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -10 }}
+                    className="w-full"
                   >
-                    {/* // Added inline style tag with !important rules to force images full-width */}
+                    {/* // Added inline style tag with !important rules to force images full-width and ensure text flows properly */}
                     <style>{`
+            .product-description-content {
+              word-wrap: break-word;
+              overflow-wrap: break-word;
+              width: 100%;
+              clear: both;
+            }
             .product-description-content img {
               width: 100% !important;
               max-width: 100% !important;
@@ -1505,21 +1512,36 @@ export default function ProductDetailsEnhanced({
               margin: 2rem auto !important;
               border-radius: 1rem !important;
               box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1) !important;
-              object-fit: contain !important;
+              object-fit: cover !important;
+              clear: both !important;
             }
             .product-description-content figure {
               width: 100% !important;
               margin: 2rem 0 !important;
+              display: block !important;
+              clear: both !important;
+            }
+            .product-description-content figure img {
+              width: 100% !important;
+              height: auto !important;
             }
             .product-description-content picture {
               width: 100% !important;
               display: block !important;
+              clear: both !important;
+            }
+            .product-description-content picture img {
+              width: 100% !important;
+              height: auto !important;
+            }
+            .product-description-content > * {
+              clear: both !important;
             }
           `}</style>
-                    <div className="prose prose-lg max-w-none">
+                    <div className="prose prose-lg max-w-none w-full overflow-hidden">
                       {product?.description ? (
                         <div
-                          className="product-description-content text-gray-700 space-y-6
+                          className="product-description-content text-gray-700 space-y-6 w-full
                             [&>p]:leading-relaxed [&>p]:text-[15px] [&>p]:text-gray-600 [&>p]:mb-4
                             [&>h2]:text-xl [&>h2]:font-bold [&>h2]:text-gray-900 [&>h2]:mt-8 [&>h2]:mb-4
                             [&>h3]:text-lg [&>h3]:font-semibold [&>h3]:text-gray-800 [&>h3]:mt-6 [&>h3]:mb-3
