@@ -693,7 +693,7 @@ export default function InventoryPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
-      <div className="container mx-auto p-6 space-y-8">
+      <div className="container mx-auto p-4 sm:p-6 space-y-8">
         {/* Enhanced Header */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
           <div className="space-y-2">
@@ -1038,18 +1038,18 @@ export default function InventoryPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 sm:gap-3 md:gap-4 mb-8">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.1 }}
-            className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+            className="glass-stat-card bg-blue-500/20 border-blue-400/30 p-6 text-white"
           >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-blue-100 text-sm font-medium">Total Items</p>
                 <motion.p
-                  className="text-3xl font-bold mt-1"
+                  className="text-3xl font-bold mt-1 text-white"
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ duration: 0.5, delay: 0.3 }}
@@ -1058,7 +1058,7 @@ export default function InventoryPage() {
                 </motion.p>
                 <p className="text-blue-200 text-xs mt-1">Items tracked</p>
               </div>
-              <div className="bg-blue-400/30 p-3 rounded-lg">
+              <div className="glass-card bg-blue-400/20 p-3">
                 <Package className="h-6 w-6" />
               </div>
             </div>
@@ -1068,13 +1068,13 @@ export default function InventoryPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.2 }}
-            className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+            className="glass-stat-card bg-green-500/20 border-green-400/30 p-6 text-white"
           >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-green-100 text-sm font-medium">In Stock</p>
                 <motion.p
-                  className="text-3xl font-bold mt-1"
+                  className="text-3xl font-bold mt-1 text-white"
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ duration: 0.5, delay: 0.4 }}
@@ -1083,7 +1083,7 @@ export default function InventoryPage() {
                 </motion.p>
                 <p className="text-green-200 text-xs mt-1">Items available</p>
               </div>
-              <div className="bg-green-400/30 p-3 rounded-lg">
+              <div className="glass-card bg-green-400/20 p-3">
                 <CheckCircle className="h-6 w-6" />
               </div>
             </div>
@@ -1093,13 +1093,13 @@ export default function InventoryPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.3 }}
-            className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 relative overflow-hidden"
+            className="glass-stat-card bg-orange-500/20 border-orange-400/30 p-6 text-white relative overflow-hidden"
           >
             <div className="flex items-center justify-between relative z-10">
               <div>
                 <p className="text-orange-100 text-sm font-medium">Low Stock</p>
                 <motion.p
-                  className="text-3xl font-bold mt-1"
+                  className="text-3xl font-bold mt-1 text-white"
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ duration: 0.5, delay: 0.5 }}
@@ -1108,7 +1108,7 @@ export default function InventoryPage() {
                 </motion.p>
                 <p className="text-orange-200 text-xs mt-1">Need restocking</p>
               </div>
-              <div className="bg-orange-400/30 p-3 rounded-lg">
+              <div className="glass-card bg-orange-400/20 p-3">
                 <motion.div
                   animate={{
                     rotate: [0, -10, 10, -10, 0],
@@ -1125,7 +1125,7 @@ export default function InventoryPage() {
               </div>
             </div>
             <motion.div
-              className="absolute inset-0 bg-gradient-to-r from-orange-400/20 to-red-400/20"
+              className="absolute inset-0 bg-gradient-to-r from-orange-400/10 to-red-400/10"
               animate={{
                 opacity: [0.3, 0.6, 0.3],
                 scale: [1, 1.02, 1],
@@ -1142,13 +1142,13 @@ export default function InventoryPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.4 }}
-            className="bg-gradient-to-br from-red-500 to-red-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+            className="glass-stat-card bg-red-500/20 border-red-400/30 p-6 text-white"
           >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-red-100 text-sm font-medium">Out of Stock</p>
                 <motion.p
-                  className="text-3xl font-bold mt-1"
+                  className="text-3xl font-bold mt-1 text-white"
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ duration: 0.5, delay: 0.6 }}
@@ -1157,7 +1157,7 @@ export default function InventoryPage() {
                 </motion.p>
                 <p className="text-red-200 text-xs mt-1">Unavailable</p>
               </div>
-              <div className="bg-red-400/30 p-3 rounded-lg">
+              <div className="glass-card bg-red-400/20 p-3">
                 <XCircle className="h-6 w-6" />
               </div>
             </div>
@@ -1167,13 +1167,13 @@ export default function InventoryPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.5 }}
-            className="bg-gradient-to-br from-indigo-500 to-indigo-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+            className="glass-stat-card bg-indigo-500/20 border-indigo-400/30 p-6 text-white"
           >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-indigo-100 text-sm font-medium">Reserved</p>
                 <motion.p
-                  className="text-3xl font-bold mt-1"
+                  className="text-3xl font-bold mt-1 text-white"
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ duration: 0.5, delay: 0.7 }}
@@ -1182,7 +1182,7 @@ export default function InventoryPage() {
                 </motion.p>
                 <p className="text-indigo-200 text-xs mt-1">Items reserved</p>
               </div>
-              <div className="bg-indigo-400/30 p-3 rounded-lg">
+              <div className="glass-card bg-indigo-400/20 p-3">
                 <Clock className="h-6 w-6" />
               </div>
             </div>
@@ -1192,13 +1192,13 @@ export default function InventoryPage() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, delay: 0.6 }}
-            className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl p-6 text-white shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105"
+            className="glass-stat-card bg-purple-500/20 border-purple-400/30 p-6 text-white"
           >
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-purple-100 text-sm font-medium">Total Value</p>
                 <motion.p
-                  className="text-2xl font-bold mt-1"
+                  className="text-2xl font-bold mt-1 text-white"
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
                   transition={{ duration: 0.5, delay: 0.8 }}
@@ -1207,7 +1207,7 @@ export default function InventoryPage() {
                 </motion.p>
                 <p className="text-purple-200 text-xs mt-1">Inventory value</p>
               </div>
-              <div className="bg-purple-400/30 p-3 rounded-lg">
+              <div className="glass-card bg-purple-400/20 p-3">
                 <DollarSign className="h-6 w-6" />
               </div>
             </div>
@@ -1215,8 +1215,8 @@ export default function InventoryPage() {
         </div>
 
         {/* Enhanced Filters and Controls */}
-        <Card className="border-0 shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 rounded-t-lg">
+        <Card className="border-0 glass-card">
+          <CardHeader className="bg-gradient-to-r from-slate-50/50 to-slate-100/50 dark:from-slate-800/50 dark:to-slate-700/50 rounded-t-lg backdrop-blur-md">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
@@ -1474,7 +1474,7 @@ export default function InventoryPage() {
 
             {/* Loading State */}
             {loading ? (
-              <Card className="border-0 shadow-lg">
+              <Card className="border-0 glass-card">
                 <CardContent className="p-8">
                   <div className="space-y-6">
                     {[...Array(5)].map((_, i) => (
@@ -1492,8 +1492,8 @@ export default function InventoryPage() {
               </Card>
             ) : (
               /* Enhanced Inventory Content */
-              <Card className="border-0 shadow-lg overflow-hidden">
-                <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-800 dark:to-slate-700 border-b">
+              <Card className="border-0 glass-card overflow-hidden">
+                <CardHeader className="bg-gradient-to-r from-slate-50/50 to-slate-100/50 dark:from-slate-800/50 dark:to-slate-700/50 border-b backdrop-blur-md">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-blue-100 dark:bg-blue-900 rounded-lg">
