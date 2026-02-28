@@ -370,10 +370,10 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
   return (
     <motion.header
       className={cn(
-        "sticky top-0 z-30 flex h-16 items-center gap-2 px-4 md:px-6 shadow-lg",
-        "bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl",
-        "border-b border-gray-200/50 dark:border-gray-800/50",
-        "shadow-gray-900/5 dark:shadow-black/20",
+        "sticky top-0 z-30 flex h-16 items-center gap-2 px-4 md:px-6",
+        "glass-elevated",
+        "border-b glass-border",
+        "shadow-2xl shadow-black/30",
       )}
       initial={{ y: -20, opacity: 0 }}
       animate={{ y: 0, opacity: 1 }}
@@ -385,10 +385,9 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
             variant="ghost"
             size="icon"
             className={cn(
-              "md:hidden rounded-xl",
-              "text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400",
-              "hover:bg-white/60 dark:hover:bg-gray-800/60 backdrop-blur-sm",
-              "border border-transparent hover:border-white/20 dark:hover:border-gray-700/50",
+              "md:hidden rounded-lg",
+              "glass-button",
+              "text-glass-text-primary hover:text-glass-blue",
             )}
             onClick={toggleSidebar}
           >
@@ -401,10 +400,9 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
             variant="ghost"
             size="icon"
             className={cn(
-              "hidden md:flex rounded-xl",
-              "text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400",
-              "hover:bg-white/60 dark:hover:bg-gray-800/60 backdrop-blur-sm",
-              "border border-transparent hover:border-white/20 dark:hover:border-gray-700/50",
+              "hidden md:flex rounded-lg",
+              "glass-button",
+              "text-glass-text-primary hover:text-glass-blue",
             )}
             onClick={toggleSidebar}
           >
@@ -422,7 +420,7 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
       )}
 
       {/* Breadcrumbs - Hidden on mobile */}
-      <div className="hidden md:flex items-center space-x-1 text-sm text-gray-500 dark:text-gray-400 ml-2">
+      <div className="hidden md:flex items-center space-x-1 text-sm text-glass-text-secondary ml-2">
         {breadcrumbs.map((crumb, i) => (
           <motion.div
             key={i}
@@ -431,15 +429,15 @@ export function AdminHeader({ toggleSidebar, isSidebarCollapsed }: AdminHeaderPr
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: i * 0.1, duration: 0.2 }}
           >
-            {i > 0 && <ChevronRight className="h-3 w-3 mx-1 text-gray-300 dark:text-gray-600" />}
+            {i > 0 && <ChevronRight className="h-3 w-3 mx-1 text-glass-text-muted" />}
             <Link
               href={crumb.href}
               className={cn(
-                "hover:text-blue-600 dark:hover:text-blue-400 transition-all duration-200 px-2 py-1 rounded-lg",
-                "hover:bg-white/40 dark:hover:bg-gray-800/40 backdrop-blur-sm",
+                "transition-all duration-200 px-2 py-1 rounded-lg",
+                "hover:glass-button hover:text-glass-blue",
                 i === breadcrumbs.length - 1
-                  ? "font-medium text-gray-700 dark:text-gray-300 bg-white/30 dark:bg-gray-800/30"
-                  : "text-gray-500 dark:text-gray-400",
+                  ? "font-medium text-glass-text-primary glass-surface"
+                  : "text-glass-text-secondary",
               )}
             >
               {crumb.label}

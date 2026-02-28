@@ -231,7 +231,7 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
           <AdminProvider>
             <SessionManager>
               <AdminLayoutWrapper>
-                <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-50 antialiased">
+                <div className="min-h-screen glass-bg text-glass-text-primary antialiased">
                   <AdminSidebar isCollapsed={isSidebarCollapsed} toggleSidebar={toggleSidebar} />
                   <div
                     className={cn(
@@ -247,8 +247,7 @@ export default function AdminLayoutClient({ children }: { children: React.ReactN
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
                         transition={{ duration: 0.2 }}
-                        // Removed padding and max-width constraint for full responsive width
-                        className="flex-1"
+                        className="flex-1 p-6"
                       >
                         {children}
                       </motion.main>

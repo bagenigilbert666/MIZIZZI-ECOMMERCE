@@ -360,7 +360,7 @@ export function AdminSidebar({ isCollapsed, toggleSidebar }: AdminSidebarProps) 
         <Button
           variant="ghost"
           size="icon"
-          className="fixed top-3 left-3 z-50 md:hidden h-9 w-9 rounded-md bg-white shadow-md border border-gray-200 dark:bg-gray-900 dark:border-gray-800"
+          className="fixed top-3 left-3 z-50 md:hidden h-9 w-9 rounded-md glass-button"
           onClick={() => setIsMobileMenuOpen(true)}
         >
           <Menu size={20} />
@@ -379,15 +379,15 @@ export function AdminSidebar({ isCollapsed, toggleSidebar }: AdminSidebarProps) 
               />
               <motion.div
                 ref={sidebarRef}
-                className="fixed inset-y-0 left-0 w-[280px] bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 shadow-xl z-50 flex flex-col"
+                className="fixed inset-y-0 left-0 w-[280px] glass-elevated glass-border-lg shadow-2xl z-50 flex flex-col"
                 initial={{ x: "-100%" }}
                 animate={{ x: 0 }}
                 exit={{ x: "-100%" }}
                 transition={{ type: "spring", damping: 25, stiffness: 300 }}
               >
-                <div className="flex h-16 items-center justify-between px-4 border-b border-gray-200 dark:border-gray-800">
+                <div className="flex h-16 items-center justify-between px-4 glass-border-lg border-b">
                   <div className="flex items-center">
-                    <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-md bg-white dark:bg-slate-800 p-1 shadow-sm border border-slate-200 dark:border-slate-700">
+                    <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-md glass-surface p-1">
                       <Image
                         src="/images/screenshot-20from-202025-02-18-2013-30-22.png"
                         alt="Mizizzi Logo"
@@ -396,9 +396,9 @@ export function AdminSidebar({ isCollapsed, toggleSidebar }: AdminSidebarProps) 
                         className="h-full w-full object-contain"
                       />
                     </div>
-                    <span className="ml-2 text-lg font-bold">
+                    <span className="ml-2 text-lg font-bold text-glass-text-primary">
                       Mizizzi{" "}
-                      <span className="text-xs bg-gradient-to-r from-orange-600 to-orange-700 text-white px-1.5 py-0.5 rounded-sm font-medium">
+                      <span className="text-xs bg-gradient-to-r from-glass-orange to-orange-700 text-white px-1.5 py-0.5 rounded-sm font-medium">
                         Admin
                       </span>
                     </span>
@@ -406,7 +406,7 @@ export function AdminSidebar({ isCollapsed, toggleSidebar }: AdminSidebarProps) 
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-8 w-8 rounded-md"
+                    className="h-8 w-8 rounded-md glass-button"
                     onClick={() => setIsMobileMenuOpen(false)}
                   >
                     <X size={18} />
@@ -415,21 +415,21 @@ export function AdminSidebar({ isCollapsed, toggleSidebar }: AdminSidebarProps) 
 
                 <div className="px-3 py-2">
                   <div className="relative">
-                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-400" />
+                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-glass-text-muted" />
                     <input
                       type="text"
                       placeholder="Search..."
-                      className="w-full rounded-md border border-gray-200 bg-gray-50 py-2 pl-8 pr-3 text-sm placeholder:text-gray-400 focus:outline-none focus:ring-1 focus:ring-orange-500 dark:border-gray-700 dark:bg-gray-800 dark:placeholder:text-gray-500"
+                      className="glass-input w-full pl-8 pr-3"
                     />
                   </div>
                 </div>
 
                 <ScrollArea className="flex-1 px-3 py-2">{renderMenuItems()}</ScrollArea>
 
-                <div className="mt-auto border-t border-gray-200 dark:border-gray-800 p-3">
+                <div className="mt-auto glass-border-lg border-t p-3">
                   <Button
                     variant="ghost"
-                    className="w-full justify-start text-gray-700 hover:bg-gray-100 dark:text-gray-300 dark:hover:bg-gray-800"
+                    className="w-full justify-start glass-button text-glass-text-primary hover:text-glass-blue"
                     onClick={handleLogout}
                   >
                     <LogOut size={18} className="mr-2" />
@@ -448,7 +448,7 @@ export function AdminSidebar({ isCollapsed, toggleSidebar }: AdminSidebarProps) 
   return (
     <TooltipProvider>
       <motion.div
-        className="fixed inset-y-0 left-0 z-40 flex flex-col border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 shadow-sm"
+        className="fixed inset-y-0 left-0 z-40 flex flex-col glass-elevated glass-border-lg"
         initial={false}
         animate={isCollapsed ? "collapsed" : "expanded"}
         variants={sidebarVariants}

@@ -314,34 +314,34 @@ export function DashboardCards({ data, sales }: DashboardCardsProps) {
     <div className="space-y-6">
       <Tabs defaultValue="main" className="w-full">
         <div className="overflow-x-auto pb-4">
-          <TabsList className="bg-white dark:bg-gray-800 p-1.5 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 w-full flex justify-between">
+          <TabsList className="glass-elevated p-1.5 rounded-lg w-full flex justify-between">
             <TabsTrigger
               value="main"
-              className="text-sm font-medium rounded-lg py-2.5 px-4 data-[state=active]:bg-cherry-50 data-[state=active]:text-cherry-700 data-[state=active]:shadow-sm dark:data-[state=active]:bg-gray-700 dark:data-[state=active]:text-white"
+              className="text-sm font-medium rounded-lg py-2.5 px-4 glass-button data-[state=active]:glass-surface-elevated data-[state=active]:text-glass-blue data-[state=active]:box-shadow-lg"
             >
               Main
             </TabsTrigger>
             <TabsTrigger
               value="customers"
-              className="text-sm font-medium rounded-lg py-2.5 px-4 data-[state=active]:bg-cherry-50 data-[state=active]:text-cherry-700 data-[state=active]:shadow-sm dark:data-[state=active]:bg-gray-700 dark:data-[state=active]:text-white"
+              className="text-sm font-medium rounded-lg py-2.5 px-4 glass-button data-[state=active]:glass-surface-elevated data-[state=active]:text-glass-blue data-[state=active]:box-shadow-lg"
             >
               Customers
             </TabsTrigger>
             <TabsTrigger
               value="orders"
-              className="text-sm font-medium rounded-lg py-2.5 px-4 data-[state=active]:bg-cherry-50 data-[state=active]:text-cherry-700 data-[state=active]:shadow-sm dark:data-[state=active]:bg-gray-700 dark:data-[state=active]:text-white"
+              className="text-sm font-medium rounded-lg py-2.5 px-4 glass-button data-[state=active]:glass-surface-elevated data-[state=active]:text-glass-blue data-[state=active]:box-shadow-lg"
             >
               Orders
             </TabsTrigger>
             <TabsTrigger
               value="analytics"
-              className="text-sm font-medium rounded-lg py-2.5 px-4 data-[state=active]:bg-cherry-50 data-[state=active]:text-cherry-700 data-[state=active]:shadow-sm dark:data-[state=active]:bg-gray-700 dark:data-[state=active]:text-white"
+              className="text-sm font-medium rounded-lg py-2.5 px-4 glass-button data-[state=active]:glass-surface-elevated data-[state=active]:text-glass-blue data-[state=active]:box-shadow-lg"
             >
               Analytics
             </TabsTrigger>
             <TabsTrigger
               value="platform"
-              className="text-sm font-medium rounded-lg py-2.5 px-4 data-[state=active]:bg-cherry-50 data-[state=active]:text-cherry-700 data-[state=active]:shadow-sm dark:data-[state=active]:bg-gray-700 dark:data-[state=active]:text-white"
+              className="text-sm font-medium rounded-lg py-2.5 px-4 glass-button data-[state=active]:glass-surface-elevated data-[state=active]:text-glass-blue data-[state=active]:box-shadow-lg"
             >
               Platform
             </TabsTrigger>
@@ -359,7 +359,7 @@ export function DashboardCards({ data, sales }: DashboardCardsProps) {
                   transition={{ duration: 0.3, delay: index * 0.1 }}
                   whileHover={{ scale: 1.02, y: -5 }}
                   whileTap={{ scale: 0.98 }}
-                  className="relative overflow-hidden rounded-xl bg-white dark:bg-gray-800 shadow-lg border border-gray-100 dark:border-gray-700"
+                  className="relative overflow-hidden rounded-xl glass-card p-6"
                 >
                   {/* Decorative gradient element */}
                   <div
@@ -380,12 +380,12 @@ export function DashboardCards({ data, sales }: DashboardCardsProps) {
                         >
                           {card.icon}
                         </div>
-                        <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-200">{card.title}</h3>
+                        <h3 className="text-lg font-semibold text-glass-text-primary">{card.title}</h3>
                       </div>
                     </div>
 
                     <div className="flex flex-col">
-                      <div className="text-3xl font-bold mb-3 text-gray-900 dark:text-white">{card.value}</div>
+                      <div className="text-3xl font-bold mb-3 text-glass-text-primary">{card.value}</div>
 
                       {card.growth && (
                         <div className="flex items-center gap-1.5">
