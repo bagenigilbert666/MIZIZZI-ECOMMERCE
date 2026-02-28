@@ -1185,3 +1185,7 @@ function invalidateProductCaches(productId?: number): void {
   }
   dashboardCache.clear()
 }
+
+// Explicit re-export of types to ensure proper module resolution
+export type { AdminDashboardResponse, AdminLoginResponse }
+
