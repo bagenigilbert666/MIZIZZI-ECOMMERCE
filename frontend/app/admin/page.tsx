@@ -158,9 +158,9 @@ export default function AdminDashboardPage() {
               <AppleCard
                 icon={<DollarSign className="h-5 w-5 text-blue-600" />}
                 title="Total Revenue"
-                value={`$${(data.sales.total_revenue / 1000000).toFixed(1)}M`}
+                value={`$${((data.sales?.total_revenue || 0) / 1000000).toFixed(1)}M`}
                 subtitle="All-time revenue"
-                trend={data.sales.today_trend}
+                trend={data.sales?.today_trend}
                 bgColor="bg-blue-50"
               />
 
@@ -168,7 +168,7 @@ export default function AdminDashboardPage() {
               <AppleCard
                 icon={<TrendingUp className="h-5 w-5 text-green-600" />}
                 title="Today's Sales"
-                value={`$${(data.sales.today / 1000).toFixed(1)}K`}
+                value={`$${((data.sales?.today || 0) / 1000).toFixed(1)}K`}
                 subtitle={`${Math.abs(salesGrowth)}% ${salesGrowth >= 0 ? "increase" : "decrease"} vs yesterday`}
                 trend={salesGrowth}
                 bgColor="bg-green-50"
@@ -254,23 +254,23 @@ export default function AdminDashboardPage() {
                     <div>
                       <p className="text-sm text-gray-600">Weekly Revenue</p>
                       <p className="text-2xl font-semibold mt-1">
-                        ${(data.sales.weekly / 1000).toFixed(1)}K
+                        ${((data.sales?.weekly || 0) / 1000).toFixed(1)}K
                       </p>
                     </div>
-                    <TrendIndicator value={data.sales.weekly_trend} />
+                    <TrendIndicator value={data.sales?.weekly_trend || 0} />
                   </div>
                   <div className="flex items-end justify-between pt-4 border-t border-gray-100">
                     <div>
                       <p className="text-sm text-gray-600">Monthly Revenue</p>
                       <p className="text-2xl font-semibold mt-1">
-                        ${(data.sales.monthly / 1000000).toFixed(2)}M
+                        ${((data.sales?.monthly || 0) / 1000000).toFixed(2)}M
                       </p>
                     </div>
-                    <TrendIndicator value={data.sales.monthly_trend} />
+                    <TrendIndicator value={data.sales?.monthly_trend || 0} />
                   </div>
                   <div className="pt-4">
                     <p className="text-sm text-gray-600 mb-2">Average Order Value</p>
-                    <p className="text-2xl font-semibold">${data.sales.average_order_value.toFixed(2)}</p>
+                    <p className="text-2xl font-semibold">${(data.sales.average_order_value || 0).toFixed(2)}</p>
                   </div>
                 </CardContent>
               </Card>
@@ -290,14 +290,14 @@ export default function AdminDashboardPage() {
 
                   <div className="flex items-center justify-between pt-2">
                     <span className="text-sm text-gray-600">Satisfaction Score</span>
-                    <span className="font-semibold">{data.customer_analytics.customer_satisfaction_score.toFixed(1)}/5</span>
+                    <span className="font-semibold">{(data.customer_analytics?.customer_satisfaction_score || 0).toFixed(1)}/5</span>
                   </div>
                   <div className="flex gap-1">
                     {[...Array(5)].map((_, i) => (
                       <div
                         key={i}
                         className={`h-2 flex-1 rounded-full ${
-                          i < Math.floor(data.customer_analytics.customer_satisfaction_score)
+                          i < Math.floor(data.customer_analytics?.customer_satisfaction_score || 0)
                             ? "bg-yellow-400"
                             : "bg-gray-200"
                         }`}
@@ -466,28 +466,28 @@ export default function AdminDashboardPage() {
                   <CardDescription>Top performing products</CardDescription>
                 </CardHeader>
                 <CardContent className="p-6">
-                  <div className="space-y-3">
-                    {data.best_selling_products.slice(0, 5).map((product) => (
-                      <div key={product.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
-                        <div className="min-w-0 flex-1">
-                          <p className="font-medium text-sm">{product.name}</p>
-                          <p className="text-xs text-gray-600">{product.sales_count} sales • ${(product.revenue / 1000).toFixed(1)}K revenue</p>
-                        </div>
-                        <div className="flex items-center gap-2 ml-4">
-                          <div className="flex gap-0.5">
-                            {[...Array(5)].map((_, i) => (
-                              <div
-                                key={i}
-                                className={`h-2 w-2 rounded-full ${
-                                  i < Math.floor(product.rating) ? "bg-yellow-400" : "bg-gray-300"
-                                }`}
-                              />
-                            ))}
+                    <div className="space-y-3">
+                      {data.best_selling_products.slice(0, 5).map((product) => (
+                        <div key={product.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-sm">{product.name}</p>
+                            <p className="text-xs text-gray-600">{product.sales_count} sales • ${((product.revenue || 0) / 1000).toFixed(1)}K revenue</p>
                           </div>
-                          <span className="text-xs font-medium">{product.rating}</span>
+                          <div className="flex items-center gap-2 ml-4">
+                            <div className="flex gap-0.5">
+                              {[...Array(5)].map((_, i) => (
+                                <div
+                                  key={i}
+                                  className={`h-2 w-2 rounded-full ${
+                                    i < Math.floor(product.rating || 0) ? "bg-yellow-400" : "bg-gray-300"
+                                  }`}
+                                />
+                              ))}
+                            </div>
+                            <span className="text-xs font-medium">{(product.rating || 0).toFixed(1)}</span>
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      ))}
                   </div>
                 </CardContent>
               </Card>
@@ -615,6 +615,7 @@ function AppleCard({
   trend?: number
   bgColor: string
 }) {
+  const safeTrend = trend ?? undefined
   return (
     <div className={`${bgColor} rounded-2xl p-6 border border-gray-200 shadow-sm hover:shadow-md transition-shadow`}>
       <div className="flex items-start justify-between">
@@ -625,12 +626,12 @@ function AppleCard({
         </div>
         <div className="flex-shrink-0">{icon}</div>
       </div>
-      {trend !== undefined && (
+      {safeTrend !== undefined && (
         <div className={`flex items-center gap-1 mt-4 text-xs font-medium ${
-          trend >= 0 ? "text-green-600" : "text-red-600"
+          safeTrend >= 0 ? "text-green-600" : "text-red-600"
         }`}>
-          {trend >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-          <span>{Math.abs(trend)}% vs last period</span>
+          {safeTrend >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+          <span>{Math.abs(safeTrend)}% vs last period</span>
         </div>
       )}
     </div>
@@ -673,14 +674,15 @@ function MetricCard({
 }
 
 function TrendIndicator({ value }: { value: number }) {
+  const safeValue = value || 0
   return (
     <div className={`flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-lg ${
-      value >= 0
+      safeValue >= 0
         ? "bg-green-100 text-green-700"
         : "bg-red-100 text-red-700"
     }`}>
-      {value >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
-      <span>{Math.abs(value)}%</span>
+      {safeValue >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+      <span>{Math.abs(safeValue)}%</span>
     </div>
   )
 }
@@ -702,7 +704,7 @@ function OrderItem({ order }: { order: any }) {
         <p className="text-xs text-gray-600 truncate">{order.user_name}</p>
       </div>
       <div className="flex items-center gap-3 ml-4">
-        <span className="font-semibold text-sm tabular-nums">${order.total_amount.toFixed(2)}</span>
+        <span className="font-semibold text-sm tabular-nums">${(order.total_amount || 0).toFixed(2)}</span>
         <Badge className={`${statusColors[order.status] || statusColors.pending} border-0 text-xs`}>
           {order.status}
         </Badge>
