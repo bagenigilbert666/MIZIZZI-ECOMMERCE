@@ -208,11 +208,11 @@ export function useProductForm({ productId, onSuccess, onError }: UseProductForm
     [setValue],
   )
 
-  // Handle form submission with optimistic updates
+  // Handle form submission
   const handleSubmit = async (data: ProductFormValues) => {
     try {
       setIsSubmitting(true)
-      console.log("[v0] Form submission started:", data)
+      console.log("Form submission started with data:", data)
 
       // Prepare product data for submission
       const productData = {
@@ -227,23 +227,38 @@ export function useProductForm({ productId, onSuccess, onError }: UseProductForm
         productData.brand_id = null
       }
 
-      console.log("[v0] Submitting product data:", productData)
+      console.log("Submitting product data:", productData)
 
-      // Update the product via API
-      const updatedProduct = await adminService.updateProduct(productId, productData)
-      console.log("[v0] Product updated successfully:", updatedProduct)
-
-      // Call the success callback - this will trigger SWR revalidation
-      onSuccess(updatedProduct)
-
-      // Update local storage to track last saved time
+      // Update the product
       try {
-        localStorage.setItem(`product_${productId}_last_saved`, new Date().toISOString())
-      } catch (storageError) {
-        console.warn("Could not save to localStorage:", storageError)
+        const updatedProduct = await adminService.updateProduct(productId, productData)
+        console.log("Product updated successfully:", updatedProduct)
+
+        // Call the success callback
+        onSuccess(updatedProduct)
+
+        // Update local storage to track last saved time
+        try {
+          localStorage.setItem(`product_${productId}_last_saved`, new Date().toISOString())
+        } catch (storageError) {
+          console.warn("Could not save to localStorage:", storageError)
+        }
+      } catch (updateError: any) {
+        console.error("Error during product update:", updateError)
+        
+        // Don't trigger auth error for 401 - the API request will handle retry
+        // with refreshed token if needed. Keep user on the page so they don't lose work.
+        if (updateError.response?.status === 401) {
+          // Let the API error handler in adminService deal with token refresh
+          throw new Error("Session verification required. Please try saving again.")
+        }
+        if (updateError.message && updateError.message.includes("Authentication")) {
+          throw new Error("Session verification failed. Please check your connection and try again.")
+        }
+        throw updateError
       }
     } catch (error: any) {
-      console.error("[v0] Failed to update product:", error)
+      console.error("Failed to update product:", error)
       const errorMessage = error.message || "There was a problem updating the product. Please try again."
       onError(errorMessage)
     } finally {
