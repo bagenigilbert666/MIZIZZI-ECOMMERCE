@@ -239,40 +239,24 @@ const StatsCard = ({
   value,
   subtitle,
   icon: Icon,
-  trend,
-  trendValue,
+  colorClass = "bg-blue-500",
 }: {
   title: string
   value: string | number
   subtitle: string
   icon: any
-  trend?: "up" | "down" | "neutral"
-  trendValue?: string
+  colorClass?: string
 }) => (
-  <div className="bg-white rounded-2xl p-6 border border-gray-100 hover:border-gray-200 transition-all duration-200">
+  <div className={`${colorClass} rounded-2xl p-5 sm:p-6 lg:p-7 shadow-lg hover:shadow-xl transition-all duration-200 text-white`}>
     <div className="flex items-start justify-between mb-4">
-      <div className="p-2.5 bg-gray-50 rounded-xl">
-        <Icon className="h-5 w-5 text-gray-700" strokeWidth={1.5} />
+      <div className="p-2.5 bg-white/20 rounded-xl">
+        <Icon className="h-5 w-5 text-white" strokeWidth={1.5} />
       </div>
-      {trend && (
-        <span
-          className={cn(
-            "text-xs font-medium px-2.5 py-1 rounded-full",
-            trend === "up"
-              ? "bg-green-50 text-green-700"
-              : trend === "down"
-                ? "bg-red-50 text-red-700"
-                : "bg-gray-50 text-gray-600",
-          )}
-        >
-          {trendValue}
-        </span>
-      )}
     </div>
-    <div className="space-y-1">
-      <p className="text-sm font-medium text-gray-500">{title}</p>
-      <p className="text-3xl font-semibold text-gray-900 tracking-tight">{value}</p>
-      <p className="text-xs text-gray-400 mt-1">{subtitle}</p>
+    <div className="space-y-2">
+      <p className="text-xs sm:text-sm font-medium text-white/80 uppercase tracking-wider">{title}</p>
+      <p className="text-2xl sm:text-3xl lg:text-4xl font-bold text-white tracking-tight">{value}</p>
+      <p className="text-xs sm:text-sm text-white/70 mt-1">{subtitle}</p>
     </div>
   </div>
 )
@@ -1132,62 +1116,66 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
         </div>
       </div>
 
-      {/* Stats Grid - Responsive */}
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+      {/* Stats Grid - Responsive with vibrant colors */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5">
         <StatsCard
           title="Total Products"
           value={productStats?.totalProducts || 0}
           subtitle={`${productStats?.categoriesCount || 0} categories`}
           icon={Package}
+          colorClass="bg-blue-600 hover:bg-blue-700"
         />
         <StatsCard
           title="In Stock"
           value={productStats?.inStock || 0}
           subtitle="Available products"
           icon={CheckCircle2}
-          trend={productStats?.inStock ? (productStats.inStock > 0 ? "up" : "neutral") : "neutral"}
-          trendValue={productStats?.inStock ? (productStats.inStock > 0 ? "Available" : "None") : "None"}
+          colorClass="bg-green-600 hover:bg-green-700"
         />
         <StatsCard
           title="Low Stock"
           value={productStats?.lowStock || 0}
           subtitle="Need attention"
           icon={AlertTriangle}
-          trend={productStats?.lowStock ? (productStats.lowStock > 0 ? "down" : "up") : "up"}
-          trendValue={productStats?.lowStock ? (productStats.lowStock > 0 ? "Alert" : "Good") : "Good"}
+          colorClass="bg-amber-500 hover:bg-amber-600"
         />
         <StatsCard
           title="On Sale"
           value={productStats?.onSale || 0}
           subtitle={`${productStats?.featured || 0} featured`}
           icon={Tag}
+          colorClass="bg-purple-600 hover:bg-purple-700"
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-5 mb-8">
         <StatsCard
           title="New Products"
           value={productStats?.newProducts || 0}
           subtitle="Recently added"
           icon={Sparkles}
+          colorClass="bg-indigo-600 hover:bg-indigo-700"
         />
         <StatsCard
           title="Inventory Value"
           value={`KSh ${(productStats?.totalInventoryValue || 0).toLocaleString()}`}
           subtitle="Total stock value"
           icon={DollarSign}
+          colorClass="bg-emerald-600 hover:bg-emerald-700"
         />
         <StatsCard
           title="Average Price"
           value={`KSh ${(productStats?.averagePrice || 0).toLocaleString()}`}
           subtitle="Per product"
           icon={TrendingUp}
+          colorClass="bg-rose-600 hover:bg-rose-700"
         />
         <StatsCard
           title="Luxury Deals"
           value={productStats?.luxuryDeal || 0}
           subtitle="Exclusive offers"
           icon={Crown}
+          colorClass="bg-cyan-600 hover:bg-cyan-700"
         />
       </div>
 
