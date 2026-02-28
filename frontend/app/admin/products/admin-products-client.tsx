@@ -421,6 +421,16 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
   const [productImages, setProductImages] = useState<Record<string, string>>({})
   const [itemLoadingStates, setItemLoadingStates] = useState<Record<string, boolean>>({})
 
+  // Auto-switch to list view on mobile
+  useEffect(() => {
+    if (isMobile && uiState.viewMode === "grid") {
+      setUiState(prev => ({ ...prev, viewMode: "list" }))
+    } else if (!isMobile && uiState.viewMode === "list" && !searchInput) {
+      // Optional: switch back to grid on desktop (only if grid is preferred)
+      // setUiState(prev => ({ ...prev, viewMode: "grid" }))
+    }
+  }, [isMobile])
+
   // Debounce search input (using ref for proper debouncing)
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -1480,7 +1490,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                 </SelectContent>
               </Select>
 
-              {/* View Mode Toggle */}
+              {/* View Mode Toggle - Hide grid/analytics on mobile */}
               <div className="flex items-center space-x-2">
                 <Button
                   variant={uiState.viewMode === "list" ? "default" : "outline"}
@@ -1490,19 +1500,21 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                 >
                   <FileText className="h-4 w-4" />
                 </Button>
+                {/* Grid button - hidden on mobile */}
                 <Button
                   variant={uiState.viewMode === "grid" ? "default" : "outline"}
                   size="sm"
                   onClick={() => handleUIStateChange("viewMode", "grid")}
-                  className="rounded-full"
+                  className="rounded-full hidden sm:inline-flex"
                 >
                   <Package className="h-4 w-4" />
                 </Button>
+                {/* Analytics button - hidden on mobile */}
                 <Button
                   variant={uiState.viewMode === "analytics" ? "default" : "outline"}
                   size="sm"
                   onClick={() => handleUIStateChange("viewMode", "analytics")}
-                  className="rounded-full"
+                  className="rounded-full hidden sm:inline-flex"
                 >
                   <TrendingUp className="h-4 w-4" />
                 </Button>
