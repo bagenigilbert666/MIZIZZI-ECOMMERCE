@@ -1117,7 +1117,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
       </div>
 
       {/* Stats Grid - Responsive with vibrant colors */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 mb-4">
         <StatsCard
           title="Total Products"
           value={productStats?.totalProducts || 0}
@@ -1148,7 +1148,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
         />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 mb-8">
         <StatsCard
           title="New Products"
           value={productStats?.newProducts || 0}
@@ -1627,32 +1627,40 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
               />
             )}
 
-            {/* Enhanced pagination */}
+            {/* Enhanced responsive pagination */}
             {filteredProducts.length > 0 && totalPages > 1 && (
-              <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-100">
-                <div className="text-sm text-gray-600">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mt-6 sm:mt-8 pt-4 sm:pt-6 border-t border-gray-100">
+                {/* Info text - hidden on mobile, visible on sm+ */}
+                <div className="hidden sm:block text-sm text-gray-600">
                   Showing <span className="font-semibold">{(currentPage - 1) * filterState.pageSize + 1}</span> to{" "}
                   <span className="font-semibold">{Math.min(currentPage * filterState.pageSize, filteredProducts.length)}</span> of{" "}
                   <span className="font-semibold">{filteredProducts.length}</span> products
                 </div>
-                <div className="flex items-center gap-2">
+
+                {/* Mobile info - visible on mobile only */}
+                <div className="sm:hidden text-xs text-gray-600 text-center">
+                  Page <span className="font-semibold">{currentPage}</span> of <span className="font-semibold">{totalPages}</span>
+                </div>
+
+                {/* Pagination controls */}
+                <div className="flex items-center justify-center sm:justify-end gap-2">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => goToPage(currentPage - 1)}
                     disabled={currentPage === 1}
-                    className="rounded-full"
+                    className="rounded-full h-8 w-8 sm:h-10 sm:w-10 p-0"
                   >
                     <ChevronLeft className="h-4 w-4" />
                   </Button>
 
-                  {/* Page numbers */}
-                  <div className="flex gap-1">
+                  {/* Page numbers - hidden on mobile, visible on sm+ */}
+                  <div className="hidden sm:flex gap-1">
                     {getPaginationItems().map((pageItem, index) =>
                       pageItem === "ellipsis-start" || pageItem === "ellipsis-end" ? (
                         <span
                           key={pageItem + index}
-                          className="flex items-center justify-center w-10 h-10 text-sm text-gray-500"
+                          className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 text-xs sm:text-sm text-gray-500"
                         >
                           ...
                         </span>
@@ -1662,7 +1670,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                           variant={currentPage === pageItem ? "default" : "outline"}
                           size="sm"
                           onClick={() => goToPage(pageItem as number)}
-                          className="rounded-full w-10 h-10"
+                          className="rounded-full w-8 h-8 sm:w-10 sm:h-10 p-0 text-xs sm:text-sm"
                         >
                           {pageItem}
                         </Button>
@@ -1670,12 +1678,17 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                     )}
                   </div>
 
+                  {/* Current page indicator - visible on mobile only */}
+                  <div className="sm:hidden flex items-center justify-center w-8 h-8 rounded-full bg-primary text-white text-xs font-semibold">
+                    {currentPage}
+                  </div>
+
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => goToPage(currentPage + 1)}
                     disabled={currentPage === totalPages}
-                    className="rounded-full"
+                    className="rounded-full h-8 w-8 sm:h-10 sm:w-10 p-0"
                   >
                     <ChevronRight className="h-4 w-4" />
                   </Button>

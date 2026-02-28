@@ -231,14 +231,20 @@ const ProductRow = memo(function ProductRow({
             )}
           </Button>
 
-          {/* Custom Dropdown Menu */}
-          {isMenuOpen && (
+          {/* Custom Dropdown Menu - Using Portal to prevent z-index issues */}
+          {isMenuOpen && createPortal(
             <div
               ref={menuRef}
-              className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-50 py-1 animate-in fade-in slide-in-from-top-1 duration-150"
+              className="fixed z-50 bg-white rounded-lg shadow-lg border border-gray-200 py-1 animate-in fade-in slide-in-from-top-1 duration-150"
               onClick={(e) => e.stopPropagation()}
               role="menu"
               aria-orientation="vertical"
+              style={{
+                position: 'fixed',
+                top: triggerRef.current ? triggerRef.current.getBoundingClientRect().bottom + 8 : 0,
+                right: triggerRef.current ? window.innerWidth - triggerRef.current.getBoundingClientRect().right : 0,
+                width: '192px'
+              }}
             >
               <div className="px-3 py-2 text-xs font-semibold text-gray-700 uppercase tracking-wider">
                 Actions
@@ -267,7 +273,8 @@ const ProductRow = memo(function ProductRow({
                   <span className="flex-1 text-left">{item.label}</span>
                 </button>
               ))}
-            </div>
+            </div>,
+            document.body
           )}
 
           {/* Backdrop for closing menu */}
