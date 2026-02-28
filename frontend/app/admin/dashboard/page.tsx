@@ -9,27 +9,23 @@ import { Loader } from "@/components/ui/loader"
 import { adminService } from "@/services/admin"
 import { toast } from "@/components/ui/use-toast"
 import { ProductUpdateNotification } from "@/components/admin/product-update-notification"
-import { DashboardCards } from "@/components/admin/dashboard/dashboard-cards"
 import { SalesOverviewChart } from "@/components/admin/dashboard/sales-overview-chart"
 import { RecentOrders } from "@/components/admin/dashboard/recent-orders"
 import { RecentActivity } from "@/components/admin/dashboard/recent-activity"
 import { BestSellingProducts } from "@/components/admin/dashboard/best-selling-products"
-import { TrafficSourcesChart } from "@/components/admin/dashboard/traffic-sources-chart"
 import { LowStockProducts } from "@/components/admin/dashboard/low-stock-products"
 import { OrderStatusDistribution } from "@/components/admin/dashboard/order-status-distribution"
-import { QuickActions } from "@/components/admin/dashboard/quick-actions"
 import { RecentCustomers } from "@/components/admin/dashboard/recent-customers"
-import { Overview } from "@/components/admin/dashboard/overview"
 import { OrderStatusChart } from "@/components/admin/dashboard/order-status-chart"
 import { SalesByCategoryChart } from "@/components/admin/dashboard/sales-by-category"
-import { UpcomingEvents } from "@/components/admin/dashboard/upcoming-events"
-import { UsersByRegionMap } from "@/components/admin/dashboard/users-by-region-map"
 import { RevenueVsRefundsChart } from "@/components/admin/dashboard/revenue-vs-refunds-chart"
 import { ActiveUsersChart } from "@/components/admin/dashboard/active-users-chart"
-import { NotificationsPanel } from "@/components/admin/dashboard/notifications-panel"
-import { RecentSales } from "@/components/admin/dashboard/recent-sales"
 import { DashboardHeader } from "@/components/admin/dashboard/dashboard-header"
 import { motion } from "framer-motion"
+import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
+import { AlertCircle, TrendingUp, AlertTriangle, Package, ShoppingCart, Users, Eye } from "lucide-react"
+import { cn } from "@/lib/utils"
 
 export default function AdminDashboard() {
   const { isAuthenticated, isLoading, user } = useAdminAuth()
@@ -521,7 +517,7 @@ export default function AdminDashboard() {
   console.log("[v0] isLoadingData:", isLoadingData, "isRefreshing:", isRefreshing)
 
   return (
-    <div className="flex-1 space-y-3 sm:space-y-4 md:space-y-6 p-2 sm:p-4 md:p-8 w-full overflow-x-hidden">
+    <div className="flex-1 space-y-3 sm:space-y-4 md:space-y-6 p-2 sm:p-4 md:p-8 w-full overflow-x-hidden bg-gray-50/50">
       <DashboardHeader
         onRefresh={fetchDashboardData}
         isRefreshing={isRefreshing}
@@ -536,170 +532,228 @@ export default function AdminDashboard() {
         </div>
       ) : (
         <div className="space-y-6">
+          {/* Key Metrics - Compact KPI Cards */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.1 }}
+            className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4"
           >
-            <DashboardCards
-              data={{
-                users: dashboardData?.counts?.users || 1247,
-                products: dashboardData?.counts?.products || 28,
-                orders: dashboardData?.counts?.orders || 156,
-                categories: dashboardData?.counts?.categories || 12,
-                brands: dashboardData?.counts?.brands || 8,
-                reviews: dashboardData?.counts?.reviews || 89,
-                pending_reviews: dashboardData?.counts?.pending_reviews || 5,
-                newsletter_subscribers: dashboardData?.counts?.newsletter_subscribers || 324,
-                new_signups_today: dashboardData?.counts?.new_signups_today || 12,
-                new_signups_week: dashboardData?.counts?.new_signups_week || 47,
-                orders_in_transit: dashboardData?.counts?.orders_in_transit || 23,
-                pending_payments: dashboardData?.counts?.pending_payments || 8,
-                low_stock_count: dashboardData?.low_stock_products?.length || 5,
-              }}
-              sales={{
-                today: dashboardData?.sales?.today || 2450.75,
-                monthly: dashboardData?.sales?.monthly || 45670.25,
-                yesterday: dashboardData?.sales?.yesterday || 1890.5,
-                weekly: dashboardData?.sales?.weekly || 12340.8,
-                yearly: dashboardData?.sales?.yearly || 234567.9,
-                total_revenue: dashboardData?.sales?.total_revenue || 567890.45,
-                pending_amount: dashboardData?.sales?.pending_amount || 1250.3,
-              }}
-            />
+            {[
+              {
+                label: "Today's Revenue",
+                value: `$${dashboardData?.sales?.today?.toFixed(2) || "0.00"}`,
+                icon: <TrendingUp className="h-5 w-5" />,
+                color: "from-emerald-500 to-teal-600",
+              },
+              {
+                label: "Total Orders",
+                value: dashboardData?.counts?.orders || "0",
+                icon: <ShoppingCart className="h-5 w-5" />,
+                color: "from-blue-500 to-cyan-600",
+              },
+              {
+                label: "Total Customers",
+                value: dashboardData?.counts?.users || "0",
+                icon: <Users className="h-5 w-5" />,
+                color: "from-purple-500 to-pink-600",
+              },
+              {
+                label: "Products",
+                value: dashboardData?.counts?.products || "0",
+                icon: <Package className="h-5 w-5" />,
+                color: "from-amber-500 to-orange-600",
+              },
+            ].map((metric, idx) => (
+              <motion.div
+                key={idx}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: idx * 0.08 }}
+              >
+                <Card className="border-none bg-white shadow-sm hover:shadow-md transition-shadow duration-200 rounded-lg overflow-hidden">
+                  <div className="p-3 sm:p-4">
+                    <div className="flex items-start justify-between mb-2">
+                      <div className={cn("p-2 rounded-lg bg-gradient-to-br", metric.color)}>
+                        <div className="text-white">{metric.icon}</div>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-600 mb-1">{metric.label}</p>
+                    <p className="text-lg sm:text-xl font-bold text-gray-900">{metric.value}</p>
+                  </div>
+                </Card>
+              </motion.div>
+            ))}
           </motion.div>
 
+          {/* Alerts & Warnings */}
+          {(dashboardData?.counts?.low_stock_count > 0 || dashboardData?.counts?.pending_payments > 0) && (
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: 0.15 }}
+              className="flex flex-col gap-2 sm:flex-row"
+            >
+              {dashboardData?.counts?.low_stock_count > 0 && (
+                <Card className="flex-1 border-amber-200 bg-amber-50 shadow-sm rounded-lg p-3 sm:p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-semibold text-amber-900">Low Stock Alert</p>
+                      <p className="text-xs text-amber-700">{dashboardData?.counts?.low_stock_count} products running low</p>
+                    </div>
+                  </div>
+                </Card>
+              )}
+              {dashboardData?.counts?.pending_payments > 0 && (
+                <Card className="flex-1 border-red-200 bg-red-50 shadow-sm rounded-lg p-3 sm:p-4">
+                  <div className="flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-semibold text-red-900">Pending Payments</p>
+                      <p className="text-xs text-red-700">${dashboardData?.sales?.pending_amount?.toFixed(2) || "0.00"} pending</p>
+                    </div>
+                  </div>
+                </Card>
+              )}
+            </motion.div>
+          )}
+
+          {/* Main Content Grid */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.2 }}
-            className="mt-6"
+            className="grid grid-cols-1 lg:grid-cols-3 gap-6"
           >
-            <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl p-4">
-              <div className="mb-2">
-                <h2 className="text-lg font-semibold">Quick Actions</h2>
+            {/* Sales Chart - Full Width */}
+            <Card className="lg:col-span-3 border-none bg-white shadow-sm rounded-lg overflow-hidden">
+              <div className="p-4 sm:p-6 min-h-[400px]">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Sales Overview</h3>
+                <SalesOverviewChart salesData={dashboardData?.sales_data || []} />
               </div>
-              <QuickActions />
             </Card>
           </motion.div>
 
+          {/* Orders & Status Distribution */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.25 }}
+            className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+          >
+            <Card className="border-none bg-white shadow-sm rounded-lg overflow-hidden">
+              <div className="p-4 sm:p-6 min-h-[350px]">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Status</h3>
+                <OrderStatusChart data={dashboardData?.order_status || {}} />
+              </div>
+            </Card>
+
+            <Card className="border-none bg-white shadow-sm rounded-lg overflow-hidden">
+              <div className="p-4 sm:p-6 min-h-[350px]">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Order Distribution</h3>
+                <OrderStatusDistribution data={dashboardData?.order_status || {}} />
+              </div>
+            </Card>
+          </motion.div>
+
+          {/* Recent Orders & Best Sellers */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.3 }}
-            className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+            className="grid grid-cols-1 lg:grid-cols-2 gap-6"
           >
-            <Card className="lg:col-span-2 border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl min-h-[400px]">
-              <SalesOverviewChart salesData={dashboardData?.sales_data || []} />
+            <Card className="border-none bg-white shadow-sm rounded-lg overflow-hidden">
+              <div className="p-4 sm:p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Orders</h3>
+                <div className="max-h-[500px] overflow-auto">
+                  <RecentOrders orders={dashboardData?.recent_orders || []} />
+                </div>
+              </div>
             </Card>
 
-            <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl min-h-[400px]">
-              <OrderStatusChart data={dashboardData?.order_status || {}} />
+            <Card className="border-none bg-white shadow-sm rounded-lg overflow-hidden">
+              <div className="p-4 sm:p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Best Selling Products</h3>
+                <BestSellingProducts products={dashboardData?.best_selling_products || []} />
+              </div>
             </Card>
           </motion.div>
 
+          {/* Products & Inventory */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.35 }}
+            className="grid grid-cols-1 lg:grid-cols-2 gap-6"
+          >
+            <Card className="border-none bg-white shadow-sm rounded-lg overflow-hidden">
+              <div className="p-4 sm:p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">Low Stock Products</h3>
+                  {dashboardData?.counts?.low_stock_count > 0 && (
+                    <Badge className="bg-amber-100 text-amber-800 hover:bg-amber-100">
+                      {dashboardData?.counts?.low_stock_count} items
+                    </Badge>
+                  )}
+                </div>
+                <LowStockProducts products={dashboardData?.low_stock_products || []} />
+              </div>
+            </Card>
+
+            <Card className="border-none bg-white shadow-sm rounded-lg overflow-hidden">
+              <div className="p-4 sm:p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Sales by Category</h3>
+                <SalesByCategoryChart data={dashboardData?.sales_by_category || []} />
+              </div>
+            </Card>
+          </motion.div>
+
+          {/* Activity & Revenue Trends */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.3, delay: 0.4 }}
-            className="grid grid-cols-1 lg:grid-cols-3 gap-6"
+            className="grid grid-cols-1 lg:grid-cols-2 gap-6"
           >
-            <Card className="lg:col-span-2 border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl">
-              <RecentOrders orders={dashboardData?.recent_orders || []} />
+            <Card className="border-none bg-white shadow-sm rounded-lg overflow-hidden">
+              <div className="p-4 sm:p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
+                <div className="max-h-[400px] overflow-auto">
+                  <RecentActivity activities={dashboardData?.recent_activities || []} />
+                </div>
+              </div>
             </Card>
 
-            <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl">
-              <RecentSales />
+            <Card className="border-none bg-white shadow-sm rounded-lg overflow-hidden">
+              <div className="p-4 sm:p-6 min-h-[350px]">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Revenue vs Refunds</h3>
+                <RevenueVsRefundsChart data={dashboardData?.revenue_vs_refunds || []} />
+              </div>
             </Card>
           </motion.div>
 
+          {/* Customers */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3, delay: 0.5 }}
+            transition={{ duration: 0.3, delay: 0.45 }}
+            className="grid grid-cols-1 lg:grid-cols-2 gap-6"
           >
-            <Tabs defaultValue="overview" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-4 bg-muted/50 rounded-lg">
-                <TabsTrigger value="overview">Overview</TabsTrigger>
-                <TabsTrigger value="products">Products</TabsTrigger>
-                <TabsTrigger value="sales">Sales</TabsTrigger>
-                <TabsTrigger value="customers">Customers</TabsTrigger>
-              </TabsList>
+            <Card className="border-none bg-white shadow-sm rounded-lg overflow-hidden">
+              <div className="p-4 sm:p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Customers</h3>
+                <RecentCustomers customers={dashboardData?.recent_users || []} />
+              </div>
+            </Card>
 
-              <TabsContent value="overview" className="space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl min-h-[400px]">
-                    <Overview salesData={dashboardData?.sales_data || []} />
-                  </Card>
-
-                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl min-h-[400px]">
-                    <SalesByCategoryChart data={dashboardData?.sales_by_category || []} />
-                  </Card>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl">
-                    <RecentActivity activities={dashboardData?.recent_activities || []} />
-                  </Card>
-
-                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl">
-                    <NotificationsPanel notifications={dashboardData?.notifications || []} />
-                  </Card>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="products" className="space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl">
-                    <LowStockProducts products={dashboardData?.low_stock_products || []} />
-                  </Card>
-
-                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl">
-                    <BestSellingProducts products={dashboardData?.best_selling_products || []} />
-                  </Card>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="sales" className="space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl min-h-[400px]">
-                    <OrderStatusDistribution data={dashboardData?.order_status || {}} />
-                  </Card>
-
-                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl min-h-[400px]">
-                    <RevenueVsRefundsChart data={dashboardData?.revenue_vs_refunds || []} />
-                  </Card>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl min-h-[400px]">
-                    <TrafficSourcesChart data={dashboardData?.traffic_sources || []} />
-                  </Card>
-
-                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl min-h-[400px]">
-                    <ActiveUsersChart data={dashboardData?.active_users || []} />
-                  </Card>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="customers" className="space-y-6">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl">
-                    <RecentCustomers customers={dashboardData?.recent_users || []} />
-                  </Card>
-
-                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl">
-                    <UsersByRegionMap data={dashboardData?.users_by_region || []} />
-                  </Card>
-                </div>
-
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <Card className="border-none bg-white shadow-md dark:bg-gray-800 overflow-hidden rounded-xl">
-                    <UpcomingEvents events={dashboardData?.upcoming_events || []} />
-                  </Card>
-                </div>
-              </TabsContent>
-            </Tabs>
+            <Card className="border-none bg-white shadow-sm rounded-lg overflow-hidden">
+              <div className="p-4 sm:p-6 min-h-[350px]">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Active Users</h3>
+                <ActiveUsersChart data={dashboardData?.active_users || []} />
+              </div>
+            </Card>
           </motion.div>
         </div>
       )}
