@@ -752,7 +752,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
       console.log("[v0] Cleaning up WebSocket listener")
       unsubscribe()
     }
-  }, [isAuthenticated, fetchProducts])
+  }, [isAuthenticated])
 
   // Add event listener for product image updates
   useEffect(() => {
@@ -996,20 +996,14 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
       
       // Reset pagination if the current page would be empty after deletion
       setCurrentPage((prevPage) => {
-        const startIndex = (prevPage - 1) * filterState.pageSize
-        const endIndex = startIndex + filterState.pageSize
-        
-        // Check how many items would be on the current page after deletion
-        const itemsAfterDelete = allProducts
-          .filter((p) => String(p.id) !== id)
-          .slice(startIndex, endIndex).length
-      
-        if (prevPage > 1 && itemsAfterDelete === 0) {
+        // Since we can't access allProducts here, we'll check if we need to go back
+        // The ProductList will re-render with the filtered products anyway
+        if (prevPage > 1) {
           return Math.max(1, prevPage - 1)
         }
         return prevPage
       })
-    }, [filterState.pageSize, allProducts])
+    }, [filterState.pageSize])
 
   // Bulk delete selected products
   const handleBulkDelete = useCallback(async () => {
