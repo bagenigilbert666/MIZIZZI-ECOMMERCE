@@ -75,9 +75,12 @@ export default function NewProductPage() {
       }
 
       const response = await adminService.createProduct(productData)
-      const productId = response?.id
-
+      
+      // Extract product ID from response (handle nested structure)
+      const productId = response?.product?.id || response?.id
+      
       if (!productId) {
+        console.error('[v0] Product response structure:', response)
         throw new Error('Product created but no ID was returned from the server')
       }
 
