@@ -13,17 +13,7 @@ import {
   Loader2,
 } from "lucide-react"
 
-import { SettingSection } from "@/components/admin/settings/setting-section"
-import { SiteSettings } from "@/components/admin/settings/site-settings"
-import { StoreSettings } from "@/components/admin/settings/store-settings"
-import { InventorySettings } from "@/components/admin/settings/inventory-settings"
-import { ReviewsSettings } from "@/components/admin/settings/reviews-settings"
-import { SecuritySettings } from "@/components/admin/settings/security-settings"
-import { PaymentSettings } from "@/components/admin/settings/payment-settings"
-import { SeoSettings } from "@/components/admin/settings/seo-settings"
-import { EmailSettings } from "@/components/admin/settings/email-settings"
-import { LocalizationSettings } from "@/components/admin/settings/localization-settings"
-import { MaintenanceSettings } from "@/components/admin/settings/maintenance-settings"
+import { SettingSection, SiteSettings, StoreSettings, InventorySettings, ReviewsSettings, SecuritySettings, PaymentSettings, SeoSettings, EmailSettings, LocalizationSettings, MaintenanceSettings } from "@/components/admin/settings"
 
 interface Settings {
   site: {
