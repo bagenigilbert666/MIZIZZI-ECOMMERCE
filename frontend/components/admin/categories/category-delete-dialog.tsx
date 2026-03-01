@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogBody, DialogFooter } from "@/components/ui/dialog"
+import { Modal } from "@/components/ui/modal"
 import { useToast } from "@/hooks/use-toast"
 import { AlertTriangle, Loader, Trash2 } from "lucide-react"
 import { websocketService } from "@/services/websocket"
@@ -60,7 +60,7 @@ export function CategoryDeleteDialog({
 
       toast({
         title: "Success",
-        description: `"${category.name}" has been deleted successfully`,
+        description: "Category deleted successfully",
       })
 
       await websocketService.emit("category_updated", {
@@ -68,10 +68,11 @@ export function CategoryDeleteDialog({
         category: { id: category.id },
       })
 
-      onOpenChange(false)
-      onDeleteSuccess()
       categoryService.clearCache()
       mutate((key: any) => typeof key === "string" && key.includes("categories"), undefined, { revalidate: true })
+
+      onOpenChange(false)
+      onDeleteSuccess()
     } catch (error) {
       console.error("Error deleting category:", error)
       toast({
@@ -85,65 +86,65 @@ export function CategoryDeleteDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-sm">
-        {/* Header with Icon */}
-        <DialogHeader>
-          <div className="flex flex-col items-center gap-3 text-center">
-            <div className="flex h-12 w-12 sm:h-14 sm:w-14 items-center justify-center rounded-full bg-red-50">
-              <AlertTriangle className="h-6 w-6 sm:h-7 sm:w-7 text-red-600" />
-            </div>
-            <h2 className="text-lg sm:text-xl font-bold text-gray-900">Delete Category?</h2>
-          </div>
-        </DialogHeader>
-
-        {/* Body - Warning message */}
-        <DialogBody>
-          <div className="text-center space-y-2">
-            {category && (
-              <>
-                <p className="text-sm sm:text-base text-gray-600">
-                  You're about to permanently delete{" "}
-                  <span className="font-semibold text-gray-900">"{category.name}"</span>
-                </p>
-                <p className="text-xs sm:text-sm text-gray-500">
-                  This action cannot be undone. All associated data will be removed.
-                </p>
-              </>
-            )}
-          </div>
-        </DialogBody>
-
-        {/* Footer - Action buttons */}
-        <DialogFooter>
+    <Modal
+      open={open}
+      onOpenChange={onOpenChange}
+      size="sm"
+      footer={
+        <div className="flex gap-3 w-full">
           <Button
-            type="button"
             variant="outline"
             onClick={() => onOpenChange(false)}
             disabled={deleting}
-            className="h-10 sm:h-11 px-4 sm:px-6 rounded-lg font-medium text-sm border-gray-200 hover:bg-gray-50"
+            className="flex-1 h-10 rounded-lg font-medium"
           >
-            Keep Category
+            Cancel
           </Button>
           <Button
+            variant="destructive"
             onClick={handleDelete}
             disabled={deleting}
-            className="h-10 sm:h-11 px-4 sm:px-6 rounded-lg font-medium text-sm bg-red-600 hover:bg-red-700 text-white gap-2"
+            className="flex-1 h-10 rounded-lg font-medium gap-2"
           >
             {deleting ? (
               <>
                 <Loader className="h-4 w-4 animate-spin" />
-                <span className="hidden sm:inline">Deleting...</span>
+                Deleting...
               </>
             ) : (
               <>
                 <Trash2 className="h-4 w-4" />
-                <span>Delete</span>
+                Delete
               </>
             )}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </div>
+      }
+    >
+      <div className="flex flex-col items-center text-center py-2">
+        {/* Alert Icon */}
+        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4 animate-pulse">
+          <AlertTriangle className="h-8 w-8 text-red-600" />
+        </div>
+
+        {/* Title */}
+        <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">Delete Category?</h3>
+
+        {/* Message */}
+        <p className="text-sm text-gray-600 mb-1">
+          You're about to permanently delete
+        </p>
+        <p className="text-base font-semibold text-gray-900 break-words mb-4">
+          "{category?.name}"
+        </p>
+
+        {/* Warning */}
+        <div className="w-full p-3 rounded-lg bg-red-50 border border-red-200 mb-4">
+          <p className="text-xs text-red-700 font-medium">
+            ⚠️ This action cannot be undone. All data associated with this category will be permanently deleted.
+          </p>
+        </div>
+      </div>
+    </Modal>
   )
 }
