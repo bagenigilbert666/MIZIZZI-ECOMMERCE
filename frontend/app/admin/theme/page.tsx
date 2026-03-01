@@ -83,7 +83,14 @@ export default function PremiumThemeCustomizer() {
       console.log("[v0] Fetch response status:", response.status)
 
       if (!response.ok) {
-        throw new Error("Failed to fetch theme settings")
+        let errorBody = ""
+        try {
+          errorBody = await response.text()
+          console.log("[v0] Error response body:", errorBody)
+        } catch (e) {
+          console.log("[v0] Could not read error body")
+        }
+        throw new Error(`Failed to fetch theme settings (Status: ${response.status})`)
       }
 
       const data = await response.json()
@@ -104,11 +111,12 @@ export default function PremiumThemeCustomizer() {
         setError("No active theme found")
       }
     } catch (error) {
-      console.error("[v0] Error fetching theme:", error)
-      setError("Unable to load theme settings")
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
+      console.error("[v0] Error fetching theme:", errorMessage)
+      setError(`Unable to load theme settings: ${errorMessage}`)
       toast({
         title: "Error",
-        description: "Failed to load theme. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       })
     } finally {
