@@ -430,86 +430,112 @@ export default function ShopCategoriesAdminPage() {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Shop By Category</h1>
-          <p className="text-muted-foreground">Manage category cards displayed on the homepage</p>
+    <div className="min-h-screen bg-background">
+      {/* Header Section - Sticky & Responsive */}
+      <div className="sticky top-0 z-40 border-b border-border/40 bg-background/95 backdrop-blur-sm">
+        <div className="container mx-auto px-4 sm:px-6 py-4">
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1">
+              <h1 className="text-3xl sm:text-4xl font-bold tracking-tight">Shop By Category</h1>
+              <p className="text-sm sm:text-base text-muted-foreground">
+                Manage category cards displayed on the homepage
+              </p>
+            </div>
+            <Button onClick={openCreateDialog} className="gap-2 whitespace-nowrap flex-shrink-0">
+              <Plus className="h-4 w-4" />
+              <span className="hidden sm:inline">Add Category</span>
+              <span className="sm:hidden">Add</span>
+            </Button>
+          </div>
         </div>
-        <Button onClick={openCreateDialog} className="gap-2">
-          <Plus className="h-4 w-4" />
-          Add Category
-        </Button>
       </div>
 
-      {/* Categories List */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Current Categories</CardTitle>
-          <CardDescription>
-            Drag to reorder • Click to edit • Categories are displayed in this order on the homepage
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader className="h-6 w-6 animate-spin text-muted-foreground" />
-            </div>
-          ) : categories.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <ImageIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No categories yet</p>
-              <p className="text-sm">Click "Add Category" to create your first category</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {categories.map((category) => (
-                <div
-                  key={category.id}
-                  className="flex items-center gap-4 p-4 border rounded-lg bg-card hover:bg-accent/50 transition-colors"
-                >
-                  <GripVertical className="h-5 w-5 text-muted-foreground cursor-grab" />
-
-                  {/* Category Image */}
-                  <div className="relative h-16 w-20 rounded-md overflow-hidden bg-muted flex-shrink-0">
-                    <Image
-                      src={category.image_url || "/placeholder.svg"}
-                      alt={category.name}
-                      fill
-                      className="object-cover"
-                    />
-                  </div>
-
-                  {/* Category Info */}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-medium truncate">{category.name}</h3>
-                    <p className="text-sm text-muted-foreground truncate">{category.description || "No description"}</p>
-                    <p className="text-xs text-muted-foreground">Slug: {category.slug}</p>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-2">
-                    <Button variant="outline" size="sm" onClick={() => openEditDialog(category)}>
-                      <Pencil className="h-4 w-4 mr-1" />
-                      Edit
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="text-destructive hover:text-destructive bg-transparent"
-                      onClick={() => openDeleteDialog(category)}
-                    >
-                      <Trash2 className="h-4 w-4 mr-1" />
-                      Delete
-                    </Button>
-                  </div>
+      {/* Main Content */}
+      <div className="container mx-auto px-4 sm:px-6 py-8">
+        <div className="space-y-6">
+          {/* Categories Section */}
+          <Card className="border-0 shadow-sm">
+            <CardHeader className="pb-4">
+              <CardTitle>Current Categories</CardTitle>
+              <CardDescription className="text-sm">
+                Click to edit • Categories are displayed in this order on the homepage
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader className="h-6 w-6 animate-spin text-muted-foreground" />
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              ) : categories.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground">
+                  <ImageIcon className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                  <p className="font-medium">No categories yet</p>
+                  <p className="text-sm">Click "Add Category" to create your first category</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {categories.map((category) => (
+                    <div
+                      key={category.id}
+                      className="group relative overflow-hidden rounded-lg border border-border bg-card hover:shadow-lg transition-all duration-300 hover:border-primary/50"
+                    >
+                      {/* Category Image */}
+                      <div className="relative h-32 w-full overflow-hidden bg-muted">
+                        <Image
+                          src={category.image_url || "/placeholder.svg"}
+                          alt={category.name}
+                          fill
+                          className="object-cover group-hover:scale-105 transition-transform duration-300"
+                        />
+                      </div>
+
+                      {/* Category Info */}
+                      <div className="p-4 space-y-3">
+                        <div className="space-y-1">
+                          <h3 className="font-semibold text-base line-clamp-2">{category.name}</h3>
+                          <p className="text-sm text-muted-foreground line-clamp-2">
+                            {category.description || "No description"}
+                          </p>
+                          <p className="text-xs text-muted-foreground font-mono">{category.slug}</p>
+                        </div>
+
+                        {/* Actions - Visible on Hover (Desktop) or Always (Mobile) */}
+                        <div className="flex items-center gap-2 pt-2 border-t border-border/50">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => openEditDialog(category)}
+                            className="flex-1 h-9"
+                          >
+                            <Pencil className="h-3.5 w-3.5 mr-1.5" />
+                            <span className="text-xs">Edit</span>
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="flex-1 h-9 text-destructive hover:text-destructive hover:bg-destructive/10 border-destructive/20"
+                            onClick={() => openDeleteDialog(category)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5 mr-1.5" />
+                            <span className="text-xs">Delete</span>
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Badge for Featured/Active Status */}
+                      {category.is_featured && (
+                        <div className="absolute top-2 right-2 bg-primary/90 text-primary-foreground text-xs px-2 py-1 rounded-md">
+                          Featured
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
       {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
