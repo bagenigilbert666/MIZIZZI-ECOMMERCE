@@ -101,45 +101,45 @@ export function RichDescriptionEditor({
 
     setIsUploading(true)
     try {
-      // Create FormData for file upload
       const formData = new FormData()
       formData.append("file", file)
+      formData.append("product_id", "temp") // For description images, use temp product ID
 
       console.log("[v0] Uploading image file to Cloudinary:", file.name)
 
-      // Upload to your API endpoint which connects to Cloudinary
-      const response = await fetch("/api/upload/image", {
+      // Get auth token
+      const token = localStorage.getItem("admin_token") || localStorage.getItem("mizizzi_token")
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
+
+      // Upload using the same backend endpoint as product images
+      const response = await fetch(`${baseUrl}/api/admin/cloudinary/upload`, {
         method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        },
         body: formData,
       })
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: "Upload failed" }))
         console.error("[v0] Upload error:", errorData)
-        throw new Error(errorData.error || errorData.message || `Upload failed with status ${response.status}`)
+        throw new Error(errorData.error?.message || errorData.error || errorData.message || `Upload failed with status ${response.status}`)
       }
 
       const uploadResult = await response.json()
       console.log("[v0] Cloudinary upload response:", uploadResult)
 
-      // Extract URL from various possible response formats
-      let uploadedUrl = uploadResult.url || 
-                       uploadResult.secure_url || 
-                       uploadResult.uploaded_image?.url ||
-                       uploadResult.uploaded_image?.secure_url ||
-                       uploadResult.uploaded?.[0]?.url ||
-                       uploadResult.uploaded?.[0]?.secure_url
+      // Extract secure URL from backend response (same format as product images use)
+      const uploadedUrl = uploadResult.secure_url || uploadResult.url || uploadResult.data?.secure_url
 
       if (!uploadedUrl) {
         console.error("[v0] No URL found in upload response:", uploadResult)
-        throw new Error("No image URL returned from upload service")
+        throw new Error("No image URL returned from Cloudinary")
       }
 
       // Add Cloudinary optimization transformations for auto format and quality
-      // This ensures images are automatically formatted and compressed based on client device
-      const cloudinaryOptimizedUrl = uploadedUrl.includes("res.cloudinary.com")
-        ? uploadedUrl.replace("/upload/", "/upload/c_limit,q_auto,f_auto/")
-        : uploadedUrl
+      const cloudinaryOptimizedUrl = uploadedUrl.replace("/upload/", "/upload/c_limit,q_auto,f_auto/")
 
       console.log("[v0] Inserting image with optimized URL:", cloudinaryOptimizedUrl)
 
