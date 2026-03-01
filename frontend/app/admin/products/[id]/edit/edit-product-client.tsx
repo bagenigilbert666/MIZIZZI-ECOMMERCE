@@ -263,7 +263,25 @@ export function EditProductClient({ productId }: { productId: string }) {
           productData.brand_id = null
         }
 
+        // Remove fields that the backend doesn't handle
+        // The backend only handles specific fields defined in the update_product route
+        const allowedFields = [
+          'name', 'slug', 'description', 'price', 'sale_price', 'stock',
+          'category_id', 'brand_id', 'sku', 'weight',
+          'is_featured', 'is_new', 'is_sale', 'is_flash_sale', 'is_luxury_deal',
+          'meta_title', 'meta_description', 'material',
+          'image_urls', 'thumbnail_url', 'tags'
+        ]
+
+        const cleanedData = Object.keys(productData).reduce((acc: Record<string, any>, key) => {
+          if (allowedFields.includes(key)) {
+            acc[key] = productData[key]
+          }
+          return acc
+        }, {})
+
         console.log(`[v0] Submitting ${section} data for product ID: ${productId}`)
+        console.log("[v0] Cleaned payload being sent:", JSON.stringify(cleanedData, null, 2))
 
         // Dispatch event to notify that update is starting
         if (typeof window !== "undefined") {
@@ -294,7 +312,7 @@ export function EditProductClient({ productId }: { productId: string }) {
           const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/admin/products/${productId}`, {
             method: "PUT",
             headers: headers,
-            body: JSON.stringify(productData),
+            body: JSON.stringify(cleanedData),
             signal: controller.signal,
           })
 
@@ -317,7 +335,7 @@ export function EditProductClient({ productId }: { productId: string }) {
                       "Content-Type": "application/json",
                       Authorization: `Bearer ${newToken}`,
                     },
-                    body: JSON.stringify(productData),
+                    body: JSON.stringify(cleanedData),
                   },
                 )
 
@@ -372,6 +390,16 @@ export function EditProductClient({ productId }: { productId: string }) {
                   mutateProduct(undefined, { revalidate: true })
                   mutateImages(undefined, { revalidate: true })
                   return true
+                } else {
+                  // Retry also failed
+                  let retryErrorData = {}
+                  try {
+                    const retryErrorText = await retryResponse.text()
+                    retryErrorData = JSON.parse(retryErrorText)
+                  } catch {
+                    retryErrorData = { status: retryResponse.status }
+                  }
+                  console.error("[v0] Retry request also failed:", retryErrorData)
                 }
               }
             }
@@ -382,9 +410,17 @@ export function EditProductClient({ productId }: { productId: string }) {
 
           // Check if the response is ok
           if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}))
-            console.error("[v0] API error response:", errorData)
-            throw new Error(errorData.message || `Failed to update product. Status: ${response.status}`)
+            let errorData = {}
+            let errorText = ""
+            try {
+              errorText = await response.text()
+              errorData = JSON.parse(errorText)
+            } catch {
+              errorData = { raw_error: errorText }
+            }
+            console.error("[v0] API error response status:", response.status)
+            console.error("[v0] API error response data:", errorData)
+            throw new Error(errorData.message || errorData.error || `Failed to update product. Status: ${response.status}`)
           }
 
           // Parse the response
