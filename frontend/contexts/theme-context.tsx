@@ -84,7 +84,6 @@ interface Theme {
 
 interface ThemeContextType {
   theme: Theme | null
-  isLoading: boolean
   refreshTheme: () => Promise<void>
   applyTheme: (theme: Theme) => void
 }
@@ -94,7 +93,6 @@ const THEME_STORAGE_KEY = "mizizzi_active_theme"
 
 export function ThemeProvider({ children, initialTheme }: { children: React.ReactNode; initialTheme?: Theme | null }) {
   const [theme, setTheme] = useState<Theme | null>(initialTheme || null)
-  const [isLoading, setIsLoading] = useState(!initialTheme)
   const [lastFetchedThemeId, setLastFetchedThemeId] = useState<number | null>(initialTheme?.id || null)
 
   const applyTheme = useCallback((themeData: Theme) => {
@@ -165,7 +163,6 @@ export function ThemeProvider({ children, initialTheme }: { children: React.Reac
 
   const refreshTheme = useCallback(async () => {
     try {
-      setIsLoading(true)
       const apiUrl = `${process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"}/api/theme/active`
       
       const response = await fetch(apiUrl)
@@ -186,8 +183,6 @@ export function ThemeProvider({ children, initialTheme }: { children: React.Reac
       }
     } catch (error) {
       console.error("[v0] Error fetching theme:", error)
-    } finally {
-      setIsLoading(false)
     }
   }, [applyTheme, lastFetchedThemeId, theme])
 
@@ -196,7 +191,6 @@ export function ThemeProvider({ children, initialTheme }: { children: React.Reac
     if (initialTheme) {
       applyTheme(initialTheme)
       setLastFetchedThemeId(initialTheme.id)
-      setIsLoading(false)
     }
 
     try {
@@ -232,7 +226,7 @@ export function ThemeProvider({ children, initialTheme }: { children: React.Reac
   }, [refreshTheme, applyTheme, initialTheme])
 
   return (
-    <ThemeContext.Provider value={{ theme, isLoading, refreshTheme, applyTheme }}>{children}</ThemeContext.Provider>
+    <ThemeContext.Provider value={{ theme, refreshTheme, applyTheme }}>{children}</ThemeContext.Provider>
   )
 }
 
