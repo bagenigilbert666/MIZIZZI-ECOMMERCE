@@ -539,57 +539,24 @@ export default function ShopCategoriesAdminPage() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editingCategory ? "Edit Category" : "Create Category"}</DialogTitle>
-            <DialogDescription>
-              {editingCategory ? "Update the category details below" : "Fill in the details to create a new category"}
+        <DialogContent className="w-full max-w-2xl max-h-[90vh] overflow-y-auto p-0 gap-0 rounded-2xl">
+          {/* Header */}
+          <div className="sticky top-0 z-10 border-b border-border/40 bg-background/95 backdrop-blur-sm px-6 py-5">
+            <DialogTitle className="text-2xl font-bold tracking-tight">
+              {editingCategory ? "Edit Category" : "Create Category"}
+            </DialogTitle>
+            <DialogDescription className="mt-1.5 text-sm">
+              {editingCategory ? "Update the category details" : "Add a new category to your store"}
             </DialogDescription>
-          </DialogHeader>
+          </div>
 
-          <div className="space-y-6 py-4">
-            {/* Name */}
-            <div className="space-y-2">
-              <Label htmlFor="name">Category Name *</Label>
-              <Input
-                id="name"
-                value={formData.name}
-                onChange={(e) => handleNameChange(e.target.value)}
-                placeholder="e.g., Electronics"
-              />
-            </div>
-
-            {/* Slug */}
-            <div className="space-y-2">
-              <Label htmlFor="slug">URL Slug</Label>
-              <Input
-                id="slug"
-                value={formData.slug}
-                onChange={(e) => setFormData((prev) => ({ ...prev, slug: e.target.value }))}
-                placeholder="e.g., electronics"
-              />
-              <p className="text-xs text-muted-foreground">
-                Auto-generated from name. Used in URLs like /category/electronics
-              </p>
-            </div>
-
-            {/* Description */}
-            <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
-              <Textarea
-                id="description"
-                value={formData.description}
-                onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-                placeholder="Brief description of the category"
-                rows={3}
-              />
-            </div>
-
-            {/* Image Upload */}
-            <div className="space-y-2">
-              <Label>Category Image *</Label>
+          {/* Content */}
+          <div className="space-y-6 p-6">
+            {/* Category Image - Primary Focus */}
+            <div className="space-y-3">
+              <Label className="text-base font-semibold">Category Image *</Label>
               <div className="relative">
-                <div className="relative h-48 w-full rounded-md overflow-hidden bg-gray-100 mb-3">
+                <div className="relative h-48 w-full rounded-xl overflow-hidden bg-muted border border-border/50 mb-3 shadow-sm hover:shadow-md transition-shadow">
                   <Image
                     src={formData.image_url || "/placeholder.svg"}
                     alt="Category preview"
@@ -612,7 +579,7 @@ export default function ShopCategoriesAdminPage() {
                   variant="outline"
                   onClick={() => imageInputRef.current?.click()}
                   disabled={uploadingImage}
-                  className="w-full"
+                  className="w-full h-10 rounded-lg border-border/50 hover:bg-muted/50"
                 >
                   {uploadingImage ? (
                     <>
@@ -629,11 +596,49 @@ export default function ShopCategoriesAdminPage() {
               </div>
             </div>
 
-            {/* Banner Upload (Optional) */}
+            {/* Name and Slug - Two Column on Desktop, Stacked on Mobile */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="name" className="font-medium">Category Name *</Label>
+                <Input
+                  id="name"
+                  value={formData.name}
+                  onChange={(e) => handleNameChange(e.target.value)}
+                  placeholder="Electronics"
+                  className="h-10 rounded-lg bg-muted/50 border-border hover:bg-muted focus:bg-background focus:border-primary transition-colors"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="slug" className="font-medium">URL Slug</Label>
+                <Input
+                  id="slug"
+                  value={formData.slug}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, slug: e.target.value }))}
+                  placeholder="electronics"
+                  className="h-10 rounded-lg bg-muted/50 border-border hover:bg-muted focus:bg-background focus:border-primary transition-colors font-mono text-sm"
+                />
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">Auto-generated from name. Used in URLs like /category/electronics</p>
+
+            {/* Description */}
             <div className="space-y-2">
-              <Label>Banner Image (Optional)</Label>
+              <Label htmlFor="description" className="font-medium">Description</Label>
+              <Textarea
+                id="description"
+                value={formData.description}
+                onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+                placeholder="Brief description of the category"
+                rows={3}
+                className="rounded-lg bg-muted/50 border-border hover:bg-muted focus:bg-background focus:border-primary transition-colors resize-none"
+              />
+            </div>
+
+            {/* Banner Upload */}
+            <div className="space-y-3">
+              <Label className="text-base font-semibold">Banner Image (Optional)</Label>
               <div className="relative">
-                <div className="relative h-32 w-full rounded-md overflow-hidden bg-gray-100 mb-3">
+                <div className="relative h-28 w-full rounded-xl overflow-hidden bg-muted border border-border/50 mb-3 shadow-sm">
                   <Image
                     src={formData.banner_url || "/placeholder.svg"}
                     alt="Banner preview"
@@ -656,7 +661,7 @@ export default function ShopCategoriesAdminPage() {
                   variant="outline"
                   onClick={() => bannerInputRef.current?.click()}
                   disabled={uploadingImage}
-                  className="w-full"
+                  className="w-full h-10 rounded-lg border-border/50 hover:bg-muted/50"
                 >
                   {uploadingImage ? (
                     <>
@@ -673,70 +678,92 @@ export default function ShopCategoriesAdminPage() {
               </div>
             </div>
 
-            {/* Featured Toggle */}
-            <div className="flex items-center justify-between">
-              <div className="space-y-0.5">
-                <Label>Featured Category</Label>
-                <p className="text-sm text-muted-foreground">Featured categories are highlighted on the homepage</p>
+            {/* Settings Grid */}
+            <div className="space-y-4 pt-2 border-t border-border/40">
+              {/* Featured Toggle */}
+              <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
+                <div className="space-y-0.5">
+                  <Label className="font-medium cursor-pointer">Featured Category</Label>
+                  <p className="text-xs text-muted-foreground">Highlight on homepage</p>
+                </div>
+                <Switch
+                  checked={formData.is_featured}
+                  onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, is_featured: checked }))}
+                />
               </div>
-              <Switch
-                checked={formData.is_featured}
-                onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, is_featured: checked }))}
-              />
-            </div>
 
-            {/* Sort Order */}
-            <div className="space-y-2">
-              <Label htmlFor="sort_order">Display Order</Label>
-              <Input
-                id="sort_order"
-                type="number"
-                value={formData.sort_order}
-                onChange={(e) => setFormData((prev) => ({ ...prev, sort_order: Number.parseInt(e.target.value) || 0 }))}
-                min={0}
-              />
-              <p className="text-xs text-muted-foreground">
-                Lower numbers appear first. Categories with the same order are sorted alphabetically.
-              </p>
+              {/* Sort Order */}
+              <div className="space-y-2">
+                <Label htmlFor="sort_order" className="font-medium">Display Order</Label>
+                <Input
+                  id="sort_order"
+                  type="number"
+                  value={formData.sort_order}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, sort_order: Number.parseInt(e.target.value) || 0 }))}
+                  min={0}
+                  className="h-10 rounded-lg bg-muted/50 border-border hover:bg-muted focus:bg-background focus:border-primary transition-colors"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Lower numbers appear first
+                </p>
+              </div>
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
+          {/* Footer */}
+          <div className="sticky bottom-0 border-t border-border/40 bg-background/95 backdrop-blur-sm px-6 py-4 flex items-center justify-between gap-3">
+            <Button 
+              variant="ghost" 
+              onClick={() => setIsDialogOpen(false)}
+              className="h-10 rounded-lg"
+            >
               Cancel
             </Button>
-            <Button onClick={handleSave} disabled={saving || !formData.name || !formData.image_url} className="gap-2">
+            <Button 
+              onClick={handleSave} 
+              disabled={saving || !formData.name || !formData.image_url}
+              className="h-10 rounded-lg gap-2 px-6"
+            >
               {saving ? (
                 <>
                   <Loader className="h-4 w-4 animate-spin" />
-                  Saving...
+                  <span className="hidden sm:inline">Saving...</span>
                 </>
               ) : (
                 <>
                   <Save className="h-4 w-4" />
-                  {editingCategory ? "Update" : "Create"} Category
+                  <span className="hidden sm:inline">{editingCategory ? "Update" : "Create"} Category</span>
+                  <span className="sm:hidden">{editingCategory ? "Update" : "Create"}</span>
                 </>
               )}
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Category</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete "{categoryToDelete?.name}"? This action cannot be undone.
+        <AlertDialogContent className="max-w-sm rounded-2xl">
+          <AlertDialogHeader className="space-y-3">
+            <div className="flex items-center justify-center h-12 w-12 rounded-full bg-destructive/10 mx-auto">
+              <Trash2 className="h-6 w-6 text-destructive" />
+            </div>
+            <AlertDialogTitle className="text-center text-xl">Delete Category?</AlertDialogTitle>
+            <AlertDialogDescription className="text-center">
+              Are you sure you want to delete "<strong>{categoryToDelete?.name}</strong>"? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogFooter className="flex-col-reverse gap-2 sm:flex-row">
+            <AlertDialogCancel className="h-10 rounded-lg">Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="h-10 rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
               Delete
             </AlertDialogAction>
           </AlertDialogFooter>
