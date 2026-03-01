@@ -10,7 +10,6 @@ import { AlertCircle, Palette, Settings, RotateCcw, Check, LinkIcon, Mail, MapPi
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FooterWithSettings } from '@/components/layout/footer-with-settings'
-import { Loader } from '@/components/ui/loader'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
 
@@ -239,7 +238,7 @@ export default function FooterAdminPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <Loader size="lg" />
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"></div>
       </div>
     )
   }
