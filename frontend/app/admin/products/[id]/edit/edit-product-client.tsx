@@ -41,30 +41,36 @@ const isValidProductId = (productId: string): boolean => {
 }
 
 // Client component that receives the unwrapped productId as a prop
-export function EditProductClient({ productId }: { productId: string }) {
+export function EditProductClient({ 
+  productId,
+  initialProduct,
+  initialCategories = [],
+  initialBrands = [],
+  initialImages = [],
+}: { 
+  productId: string
+  initialProduct?: any
+  initialCategories?: any[]
+  initialBrands?: any[]
+  initialImages?: any[]
+}) {
   const router = useRouter()
   const { isAuthenticated, isLoading: authLoading, logout, refreshAccessToken, getToken } = useAdminAuth()
 
-  const [isLoading, setIsLoading] = useState(true)
-  // Replace these state variables:
-  // const [product, setProduct] = useState<Product | null>(null)
-  // const [categories, setCategories] = useState<any[]>([])
-  // const [brands, setBrands] = useState<any[]>([])
-  // const [isLoadingCategories, setIsLoadingCategories] = useState(true)
-  // const [isLoadingBrands, setIsLoadingBrands] = useState(true)
-
-  // With SWR hooks:
-  const { product, isLoading: isLoadingProduct, isError: productError, mutate: mutateProduct } = useProduct(productId)
+  const [isLoading, setIsLoading] = useState(!initialProduct || initialCategories.length === 0 || initialBrands.length === 0)
+  // Use SWR with initial data from SSR
+  const { product, isLoading: isLoadingProduct, isError: productError, mutate: mutateProduct } = useProduct(productId, { fallbackData: initialProduct })
   const { images: productImages, mutate: mutateImages } = useProductImages(
     isValidProductId(productId) ? productId : undefined,
+    { fallbackData: initialImages }
   )
   const {
     categories,
     isLoading: isLoadingCategories,
     isError: categoriesError,
     mutate: mutateCategories,
-  } = useCategories()
-  const { brands, isLoading: isLoadingBrands, isError: brandsError } = useBrands()
+  } = useCategories({ fallbackData: initialCategories })
+  const { brands, isLoading: isLoadingBrands, isError: brandsError } = useBrands({ fallbackData: initialBrands })
   const [activeTab, setActiveTab] = useState("basic")
   const [unsavedChangesDialog, setUnsavedChangesDialog] = useState(false)
   const [navigateTo, setNavigateTo] = useState("")
