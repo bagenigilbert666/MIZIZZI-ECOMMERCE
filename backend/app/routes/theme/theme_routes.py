@@ -350,18 +350,6 @@ def update_theme(theme_id):
         # Handle colors - be defensive and check for nested keys
         colors = data.get('colors', {})
         
-        # Only validate if colors data is provided
-        if colors:
-            from ...validations.color_validator import ColorValidator
-            color_validator = ColorValidator(colors)
-            
-            if not color_validator.is_valid():
-                return jsonify({
-                    'success': False,
-                    'message': 'Invalid color values',
-                    'errors': color_validator.get_errors()
-                }), 400
-        
         # Safely update color properties with nested checks
         if 'primary' in colors and isinstance(colors['primary'], dict):
             if 'main' in colors['primary']:
