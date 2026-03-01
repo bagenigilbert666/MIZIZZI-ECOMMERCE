@@ -35,11 +35,6 @@ class WebSocketService {
     }
   }
 
-  // Public method to check if WebSocket is connected
-  public getIsConnected(): boolean {
-    return this.isConnected
-  }
-
   // Connect to the WebSocket server
   public connect(): Promise<boolean> {
     return new Promise((resolve) => {
