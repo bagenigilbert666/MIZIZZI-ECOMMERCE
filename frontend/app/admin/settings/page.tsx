@@ -1,12 +1,11 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { RefreshCw, Save, Search, AlertCircle, Download, Upload, RotateCcw, History } from 'lucide-react'
+import { RefreshCw, Save, Search, AlertCircle, Download, RotateCcw, History } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/hooks/use-toast'
 import { adminService } from '@/services/admin'
-import { SettingCard, SettingSection } from '@/components/admin/settings'
 
 interface AllSettings {
   site?: any
@@ -323,19 +322,18 @@ export default function CompleteSettingsPage() {
             {/* Settings Grid */}
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
               {filteredCategories.map((category) => (
-                <SettingCard
+                <div
                   key={category.id}
-                  title={category.label}
-                  icon={category.icon}
-                  description={`Manage ${category.label.toLowerCase()} settings`}
                   onClick={() => {
-                    // Scroll to section
                     const element = document.getElementById(`section-${category.id}`)
                     element?.scrollIntoView({ behavior: 'smooth' })
                   }}
-                  hasChanges={hasChanges}
-                  className={category.color}
-                />
+                  className={`${category.color} cursor-pointer p-4 rounded-lg border border-border hover:shadow-md transition-shadow`}
+                >
+                  <div className="text-3xl mb-2">{category.icon}</div>
+                  <h3 className="font-semibold text-foreground">{category.label}</h3>
+                  <p className="text-sm text-muted-foreground mt-1">Manage {category.label.toLowerCase()} settings</p>
+                </div>
               ))}
             </div>
 
