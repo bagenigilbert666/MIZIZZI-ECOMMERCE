@@ -7,9 +7,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter, DialogBody } from "@/components/ui/dialog"
 import { useToast } from "@/hooks/use-toast"
-import { Loader, ImageIcon, Upload, Save, X, ChevronLeft } from "lucide-react"
+import { Loader, ImageIcon, Upload, Save, X } from "lucide-react"
 import Image from "next/image"
 import { websocketService } from "@/services/websocket"
 import { useSWRConfig } from "swr"
@@ -53,46 +53,46 @@ export function CategoryFormDialog({
 }: CategoryFormDialogProps) {
   const { toast } = useToast()
   const { mutate } = useSWRConfig()
-  const [saving, setSaving] = useState(false)
-  const [uploadingImage, setUploadingImage] = useState(false)
-  const [activeTab, setActiveTab] = useState<"basic" | "media" | "settings">("media")
-
   const imageInputRef = useRef<HTMLInputElement>(null)
   const bannerInputRef = useRef<HTMLInputElement>(null)
 
   const [formData, setFormData] = useState({
-    name: editingCategory?.name || "",
-    slug: editingCategory?.slug || "",
-    description: editingCategory?.description || "",
-    image_url: editingCategory?.image_url || "",
-    banner_url: editingCategory?.banner_url || "",
-    is_featured: editingCategory?.is_featured || false,
-    sort_order: editingCategory?.sort_order || 0,
+    name: "",
+    slug: "",
+    description: "",
+    image_url: "",
+    banner_url: "",
+    is_featured: false,
+    sort_order: 0,
   })
 
+  const [saving, setSaving] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState(false)
+
+  // Reset form when dialog opens/closes
   useEffect(() => {
-    if (open && editingCategory) {
-      setFormData({
-        name: editingCategory.name,
-        slug: editingCategory.slug,
-        description: editingCategory.description || "",
-        image_url: editingCategory.image_url || "",
-        banner_url: editingCategory.banner_url || "",
-        is_featured: editingCategory.is_featured,
-        sort_order: editingCategory.sort_order,
-      })
-      setActiveTab("media")
-    } else if (open) {
-      setFormData({
-        name: "",
-        slug: "",
-        description: "",
-        image_url: "",
-        banner_url: "",
-        is_featured: false,
-        sort_order: 0,
-      })
-      setActiveTab("media")
+    if (open) {
+      if (editingCategory) {
+        setFormData({
+          name: editingCategory.name,
+          slug: editingCategory.slug,
+          description: editingCategory.description || "",
+          image_url: editingCategory.image_url || "",
+          banner_url: editingCategory.banner_url || "",
+          is_featured: editingCategory.is_featured,
+          sort_order: editingCategory.sort_order,
+        })
+      } else {
+        setFormData({
+          name: "",
+          slug: "",
+          description: "",
+          image_url: "",
+          banner_url: "",
+          is_featured: false,
+          sort_order: 0,
+        })
+      }
     }
   }, [open, editingCategory])
 
@@ -151,7 +151,7 @@ export function CategoryFormDialog({
     if (!formData.name || !formData.image_url) {
       toast({
         title: "Validation Error",
-        description: "Please fill in all required fields (name and image)",
+        description: "Please fill in all required fields",
         variant: "destructive",
       })
       return
@@ -216,252 +216,280 @@ export function CategoryFormDialog({
     }
   }
 
-  const tabs = [
-    { id: "media", label: "Media" },
-    { id: "basic", label: "Details" },
-    { id: "settings", label: "Settings" },
-  ] as const
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] p-0 gap-0 overflow-hidden">
+      <DialogContent>
         {/* Header */}
-        <div className="flex items-center justify-between border-b bg-background px-4 sm:px-6 py-4">
-          <div className="flex-1">
-            <DialogTitle className="text-xl sm:text-2xl font-bold">
-              {editingCategory ? "Edit Category" : "Create Category"}
-            </DialogTitle>
-            <DialogDescription className="text-xs sm:text-sm mt-1">
-              {editingCategory ? "Update category details" : "Add a new product category"}
-            </DialogDescription>
-          </div>
-          <button
-            onClick={() => onOpenChange(false)}
-            className="ml-2 p-1 hover:bg-muted rounded-lg transition-colors"
-          >
-            <X className="h-5 w-5" />
-          </button>
-        </div>
+        <DialogHeader>
+          <DialogTitle>{editingCategory ? "Edit Category" : "Create New Category"}</DialogTitle>
+          <DialogDescription>
+            {editingCategory
+              ? "Update your category details and visibility settings"
+              : "Set up a new category for your store with all necessary details"}
+          </DialogDescription>
+        </DialogHeader>
 
-        {/* Tab Navigation */}
-        <div className="flex border-b bg-muted/30 px-4 sm:px-6 gap-0 overflow-x-auto">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition-all ${
-                activeTab === tab.id
-                  ? "border-primary text-primary"
-                  : "border-transparent text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Content */}
-        <div className="overflow-y-auto flex-1 px-4 sm:px-6 py-6">
-          {/* MEDIA TAB */}
-          {activeTab === "media" && (
-            <div className="space-y-6 max-w-2xl">
-              <div>
-                <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
-                  <div className="h-1 w-1 rounded-full bg-primary" />
-                  Category Image <span className="text-destructive">*</span>
+        {/* Body - Scrollable content */}
+        <DialogBody>
+          <div className="space-y-6 sm:space-y-7">
+            {/* Image Upload Section */}
+            <div className="space-y-3 sm:space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-blue-600" />
+                <h3 className="text-xs sm:text-sm font-bold text-gray-900 uppercase tracking-widest">
+                  Product Images
                 </h3>
-                <div className="space-y-3">
-                  <div className="relative rounded-xl overflow-hidden bg-gradient-to-br from-muted via-muted to-muted/60 border-2 border-border/50 hover:border-border transition-colors group h-48 sm:h-64">
-                    <Image
-                      src={getValidImageUrl(formData.image_url)}
-                      alt="Category preview"
-                      fill
-                      className="object-cover group-hover:opacity-80 transition-opacity"
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-5">
+                {/* Main Category Image */}
+                <div className="space-y-2 sm:space-y-3">
+                  <Label className="text-sm font-semibold text-gray-900">
+                    Category Image <span className="text-red-500">*</span>
+                  </Label>
+
+                  <div className="relative rounded-xl overflow-hidden bg-gray-50 border-2 border-dashed border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all duration-200 h-32 sm:h-40 group cursor-pointer">
+                    <input
+                      ref={imageInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) handleImageUpload(file, "image_url")
+                      }}
                     />
-                    {!formData.image_url && (
-                      <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/5">
-                        <ImageIcon className="h-12 w-12 text-muted-foreground/40 mb-2" />
-                        <p className="text-xs text-muted-foreground">No image selected</p>
-                      </div>
-                    )}
-                  </div>
-                  <input
-                    ref={imageInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) handleImageUpload(file, "image_url")
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => imageInputRef.current?.click()}
-                    disabled={uploadingImage}
-                    className="w-full h-10 rounded-lg font-medium text-sm gap-2"
-                  >
-                    {uploadingImage ? (
+
+                    {formData.image_url ? (
                       <>
-                        <Loader className="h-4 w-4 animate-spin" />
-                        Uploading...
+                        <Image
+                          src={getValidImageUrl(formData.image_url)}
+                          alt="Category preview"
+                          fill
+                          className="object-cover group-hover:opacity-80 transition-opacity"
+                        />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                          <button
+                            onClick={() => imageInputRef.current?.click()}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <div className="bg-white rounded-full p-2 shadow-lg">
+                              <Upload className="h-5 w-5 text-blue-600" />
+                            </div>
+                          </button>
+                        </div>
                       </>
                     ) : (
-                      <>
-                        <Upload className="h-4 w-4" />
-                        {formData.image_url ? "Change Image" : "Upload Image"}
-                      </>
+                      <button
+                        onClick={() => imageInputRef.current?.click()}
+                        className="w-full h-full flex flex-col items-center justify-center gap-2 group"
+                      >
+                        <ImageIcon className="h-8 w-8 sm:h-10 sm:w-10 text-gray-400 group-hover:text-blue-500 transition-colors" />
+                        <span className="text-xs sm:text-sm font-medium text-gray-600 group-hover:text-blue-600">
+                          {uploadingImage ? "Uploading..." : "Click to upload"}
+                        </span>
+                      </button>
                     )}
-                  </Button>
-                </div>
-              </div>
-
-              <div className="pt-4 border-t">
-                <h3 className="text-sm font-semibold mb-4 flex items-center gap-2">
-                  <div className="h-1 w-1 rounded-full bg-primary" />
-                  Banner Image <span className="text-muted-foreground">(Optional)</span>
-                </h3>
-                <div className="space-y-3">
-                  <div className="relative rounded-xl overflow-hidden bg-muted border-2 border-border/40 hover:border-border/60 transition-colors h-32 sm:h-40">
-                    <Image
-                      src={getValidImageUrl(formData.banner_url)}
-                      alt="Banner preview"
-                      fill
-                      className="object-cover"
-                    />
                   </div>
-                  <input
-                    ref={bannerInputRef}
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
-                      if (file) handleImageUpload(file, "banner_url")
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => bannerInputRef.current?.click()}
-                    disabled={uploadingImage}
-                    className="w-full h-10 rounded-lg font-medium text-sm gap-2"
-                  >
-                    {uploadingImage ? "Uploading..." : (formData.banner_url ? "Change Banner" : "Add Banner")}
-                  </Button>
+
+                  <p className="text-xs text-gray-500">JPG, PNG or GIF (max 5MB)</p>
+                </div>
+
+                {/* Banner Image */}
+                <div className="space-y-2 sm:space-y-3">
+                  <Label className="text-sm font-semibold text-gray-900">
+                    Banner <span className="text-gray-400 text-xs font-normal">(Optional)</span>
+                  </Label>
+
+                  <div className="relative rounded-xl overflow-hidden bg-gray-50 border-2 border-dashed border-gray-200 hover:border-blue-300 hover:bg-blue-50 transition-all duration-200 h-32 sm:h-40 group cursor-pointer">
+                    <input
+                      ref={bannerInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) handleImageUpload(file, "banner_url")
+                      }}
+                    />
+
+                    {formData.banner_url ? (
+                      <>
+                        <Image
+                          src={getValidImageUrl(formData.banner_url)}
+                          alt="Banner preview"
+                          fill
+                          className="object-cover group-hover:opacity-80 transition-opacity"
+                        />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                          <button
+                            onClick={() => bannerInputRef.current?.click()}
+                            className="opacity-0 group-hover:opacity-100 transition-opacity"
+                          >
+                            <div className="bg-white rounded-full p-2 shadow-lg">
+                              <Upload className="h-5 w-5 text-blue-600" />
+                            </div>
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => bannerInputRef.current?.click()}
+                        className="w-full h-full flex flex-col items-center justify-center gap-2 group"
+                      >
+                        <ImageIcon className="h-8 w-8 sm:h-10 sm:w-10 text-gray-400 group-hover:text-blue-500 transition-colors" />
+                        <span className="text-xs sm:text-sm font-medium text-gray-600 group-hover:text-blue-600">
+                          Click to upload
+                        </span>
+                      </button>
+                    )}
+                  </div>
+
+                  <p className="text-xs text-gray-500">JPG, PNG or GIF (max 5MB)</p>
                 </div>
               </div>
             </div>
-          )}
 
-          {/* DETAILS TAB */}
-          {activeTab === "basic" && (
-            <div className="space-y-5 max-w-2xl">
-              <div className="space-y-2">
-                <Label htmlFor="name" className="text-sm font-semibold">
-                  Category Name <span className="text-destructive">*</span>
-                </Label>
-                <Input
-                  id="name"
-                  value={formData.name}
-                  onChange={(e) => handleNameChange(e.target.value)}
-                  placeholder="e.g., Electronics"
-                  className="h-10 rounded-lg text-sm border-border/50 focus:border-primary"
-                />
+            {/* Divider */}
+            <div className="h-px bg-gray-100" />
+
+            {/* Basic Information Section */}
+            <div className="space-y-3 sm:space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-blue-600" />
+                <h3 className="text-xs sm:text-sm font-bold text-gray-900 uppercase tracking-widest">
+                  Basic Information
+                </h3>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="slug" className="text-sm font-semibold">
-                  URL Slug
-                </Label>
-                <Input
-                  id="slug"
-                  value={formData.slug}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, slug: e.target.value }))}
-                  placeholder="e.g., electronics"
-                  className="h-10 rounded-lg text-sm font-mono text-xs border-border/50 focus:border-primary"
-                />
-                <p className="text-xs text-muted-foreground">Auto-generated from category name</p>
-              </div>
+              <div className="space-y-3 sm:space-y-4">
+                {/* Category Name */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="name" className="text-sm font-semibold text-gray-900">
+                    Category Name <span className="text-red-500">*</span>
+                  </Label>
+                  <Input
+                    id="name"
+                    value={formData.name}
+                    onChange={(e) => handleNameChange(e.target.value)}
+                    placeholder="e.g., Electronics"
+                    className="h-10 sm:h-11 rounded-lg text-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                  />
+                </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="description" className="text-sm font-semibold">
-                  Description
-                </Label>
-                <Textarea
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-                  placeholder="Describe this category..."
-                  rows={4}
-                  className="rounded-lg text-sm border-border/50 focus:border-primary resize-none"
-                />
+                {/* URL Slug */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="slug" className="text-sm font-semibold text-gray-900">
+                    URL Slug
+                  </Label>
+                  <Input
+                    id="slug"
+                    value={formData.slug}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, slug: e.target.value }))}
+                    placeholder="e.g., electronics"
+                    className="h-10 sm:h-11 rounded-lg text-sm font-mono text-xs border-gray-200 focus:border-blue-500 focus:ring-blue-500"
+                  />
+                </div>
+
+                {/* Description */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="description" className="text-sm font-semibold text-gray-900">
+                    Description
+                  </Label>
+                  <Textarea
+                    id="description"
+                    value={formData.description}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+                    placeholder="Describe this category..."
+                    rows={3}
+                    className="rounded-lg text-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500 resize-none"
+                  />
+                </div>
               </div>
             </div>
-          )}
 
-          {/* SETTINGS TAB */}
-          {activeTab === "settings" && (
-            <div className="space-y-4 max-w-2xl">
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-4 rounded-xl border border-border/40 hover:border-border/60 transition-colors bg-muted/30">
-                  <div className="space-y-1">
-                    <p className="text-sm font-semibold">Featured Category</p>
-                    <p className="text-xs text-muted-foreground">Show on homepage</p>
+            {/* Divider */}
+            <div className="h-px bg-gray-100" />
+
+            {/* Display Settings Section */}
+            <div className="space-y-3 sm:space-y-4">
+              <div className="flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-blue-600" />
+                <h3 className="text-xs sm:text-sm font-bold text-gray-900 uppercase tracking-widest">
+                  Display Settings
+                </h3>
+              </div>
+
+              <div className="space-y-3 sm:space-y-4">
+                {/* Featured Toggle */}
+                <div className="flex items-center justify-between p-3 sm:p-4 rounded-lg bg-gray-50 border border-gray-200 hover:bg-gray-100 transition-colors">
+                  <div className="space-y-0.5">
+                    <Label className="text-sm font-semibold text-gray-900 cursor-pointer">
+                      Featured Category
+                    </Label>
+                    <p className="text-xs text-gray-500">Display on homepage</p>
                   </div>
                   <Switch
                     checked={formData.is_featured}
-                    onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, is_featured: checked }))}
+                    onCheckedChange={(checked) =>
+                      setFormData((prev) => ({ ...prev, is_featured: checked }))
+                    }
                   />
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="sort_order" className="text-sm font-semibold">
+                {/* Sort Order */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="sort_order" className="text-sm font-semibold text-gray-900">
                     Display Order
                   </Label>
                   <Input
                     id="sort_order"
                     type="number"
                     value={formData.sort_order}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, sort_order: Number.parseInt(e.target.value) || 0 }))}
+                    onChange={(e) =>
+                      setFormData((prev) => ({
+                        ...prev,
+                        sort_order: Number.parseInt(e.target.value) || 0,
+                      }))
+                    }
                     min={0}
-                    className="h-10 rounded-lg text-sm border-border/50 focus:border-primary"
+                    className="h-10 sm:h-11 rounded-lg text-sm border-gray-200 focus:border-blue-500 focus:ring-blue-500"
                   />
-                  <p className="text-xs text-muted-foreground">Lower numbers appear first</p>
                 </div>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        </DialogBody>
 
         {/* Footer */}
-        <div className="flex items-center justify-between gap-3 border-t bg-muted/20 px-4 sm:px-6 py-4">
+        <DialogFooter>
           <Button
+            type="button"
             variant="outline"
             onClick={() => onOpenChange(false)}
-            className="h-10 px-6 rounded-lg font-medium text-sm"
+            disabled={saving}
+            className="h-10 sm:h-11 px-4 sm:px-6 rounded-lg font-medium text-sm border-gray-200 hover:bg-gray-50"
           >
             Cancel
           </Button>
           <Button
             onClick={handleSave}
             disabled={saving || !formData.name || !formData.image_url}
-            className="h-10 px-6 rounded-lg font-medium text-sm gap-2 bg-primary hover:bg-primary/90"
+            className="h-10 sm:h-11 px-4 sm:px-6 rounded-lg font-medium text-sm bg-blue-600 hover:bg-blue-700 text-white gap-2"
           >
             {saving ? (
               <>
                 <Loader className="h-4 w-4 animate-spin" />
-                Saving...
+                <span className="hidden sm:inline">Saving...</span>
               </>
             ) : (
               <>
                 <Save className="h-4 w-4" />
-                {editingCategory ? "Update Category" : "Create Category"}
+                <span>{editingCategory ? "Update" : "Create"}</span>
               </>
             )}
           </Button>
-        </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
