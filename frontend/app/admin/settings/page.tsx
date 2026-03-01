@@ -6,8 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/hooks/use-toast'
 import { adminService } from '@/services/admin'
-import SettingCard from '@/components/admin/settings/setting-card'
-import { SettingSection } from '@/components/admin/settings'
+import { SettingCard, SettingSection } from '@/components/admin/settings'
 
 interface AllSettings {
   site?: any
