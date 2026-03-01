@@ -555,25 +555,25 @@ export default function ShopCategoriesAdminPage() {
 
       {/* Create/Edit Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="w-full max-w-4xl max-h-[95vh] flex flex-col p-0 gap-0 rounded-2xl border-border/50">
+        <DialogContent className="w-full max-w-4xl max-h-[90vh] flex flex-col p-0 gap-0 rounded-2xl border-border/50 overflow-hidden">
           {/* Header */}
-          <div className="flex-shrink-0 border-b border-border/40 px-8 py-6 bg-background">
-            <DialogTitle className="text-3xl font-bold tracking-tight">
+          <div className="flex-shrink-0 border-b border-border/40 px-6 sm:px-8 py-5 bg-background">
+            <DialogTitle className="text-2xl sm:text-3xl font-bold tracking-tight">
               {editingCategory ? "Edit Category" : "Create New Category"}
             </DialogTitle>
-            <DialogDescription className="mt-2 text-sm text-muted-foreground">
+            <DialogDescription className="mt-1.5 text-xs sm:text-sm text-muted-foreground">
               {editingCategory ? "Update category details and manage visibility" : "Set up a new category with image, name, and display settings"}
             </DialogDescription>
           </div>
 
-          {/* Content - Two Column Layout */}
-          <div className="overflow-y-auto flex-1">
-            <div className="grid grid-cols-1 lg:grid-cols-5 gap-8 p-8">
+          {/* Content - Two Column Layout with Proper Scrolling */}
+          <div className="overflow-y-auto flex-1 min-h-0">
+            <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 p-6 sm:p-8">
               {/* Left Column - Image (Takes 2 columns on large screens) */}
-              <div className="lg:col-span-2 space-y-4">
+              <div className="lg:col-span-2 space-y-3">
                 <div className="space-y-2">
-                  <Label className="text-sm font-semibold block">Category Image *</Label>
-                  <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-muted to-muted/50 border border-border/50 aspect-square">
+                  <Label className="text-xs sm:text-sm font-semibold block">Category Image *</Label>
+                  <div className="relative rounded-xl overflow-hidden bg-gradient-to-br from-muted to-muted/50 border border-border/50 h-40 sm:h-48">
                     <Image
                       src={getValidImageUrl(formData.image_url)}
                       alt="Preview"
@@ -582,7 +582,7 @@ export default function ShopCategoriesAdminPage() {
                     />
                     {!formData.image_url && (
                       <div className="absolute inset-0 flex items-center justify-center bg-black/20">
-                        <ImageIcon className="h-12 w-12 text-muted-foreground/40" />
+                        <ImageIcon className="h-8 w-8 sm:h-12 sm:w-12 text-muted-foreground/40" />
                       </div>
                     )}
                   </div>
@@ -604,25 +604,26 @@ export default function ShopCategoriesAdminPage() {
                   variant="outline"
                   onClick={() => imageInputRef.current?.click()}
                   disabled={uploadingImage}
-                  className="w-full h-11 rounded-xl font-medium"
+                  size="sm"
+                  className="w-full h-10 rounded-lg text-xs sm:text-sm"
                 >
                   {uploadingImage ? (
                     <>
-                      <Loader className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader className="h-3.5 w-3.5 mr-2 animate-spin" />
                       Uploading...
                     </>
                   ) : (
                     <>
-                      <Upload className="h-4 w-4 mr-2" />
+                      <Upload className="h-3.5 w-3.5 mr-2" />
                       {formData.image_url ? "Change Image" : "Upload Image"}
                     </>
                   )}
                 </Button>
 
                 {/* Banner Image - Secondary */}
-                <div className="pt-4 border-t border-border/40">
-                  <Label className="text-sm font-medium block mb-2">Banner Image</Label>
-                  <div className="relative rounded-xl overflow-hidden bg-muted border border-border/50 h-32 mb-3">
+                <div className="pt-3 border-t border-border/40">
+                  <Label className="text-xs sm:text-sm font-medium block mb-2">Banner (Optional)</Label>
+                  <div className="relative rounded-lg overflow-hidden bg-muted border border-border/50 h-20 mb-2">
                     <Image
                       src={getValidImageUrl(formData.banner_url)}
                       alt="Banner"
@@ -654,53 +655,52 @@ export default function ShopCategoriesAdminPage() {
               </div>
 
               {/* Right Column - Form Fields (Takes 3 columns on large screens) */}
-              <div className="lg:col-span-3 space-y-5">
+              <div className="lg:col-span-3 space-y-4">
                 {/* Name */}
-                <div className="space-y-2">
-                  <Label htmlFor="name" className="text-sm font-semibold">Category Name *</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="name" className="text-xs sm:text-sm font-semibold">Category Name *</Label>
                   <Input
                     id="name"
                     value={formData.name}
                     onChange={(e) => handleNameChange(e.target.value)}
-                    placeholder="e.g., Electronics, Fashion, Home & Living"
-                    className="h-11 rounded-xl text-base"
+                    placeholder="e.g., Electronics, Fashion"
+                    className="h-9 sm:h-10 rounded-lg text-sm"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">Give your category a clear, descriptive name</p>
+                  <p className="text-xs text-muted-foreground">Clear, descriptive name</p>
                 </div>
 
                 {/* Slug */}
-                <div className="space-y-2">
-                  <Label htmlFor="slug" className="text-sm font-semibold">URL Slug</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="slug" className="text-xs sm:text-sm font-semibold">URL Slug</Label>
                   <Input
                     id="slug"
                     value={formData.slug}
                     onChange={(e) => setFormData((prev) => ({ ...prev, slug: e.target.value }))}
-                    placeholder="e.g., electronics, fashion"
-                    className="h-11 rounded-xl text-base font-mono text-sm"
+                    placeholder="e.g., electronics"
+                    className="h-9 sm:h-10 rounded-lg text-sm font-mono"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">Used in URLs and SEO</p>
+                  <p className="text-xs text-muted-foreground">Used in URLs and SEO</p>
                 </div>
 
                 {/* Description */}
-                <div className="space-y-2">
-                  <Label htmlFor="description" className="text-sm font-semibold">Description</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="description" className="text-xs sm:text-sm font-semibold">Description</Label>
                   <Textarea
                     id="description"
                     value={formData.description}
                     onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-                    placeholder="Brief description about this category"
-                    rows={3}
-                    className="rounded-xl text-sm resize-none"
+                    placeholder="Brief category description"
+                    rows={2}
+                    className="rounded-lg text-sm resize-none"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">Keep it concise and informative</p>
                 </div>
 
                 {/* Featured Toggle */}
-                <div className="pt-2 border-t border-border/40">
-                  <div className="flex items-center justify-between p-4 rounded-xl bg-muted/30 hover:bg-muted/50 transition-colors">
+                <div className="pt-1 border-t border-border/40">
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors">
                     <div className="space-y-0.5">
-                      <Label className="text-sm font-semibold cursor-pointer">Featured Category</Label>
-                      <p className="text-xs text-muted-foreground">Showcase on homepage</p>
+                      <Label className="text-xs sm:text-sm font-semibold cursor-pointer">Featured</Label>
+                      <p className="text-xs text-muted-foreground">Show on homepage</p>
                     </div>
                     <Switch
                       checked={formData.is_featured}
@@ -710,45 +710,48 @@ export default function ShopCategoriesAdminPage() {
                 </div>
 
                 {/* Sort Order */}
-                <div className="space-y-2">
-                  <Label htmlFor="sort_order" className="text-sm font-semibold">Display Order</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="sort_order" className="text-xs sm:text-sm font-semibold">Display Order</Label>
                   <Input
                     id="sort_order"
                     type="number"
                     value={formData.sort_order}
                     onChange={(e) => setFormData((prev) => ({ ...prev, sort_order: Number.parseInt(e.target.value) || 0 }))}
                     min={0}
-                    className="h-11 rounded-xl text-base"
+                    className="h-9 sm:h-10 rounded-lg text-sm"
                   />
-                  <p className="text-xs text-muted-foreground mt-1">Lower numbers appear first on the homepage</p>
+                  <p className="text-xs text-muted-foreground">Lower numbers appear first</p>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Footer */}
-          <div className="flex-shrink-0 border-t border-border/40 bg-background px-8 py-5 flex items-center justify-end gap-3">
+          <div className="flex-shrink-0 border-t border-border/40 bg-background px-6 sm:px-8 py-4 flex items-center justify-end gap-2 sm:gap-3">
             <Button
               variant="outline"
               onClick={() => setIsDialogOpen(false)}
-              className="h-11 rounded-xl px-6 font-medium"
+              size="sm"
+              className="h-9 sm:h-10 rounded-lg px-4 sm:px-6 text-xs sm:text-sm"
             >
               Cancel
             </Button>
             <Button
               onClick={handleSave}
               disabled={saving || !formData.name || !formData.image_url}
-              className="h-11 rounded-xl px-8 font-medium gap-2"
+              size="sm"
+              className="h-9 sm:h-10 rounded-lg px-4 sm:px-6 text-xs sm:text-sm font-medium gap-2"
             >
               {saving ? (
                 <>
-                  <Loader className="h-4 w-4 animate-spin" />
-                  Saving...
+                  <Loader className="h-3.5 w-3.5 animate-spin" />
+                  <span className="hidden sm:inline">Saving...</span>
                 </>
               ) : (
                 <>
-                  <Save className="h-4 w-4" />
-                  {editingCategory ? "Update Category" : "Create Category"}
+                  <Save className="h-3.5 w-3.5" />
+                  <span className="hidden sm:inline">{editingCategory ? "Update" : "Create"}</span>
+                  <span className="sm:hidden">{editingCategory ? "Save" : "Add"}</span>
                 </>
               )}
             </Button>
@@ -759,22 +762,22 @@ export default function ShopCategoriesAdminPage() {
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <AlertDialogContent className="max-w-sm rounded-2xl border-border/50">
-          <AlertDialogHeader className="space-y-4">
-            <div className="flex justify-center mb-2">
-              <div className="h-16 w-16 rounded-full bg-destructive/10 flex items-center justify-center animate-pulse">
-                <Trash2 className="h-8 w-8 text-destructive" />
+          <AlertDialogHeader className="space-y-3">
+            <div className="flex justify-center mb-1">
+              <div className="h-12 w-12 rounded-full bg-destructive/10 flex items-center justify-center">
+                <Trash2 className="h-6 w-6 text-destructive" />
               </div>
             </div>
-            <AlertDialogTitle className="text-center text-2xl">Delete Category?</AlertDialogTitle>
+            <AlertDialogTitle className="text-center text-lg">Delete Category?</AlertDialogTitle>
             <AlertDialogDescription className="text-center text-sm">
-              You're about to delete <span className="font-semibold text-foreground">"{categoryToDelete?.name}"</span>. This action cannot be undone.
+              You're about to delete <span className="font-semibold text-foreground">"{categoryToDelete?.name}"</span>. This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col-reverse gap-3 sm:flex-row">
-            <AlertDialogCancel className="h-11 rounded-xl font-medium">Keep It</AlertDialogCancel>
+          <AlertDialogFooter className="flex-col-reverse gap-2 sm:flex-row">
+            <AlertDialogCancel className="h-9 sm:h-10 rounded-lg text-xs sm:text-sm">Keep It</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleDelete}
-              className="h-11 rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90 font-medium"
+              className="h-9 sm:h-10 rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 text-xs sm:text-sm"
             >
               Delete
             </AlertDialogAction>
