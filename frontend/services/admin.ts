@@ -1820,6 +1820,173 @@ export const adminService = {
     }
   },
 
+  // Get notification settings
+  async getNotificationSettings(): Promise<any> {
+    try {
+      const response = await api.get("/api/admin/settings/notifications")
+      return response.data
+    } catch (error) {
+      console.error("Error fetching notification settings:", error)
+      throw error
+    }
+  },
+
+  // Update notification settings
+  async updateNotificationSettings(data: any): Promise<any> {
+    try {
+      const response = await api.put("/api/admin/settings/notifications", data)
+      return response.data
+    } catch (error) {
+      console.error("Error updating notification settings:", error)
+      throw error
+    }
+  },
+
+  // Get shipping settings
+  async getShippingSettings(): Promise<any> {
+    try {
+      const response = await api.get("/api/admin/settings/shipping")
+      return response.data
+    } catch (error) {
+      console.error("Error fetching shipping settings:", error)
+      throw error
+    }
+  },
+
+  // Update shipping settings
+  async updateShippingSettings(data: any): Promise<any> {
+    try {
+      const response = await api.put("/api/admin/settings/shipping", data)
+      return response.data
+    } catch (error) {
+      console.error("Error updating shipping settings:", error)
+      throw error
+    }
+  },
+
+  // Get tax settings
+  async getTaxSettings(): Promise<any> {
+    try {
+      const response = await api.get("/api/admin/settings/tax")
+      return response.data
+    } catch (error) {
+      console.error("Error fetching tax settings:", error)
+      throw error
+    }
+  },
+
+  // Update tax settings
+  async updateTaxSettings(data: any): Promise<any> {
+    try {
+      const response = await api.put("/api/admin/settings/tax", data)
+      return response.data
+    } catch (error) {
+      console.error("Error updating tax settings:", error)
+      throw error
+    }
+  },
+
+  // Get localization settings
+  async getLocalizationSettings(): Promise<any> {
+    try {
+      const response = await api.get("/api/admin/settings/localization")
+      return response.data
+    } catch (error) {
+      console.error("Error fetching localization settings:", error)
+      throw error
+    }
+  },
+
+  // Update localization settings
+  async updateLocalizationSettings(data: any): Promise<any> {
+    try {
+      const response = await api.put("/api/admin/settings/localization", data)
+      return response.data
+    } catch (error) {
+      console.error("Error updating localization settings:", error)
+      throw error
+    }
+  },
+
+  // Get advanced settings
+  async getAdvancedSettings(): Promise<any> {
+    try {
+      const response = await api.get("/api/admin/settings/advanced")
+      return response.data
+    } catch (error) {
+      console.error("Error fetching advanced settings:", error)
+      throw error
+    }
+  },
+
+  // Update advanced settings
+  async updateAdvancedSettings(data: any): Promise<any> {
+    try {
+      const response = await api.put("/api/admin/settings/advanced", data)
+      return response.data
+    } catch (error) {
+      console.error("Error updating advanced settings:", error)
+      throw error
+    }
+  },
+
+  // Get audit log
+  async getAuditLog(page: number = 1, limit: number = 50): Promise<any> {
+    try {
+      const response = await api.get(`/api/admin/settings/audit-log?page=${page}&limit=${limit}`)
+      return response.data
+    } catch (error) {
+      console.error("Error fetching audit log:", error)
+      throw error
+    }
+  },
+
+  // Get settings history
+  async getSettingsHistory(page: number = 1, limit: number = 50): Promise<any> {
+    try {
+      const response = await api.get(`/api/admin/settings/history?page=${page}&limit=${limit}`)
+      return response.data
+    } catch (error) {
+      console.error("Error fetching settings history:", error)
+      throw error
+    }
+  },
+
+  // Reset all settings
+  async resetSettings(confirm: boolean = false): Promise<any> {
+    try {
+      const response = await api.post("/api/admin/settings/reset", { confirm })
+      return response.data
+    } catch (error) {
+      console.error("Error resetting settings:", error)
+      throw error
+    }
+  },
+
+  // Export settings
+  async exportSettings(): Promise<any> {
+    try {
+      const response = await api.get("/api/admin/settings/export")
+      return response.data
+    } catch (error) {
+      console.error("Error exporting settings:", error)
+      throw error
+    }
+  },
+
+  // Import settings
+  async importSettings(file: File): Promise<any> {
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      const response = await api.post("/api/admin/settings/import", formData)
+      return response.data
+    } catch (error) {
+      console.error("Error importing settings:", error)
+      throw error
+    }
+  },
+
   // Update the activateUser and deactivateUser methods
   async activateUser(id: string): Promise<any> {
     try {
