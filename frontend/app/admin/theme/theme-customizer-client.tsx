@@ -51,9 +51,6 @@ export default function ThemeCustomizerClient({ initialTheme }: { initialTheme: 
   const [hexInput, setHexInput] = useState(initialTheme?.colors?.background?.main || "#FFFFFF")
   const { toast } = useToast()
   const { refreshTheme, applyTheme } = useTheme()
-  const [hexInput, setHexInput] = useState(initialTheme?.colors?.background?.main || "#FFFFFF")
-  const { toast } = useToast()
-  const { refreshTheme } = useTheme()
 
   const getAuthToken = () => {
     return localStorage.getItem("admin_token") || localStorage.getItem("token")
@@ -182,13 +179,16 @@ export default function ThemeCustomizerClient({ initialTheme }: { initialTheme: 
   }
 
   const resetChanges = () => {
-    if (activeTheme) {
-      const bg = activeTheme.colors.background?.main || "#FFFFFF"
-      setBackgroundColor(bg)
-      setHexInput(bg)
-      setIsPreviewMode(false)
-      setSelectedPalette(null)
-    }
+    // Reset to gold color as default
+    const goldColor = "#FFD700"
+    setBackgroundColor(goldColor)
+    setHexInput(goldColor)
+    setIsPreviewMode(false)
+    setSelectedPalette(null)
+    toast({
+      title: "Reset",
+      description: "Color reset to default gold",
+    })
   }
 
   return (
