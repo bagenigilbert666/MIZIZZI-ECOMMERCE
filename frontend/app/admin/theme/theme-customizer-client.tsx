@@ -50,6 +50,9 @@ export default function ThemeCustomizerClient({ initialTheme }: { initialTheme: 
   const [copiedHex, setCopiedHex] = useState(false)
   const [hexInput, setHexInput] = useState(initialTheme?.colors?.background?.main || "#FFFFFF")
   const { toast } = useToast()
+  const { refreshTheme, applyTheme } = useTheme()
+  const [hexInput, setHexInput] = useState(initialTheme?.colors?.background?.main || "#FFFFFF")
+  const { toast } = useToast()
   const { refreshTheme } = useTheme()
 
   const getAuthToken = () => {
