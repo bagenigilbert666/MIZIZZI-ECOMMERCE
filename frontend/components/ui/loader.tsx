@@ -7,7 +7,7 @@ interface LoaderProps {
   size?: "sm" | "md" | "lg"
   showLabel?: boolean
   label?: string
-  variant?: "dots" | "ring" | "pulse" | "bars" | "icon"
+  variant?: "dots" | "ring" | "pulse" | "bars" | "icon" | "apple"
 }
 
 /**
@@ -180,6 +180,51 @@ export function Loader({
     )
   }
 
+  if (variant === "apple") {
+    return (
+      <div className="flex flex-col items-center justify-center gap-4">
+        <div className={`relative ${sizeMap[size].container}`}>
+          {/* Apple-style curved spinner with dark cherry red */}
+          <svg
+            className={`${size === "sm" ? "h-8 w-8" : size === "lg" ? "h-16 w-16" : "h-12 w-12"} text-[#9a0a00]`}
+            viewBox="0 0 24 24"
+            fill="none"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            <style>{`
+              @keyframes appleSpinner {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+              }
+              .apple-spinner {
+                animation: appleSpinner 1s linear infinite;
+                transform-origin: 50% 50%;
+              }
+            `}</style>
+            <g className="apple-spinner" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none">
+              <path d="M 12 2 A 10 10 0 0 1 22 12" opacity="1" />
+              <path d="M 12 2 A 10 10 0 0 1 22 12" opacity="0.5" strokeDasharray="5" />
+              <path d="M 12 2 A 10 10 0 0 1 22 12" opacity="0.2" strokeDasharray="5" />
+            </g>
+          </svg>
+        </div>
+        {showLabel && (
+          <motion.p
+            className={`${text} font-medium text-muted-foreground text-center`}
+            animate={{ opacity: [0.6, 1, 0.6] }}
+            transition={{
+              duration: 1,
+              repeat: Number.POSITIVE_INFINITY,
+              ease: "easeInOut",
+            }}
+          >
+            {label}
+          </motion.p>
+        )}
+      </div>
+    )
+  }
+
   // Default: dots variant
   return (
     <div className="flex flex-col items-center justify-center gap-4">
@@ -276,7 +321,7 @@ export function LoaderCompact({
  */
 export function LoaderFullPage({ 
   label = "Loading...",
-  variant = "ring"
+  variant = "apple"
 }: Omit<LoaderProps, "size">) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/50 backdrop-blur-sm">
