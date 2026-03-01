@@ -92,10 +92,10 @@ interface ThemeContextType {
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 const THEME_STORAGE_KEY = "mizizzi_active_theme"
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
-  const [lastFetchedThemeId, setLastFetchedThemeId] = useState<number | null>(null)
+export function ThemeProvider({ children, initialTheme }: { children: React.ReactNode; initialTheme?: Theme | null }) {
+  const [theme, setTheme] = useState<Theme | null>(initialTheme || null)
+  const [isLoading, setIsLoading] = useState(!initialTheme)
+  const [lastFetchedThemeId, setLastFetchedThemeId] = useState<number | null>(initialTheme?.id || null)
 
   const applyTheme = useCallback((themeData: Theme) => {
     if (!themeData || !themeData.colors) {
@@ -192,9 +192,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   }, [applyTheme, lastFetchedThemeId, theme])
 
   useEffect(() => {
+    // Apply initial theme from SSR immediately
+    if (initialTheme) {
+      applyTheme(initialTheme)
+      setLastFetchedThemeId(initialTheme.id)
+      setIsLoading(false)
+    }
+
     try {
       const cachedTheme = localStorage.getItem(THEME_STORAGE_KEY)
-      if (cachedTheme) {
+      if (cachedTheme && !initialTheme) {
         const parsedTheme = JSON.parse(cachedTheme) as Theme
         applyTheme(parsedTheme)
         setLastFetchedThemeId(parsedTheme.id)
@@ -207,7 +214,6 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     refreshTheme()
 
     const unsubscribe = websocketService.on("theme_updated", (data: any) => {
-      console.log("[v0] Theme updated via WebSocket")
       if (data.theme) {
         applyTheme(data.theme)
         setLastFetchedThemeId(data.theme.id)
@@ -223,7 +229,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       clearInterval(interval)
       unsubscribe()
     }
-  }, [refreshTheme, applyTheme])
+  }, [refreshTheme, applyTheme, initialTheme])
 
   return (
     <ThemeContext.Provider value={{ theme, isLoading, refreshTheme, applyTheme }}>{children}</ThemeContext.Provider>
