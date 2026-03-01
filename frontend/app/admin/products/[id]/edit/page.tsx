@@ -1,41 +1,59 @@
 import { EditProductClient } from "./edit-product-client"
-import { notFound } from "next/navigation"
 
-// Server-side data fetching for instant initial load
+// Server-side data fetching for instant initial load - with fallback to client-side
 async function getProductData(productId: string) {
   try {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
-    const token = process.env.ADMIN_TOKEN // Use server-side token if available
-
-    // Fetch all data in parallel on the server
+    
+    // Server-side fetch doesn't require auth token for public endpoints
+    // If fetch fails, we'll let the client fetch it instead
     const [productRes, categoriesRes, brandsRes, imagesRes] = await Promise.all([
       fetch(`${baseUrl}/api/admin/products/${productId}`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        next: { revalidate: 60 }, // Cache for 60 seconds
-      }),
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        cache: "no-store", // Don't cache for admin endpoints
+      }).catch(() => null),
       fetch(`${baseUrl}/api/admin/shop-categories/categories?per_page=100`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        next: { revalidate: 300 }, // Cache for 5 minutes
-      }),
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        cache: "revalidate",
+        next: { revalidate: 300 },
+      }).catch(() => null),
       fetch(`${baseUrl}/api/admin/brands?per_page=100`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        next: { revalidate: 300 }, // Cache for 5 minutes
-      }),
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        cache: "revalidate",
+        next: { revalidate: 300 },
+      }).catch(() => null),
       fetch(`${baseUrl}/api/admin/products/${productId}/images`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-        next: { revalidate: 60 },
-      }),
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        cache: "no-store",
+      }).catch(() => null),
     ])
 
-    if (!productRes.ok) {
-      console.error("[v0] Product fetch failed:", productRes.status)
-      return null
+    // If any fetch failed, return partial data or null to let client handle it
+    if (!productRes || !productRes.ok) {
+      console.log("[v0] Server-side product fetch failed or unavailable, will fetch from client")
+      return null // Let client handle all fetching
     }
 
-    const product = await productRes.json()
-    const categories = categoriesRes.ok ? await categoriesRes.json() : { items: [] }
-    const brands = brandsRes.ok ? await brandsRes.json() : { items: [] }
-    const images = imagesRes.ok ? await imagesRes.json() : { items: [] }
+    const product = await productRes.json().catch(() => null)
+    if (!product) return null
+
+    const categories = categoriesRes?.ok ? await categoriesRes.json().catch(() => ({ items: [] })) : { items: [] }
+    const brands = brandsRes?.ok ? await brandsRes.json().catch(() => ({ items: [] })) : { items: [] }
+    const images = imagesRes?.ok ? await imagesRes.json().catch(() => ({ items: [] })) : { items: [] }
+
+    console.log("[v0] Server-side data fetching successful")
 
     return {
       product: product.data || product,
@@ -44,7 +62,7 @@ async function getProductData(productId: string) {
       images: images.items || [],
     }
   } catch (error) {
-    console.error("[v0] Error fetching product data on server:", error)
+    console.log("[v0] Server-side fetch error, will use client-side fetching:", error)
     return null
   }
 }
@@ -53,25 +71,17 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
   const resolvedParams = await params
   const id = resolvedParams.id
 
-  console.log("[v0] EditProductPage SSR: Fetching data for product ID:", id)
-
-  // Fetch data on the server
+  // Try server-side fetching first, but don't fail if it doesn't work
   const initialData = await getProductData(id)
 
-  if (!initialData) {
-    notFound()
-  }
-
-  console.log("[v0] EditProductPage SSR: Data fetched successfully, rendering client component")
-
-  // Pass pre-fetched data to client component
+  // Pass pre-fetched data to client component (can be null if server fetch fails)
   return (
     <EditProductClient 
       productId={id}
-      initialProduct={initialData.product}
-      initialCategories={initialData.categories}
-      initialBrands={initialData.brands}
-      initialImages={initialData.images}
+      initialProduct={initialData?.product}
+      initialCategories={initialData?.categories}
+      initialBrands={initialData?.brands}
+      initialImages={initialData?.images}
     />
   )
 }
