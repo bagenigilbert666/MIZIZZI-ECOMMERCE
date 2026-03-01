@@ -222,7 +222,15 @@ export default function PremiumThemeCustomizer() {
         description: "Background color updated successfully",
       })
 
+      // Immediately refresh theme on all clients
+      console.log("[v0] Broadcasting theme update to all clients...")
       await refreshTheme()
+      
+      // Also trigger a second refresh after a short delay to ensure propagation
+      setTimeout(() => {
+        console.log("[v0] Triggering delayed theme refresh...")
+        refreshTheme()
+      }, 500)
     } catch (error) {
       console.error("[v0] Error saving theme:", error)
 

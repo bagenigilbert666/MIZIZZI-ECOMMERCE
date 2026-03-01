@@ -223,11 +223,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       }
     })
 
-    // Keep polling as fallback (increased to 15 seconds for better performance)
+    // Keep polling as fallback (reduced to 2 seconds for instant updates)
     const interval = setInterval(() => {
       console.log("[v0] Polling for theme updates...")
       refreshTheme()
-    }, 15000)
+    }, 2000)
 
     return () => {
       clearInterval(interval)
