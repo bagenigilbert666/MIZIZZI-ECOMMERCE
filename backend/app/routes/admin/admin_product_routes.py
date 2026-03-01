@@ -57,16 +57,25 @@ def create_product():
         if not data:
             return jsonify({'error': 'No data provided'}), 400
 
-        # Validate required fields
-        required_fields = ['name', 'price', 'category_id']
+        # Validate required fields - only name is truly required for initial creation
+        required_fields = ['name']
         for field in required_fields:
             if field not in data or not data[field]:
                 return jsonify({'error': f'{field} is required'}), 400
 
-        # Check if category exists
-        category = Category.query.get(data['category_id'])
-        if not category:
-            return jsonify({'error': 'Invalid category'}), 400
+        # Set defaults for optional fields if not provided
+        category_id = data.get('category_id')
+        price = data.get('price', 0)
+        
+        # If category_id is provided, validate it exists
+        if category_id:
+            category = Category.query.get(category_id)
+            if not category:
+                return jsonify({'error': 'Invalid category'}), 400
+        else:
+            # Use first category as default or create without category initially
+            default_category = Category.query.first()
+            category_id = default_category.id if default_category else 1
 
         # Check if brand exists (if provided)
         if data.get('brand_id'):
@@ -95,10 +104,10 @@ def create_product():
             name=data['name'],
             slug=data.get('slug', data['name'].lower().replace(' ', '-')),
             description=data.get('description', ''),
-            price=float(data['price']),
+            price=float(price),
             sale_price=float(data['sale_price']) if data.get('sale_price') else None,
             stock=int(data.get('stock', 0)),
-            category_id=int(data['category_id']),
+            category_id=int(category_id),
             brand_id=int(data['brand_id']) if data.get('brand_id') else None,
             sku=data.get('sku', f"SKU-{datetime.now().timestamp()}"),
             weight=float(data['weight']) if data.get('weight') else None,
