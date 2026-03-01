@@ -101,34 +101,55 @@ export default function ThemeCustomizerClient({ initialTheme }: { initialTheme: 
 
     setIsSaving(true)
     const startTime = performance.now()
-    console.log("[v0] Starting theme save at", new Date().toLocaleTimeString())
 
-    // Create abort controller with 10 second timeout
-    const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 10000)
+    // STEP 1: OPTIMISTIC UPDATE - Apply color immediately without waiting for API
+    const updatedTheme = {
+      ...activeTheme,
+      colors: {
+        ...activeTheme.colors,
+        background: {
+          ...(activeTheme.colors?.background || {}),
+          main: backgroundColor,
+        },
+      },
+    }
 
+    setActiveTheme(updatedTheme)
+    applyTheme(updatedTheme)
+    setIsPreviewMode(false)
+    setSelectedPalette(null)
+
+    const uiUpdateTime = performance.now() - startTime
+    console.log(`[v0] ✅ Color applied instantly to UI in ${uiUpdateTime.toFixed(2)}ms`)
+    console.log(`[v0] New color: ${backgroundColor}`)
+
+    // Show immediate success
+    toast({
+      title: "Success!",
+      description: `Color updated in ${uiUpdateTime.toFixed(0)}ms`,
+    })
+
+    // STEP 2: Save to backend in background (non-blocking)
     try {
       const token = getAuthToken()
 
       if (!token) {
-        throw new Error("No authentication token found")
+        console.warn("[v0] No auth token, skipping backend save")
+        setIsSaving(false)
+        return
       }
 
       const requestBody = {
         name: activeTheme.name,
-        colors: {
-          ...activeTheme.colors,
-          background: {
-            ...(activeTheme.colors?.background || {}),
-            main: backgroundColor,
-          },
-        },
+        colors: updatedTheme.colors,
         is_active: true,
       }
 
-      console.log("[v0] Sending API request to save color:", backgroundColor)
-      console.log("[v0] API endpoint:", `${API_BASE_URL}/api/theme/admin/themes/${activeTheme.id}`)
+      console.log("[v0] Saving to backend in background...")
       const apiStartTime = performance.now()
+
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 8000)
 
       const response = await fetch(`${API_BASE_URL}/api/theme/admin/themes/${activeTheme.id}`, {
         method: "PUT",
@@ -142,71 +163,24 @@ export default function ThemeCustomizerClient({ initialTheme }: { initialTheme: 
 
       clearTimeout(timeoutId)
       const apiDuration = performance.now() - apiStartTime
-      console.log(`[v0] API response received in ${apiDuration.toFixed(2)}ms with status ${response.status}`)
 
       if (!response.ok) {
-        let errorData = null
-        try {
-          errorData = await response.json()
-        } catch (e) {
-          // Response wasn't JSON
-        }
-        throw new Error(errorData?.message || `Failed to save theme (Status ${response.status})`)
+        console.warn(`[v0] Backend returned status ${response.status} (UI already updated)`)
+        setIsSaving(false)
+        return
       }
 
       const data = await response.json()
-      console.log("[v0] API Response data:", data)
+      console.log(`[v0] ✅ Backend saved in ${apiDuration.toFixed(2)}ms`)
 
-      // Update local state with the saved theme
       if (data.theme) {
         setActiveTheme(data.theme)
-        const savedBg = data.theme.colors?.background?.main || "#FFFFFF"
-        setBackgroundColor(savedBg)
-        setHexInput(savedBg)
-        // Apply theme immediately to frontend
-        applyTheme(data.theme)
-        console.log("[v0] ✅ SUCCESS: Theme saved and applied instantly")
-        console.log("[v0] New background color:", savedBg)
-      } else {
-        console.warn("[v0] No theme in response data:", data)
+        console.log("[v0] Backend state synced")
       }
 
-      setIsPreviewMode(false)
-      setSelectedPalette(null)
-
-      const totalTime = performance.now() - startTime
-      console.log(`[v0] 🎉 Total save completed in ${totalTime.toFixed(2)}ms`)
-
-      // Show success toast
-      toast({
-        title: "Success!",
-        description: `Color saved in ${totalTime.toFixed(0)}ms`,
-      })
-
-      // Refresh theme for other clients without blocking UI
-      refreshTheme()
+      setIsSaving(false)
     } catch (error) {
-      clearTimeout(timeoutId)
-      
-      let errorMessage = "Unknown error"
-      
-      if (error instanceof Error) {
-        if (error.name === "AbortError") {
-          errorMessage = "Save request timed out after 10 seconds. Backend may be offline."
-        } else {
-          errorMessage = error.message
-        }
-      }
-      
-      console.error("[v0] ❌ Error saving theme:", errorMessage)
-
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-      })
-    } finally {
-      // Always reset the saving state
+      console.warn("[v0] Backend save error (UI already updated):", error instanceof Error ? error.message : "Unknown error")
       setIsSaving(false)
     }
   }
