@@ -15,11 +15,14 @@ import { NotificationProvider } from "@/contexts/notification/notification-conte
 import { InventoryProvider } from "@/contexts/inventory/inventory-context"
 import AnimationErrorBoundary from "@/components/animation/animation-error-boundary"
 import DisableAnimations from "@/components/animation/disable-animations"
+import { suppressRadixUIRefWarning } from "@/lib/suppress-warnings"
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
+    // Suppress React 19 ref deprecation warnings from Radix UI
+    suppressRadixUIRefWarning()
     setMounted(true)
   }, [])
 

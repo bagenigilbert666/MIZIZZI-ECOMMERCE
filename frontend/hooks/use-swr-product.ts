@@ -485,6 +485,23 @@ export function prefetchProducts(productIds: string[]): void {
   try {
     // Only run in browser
     if (typeof window === "undefined") return
+
+    // Wait for WebSocket to be ready (with timeout)
+    const startTime = Date.now()
+    const timeout = 5000 // 5 second timeout
+    let isReady = websocketService.isConnected?.() ?? false
+
+    while (!isReady && Date.now() - startTime < timeout) {
+      await new Promise((resolve) => setTimeout(resolve, 200))
+      isReady = websocketService.isConnected?.() ?? false
+    }
+
+    if (!isReady) {
+      // Socket not ready - log as debug not warning since it's not fatal
+      console.debug("[v0] WebSocket not ready for category listeners (will try later)")
+      return
+    }
+
     const win = window as any
 
     const attachListeners = (socket: any) => {
@@ -594,8 +611,8 @@ export function prefetchProducts(productIds: string[]): void {
       // ignore
     }
 
-    // If we reach here, no socket could be attached; non-fatal.
-    console.warn("Category socket listeners not attached: no socket found")
+    // If we reach here, no socket could be attached; non-fatal (will retry on next useCategories call)
+    console.debug("[v0] Category socket listeners not attached on initial load")
   } catch (e) {
     // Any unexpected error should not break app
     console.error("initCategorySocketListeners error:", e)
