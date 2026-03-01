@@ -43,50 +43,53 @@ export function PageTransition({ isVisible, onComplete, onError, duration = 4000
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            transition={{ duration: 0.5 }}
-            className="fixed inset-0 z-50 flex items-center justify-center bg-white"
+            transition={{ duration: 0.3 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black"
           >
-            <div className="flex flex-col items-center">
+            <div className="flex flex-col items-center gap-6">
+              {/* Netflix-style spinner */}
               <motion.div
-                initial={{ scale: 0.8, opacity: 0 }}
-                animate={{
-                  scale: [0.8, 1.1, 1],
-                  opacity: 1,
-                }}
-                transition={{
-                  duration: 1.2,
-                  ease: "easeOut",
-                  times: [0, 0.6, 1],
-                }}
-                className="relative h-32 w-32 overflow-hidden rounded-2xl shadow-xl bg-cherry-700"
+                className="relative w-24 h-24 sm:w-32 sm:h-32"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.3 }}
               >
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3, duration: 0.5 }}
-                  className="h-full w-full rounded-xl bg-white p-4 flex items-center justify-center"
+                <svg
+                  className="w-full h-full"
+                  viewBox="0 0 100 100"
+                  xmlns="http://www.w3.org/2000/svg"
+                  style={{ filter: "drop-shadow(0 0 8px rgba(229, 9, 20, 0.3))" }}
                 >
-                  {/* Logo image */}
-                  <img src="/logo.png" alt="MIZIZZI" className="h-full w-full object-contain" />
-                </motion.div>
+                  <motion.circle
+                    cx="50"
+                    cy="50"
+                    r="45"
+                    fill="none"
+                    stroke="#E50914"
+                    strokeWidth="6"
+                    strokeDasharray="70.7 282.8"
+                    strokeLinecap="round"
+                    animate={{ rotate: 360 }}
+                    transition={{
+                      duration: 1.2,
+                      repeat: Number.POSITIVE_INFINITY,
+                      ease: "linear",
+                    }}
+                    style={{ transformOrigin: "50px 50px" }}
+                  />
+                </svg>
               </motion.div>
 
+              {/* Text - subtle and minimal */}
               <motion.div
-                initial={{ opacity: 0, y: 20 }}
+                initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.8, duration: 0.5 }}
-                className="mt-8 text-center"
+                transition={{ delay: 0.2, duration: 0.4 }}
+                className="text-center"
               >
-                <h2 className="text-2xl font-bold text-cherry-900 mb-2">Welcome to Mizizzi</h2>
-                <p className="text-cherry-600">Preparing your experience...</p>
+                <p className="text-white text-sm sm:text-base font-medium">Loading...</p>
+                <p className="text-gray-500 text-xs mt-1">Preparing your experience</p>
               </motion.div>
-
-              <motion.div
-                initial={{ width: 0 }}
-                animate={{ width: "100%" }}
-                transition={{ delay: 1, duration: 2.5, ease: "easeInOut" }}
-                className="h-1 rounded-full mt-6 max-w-xs bg-cherry-600"
-              />
             </div>
           </motion.div>
         )}
