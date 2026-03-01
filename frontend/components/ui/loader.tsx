@@ -5,25 +5,50 @@ import { motion } from "framer-motion"
 export function Loader() {
   return (
     <div className="flex items-center justify-center py-8">
-      {/* Netflix-style rotating crescent - transparent, no background */}
+      {/* Netflix-style rotating crescent spinner */}
       <div className="relative w-16 h-16 sm:w-20 sm:h-20">
         <svg
-          className="w-full h-full"
+          className="w-full h-full drop-shadow-lg"
           viewBox="0 0 100 100"
           xmlns="http://www.w3.org/2000/svg"
         >
+          {/* Outer rotating arc - Netflix Red */}
           <motion.circle
             cx="50"
             cy="50"
-            r="45"
+            r="40"
             fill="none"
             stroke="#E50914"
-            strokeWidth="8"
-            strokeDasharray="70.7 282.8"
+            strokeWidth="6"
+            strokeDasharray="62.8 188.4"
             strokeLinecap="round"
-            animate={{ rotate: 360 }}
+            animate={{ 
+              rotate: 360,
+            }}
             transition={{
-              duration: 1.5,
+              duration: 2,
+              repeat: Number.POSITIVE_INFINITY,
+              ease: "linear",
+            }}
+            style={{ transformOrigin: "50px 50px" }}
+          />
+          
+          {/* Secondary accent arc - subtle glow effect */}
+          <motion.circle
+            cx="50"
+            cy="50"
+            r="40"
+            fill="none"
+            stroke="#E50914"
+            strokeWidth="2"
+            strokeDasharray="62.8 188.4"
+            strokeLinecap="round"
+            opacity={0.3}
+            animate={{ 
+              rotate: -360,
+            }}
+            transition={{
+              duration: 3,
               repeat: Number.POSITIVE_INFINITY,
               ease: "linear",
             }}
@@ -34,3 +59,4 @@ export function Loader() {
     </div>
   )
 }
+
