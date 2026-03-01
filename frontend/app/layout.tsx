@@ -10,7 +10,6 @@ import Script from "next/script"
 import { ThemeProvider } from "@/contexts/theme-context"
 import type { Viewport } from "next"
 import { getFooterSettings } from "@/lib/server/get-footer-settings"
-import { getActiveTheme, generateThemeCSS } from "@/lib/server/get-theme"
 
 const inter = Inter({
   subsets: ["latin"],
@@ -36,12 +35,7 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const [footerSettings, theme] = await Promise.all([
-    getFooterSettings(),
-    getActiveTheme(),
-  ])
-
-  const themeCSS = generateThemeCSS(theme)
+  const footerSettings = await getFooterSettings()
 
   // Call the async LayoutRenderer function and await its result before returning JSX.
   // Cast to any-compatible signature to allow passing additional props without TS errors.
@@ -53,14 +47,6 @@ export default async function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning className="fixed inset-0 overflow-hidden">
       <head>
-        {/* Apply theme CSS immediately on page load */}
-        {themeCSS && (
-          <style
-            dangerouslySetInnerHTML={{
-              __html: themeCSS,
-            }}
-          />
-        )}
         {/* Preload critical fonts */}
         <link
           rel="preload"
@@ -93,7 +79,7 @@ export default async function RootLayout({
         {/* Defer Google Sign-In until page is interactive */}
         <Script src="https://accounts.google.com/gsi/client" strategy="lazyOnload" async defer />
 
-        <ThemeProvider initialTheme={theme}>
+        <ThemeProvider>
           <StateProviders>
             <AppProviders>
               <PageTransitionWrapper />
@@ -111,4 +97,3 @@ export default async function RootLayout({
 function RootLayoutContent({ children }: { children: React.ReactNode }) {
   return <>{children}</>
 }
-
