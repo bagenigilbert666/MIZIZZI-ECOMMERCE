@@ -39,6 +39,7 @@ import { formatPrice, cn } from "@/lib/utils"
 import { productService } from "@/services/product"
 import { inventoryService } from "@/services/inventory-service"
 import { cloudinaryService } from "@/services/cloudinary-service"
+import { websocketService } from "@/services/websocket"
 import { ImageZoomModal } from "./image-zoom-modal"
 import { reviewService, type Review, type ReviewSummary } from "@/services/review-service"
 import { useAuth } from "@/contexts/auth/auth-context"
@@ -270,6 +271,50 @@ export default function ProductDetailsEnhanced({
       setOptimisticWishlistState(null)
     }
   }, [actualWishlistState, optimisticWishlistState])
+
+  // Real-time product update subscription via WebSocket
+  useEffect(() => {
+    if (!product?.id) return
+
+    const productId = String(product.id)
+    
+    // Subscribe to product updates
+    const handleProductUpdate = (updatedProduct: any) => {
+      if (String(updatedProduct.id) === productId) {
+        console.log("[v0] Product update received from admin, updating display:", updatedProduct)
+        setProduct(updatedProduct)
+      }
+    }
+
+    // Listen for product_updated events
+    websocketService.on("product_updated", handleProductUpdate)
+
+    // Also set up polling as fallback to ensure instant updates
+    const pollInterval = setInterval(async () => {
+      try {
+        const latestProduct = await productService.getProduct(productId)
+        if (latestProduct) {
+          // Compare key fields to see if anything changed
+          if (
+            latestProduct.description !== product.description ||
+            latestProduct.name !== product.name ||
+            latestProduct.price !== product.price ||
+            JSON.stringify(latestProduct.image_urls) !== JSON.stringify(product.image_urls)
+          ) {
+            console.log("[v0] Product changes detected via polling, updating display")
+            setProduct(latestProduct)
+          }
+        }
+      } catch (error) {
+        console.error("[v0] Error polling for product updates:", error)
+      }
+    }, 5000) // Poll every 5 seconds
+
+    return () => {
+      websocketService.off("product_updated", handleProductUpdate)
+      clearInterval(pollInterval)
+    }
+  }, [product?.id])
 
   const fetchInventoryData = useCallback(async () => {
     if (!product?.id) return
