@@ -490,6 +490,7 @@ def create_app(config_name=None, enable_socketio=True):
         'meilisearch_routes': Blueprint('meilisearch_routes', __name__),
         'admin_meilisearch_routes': Blueprint('admin_meilisearch_routes', __name__),
         'flash_sale_routes': Blueprint('flash_sale_routes', __name__),
+        'admin_settings_routes': Blueprint('admin_settings_routes', __name__),
     }
     
     # Add basic routes to fallback blueprints
@@ -840,6 +841,12 @@ def create_app(config_name=None, enable_socketio=True):
             ('backend.app.routes.flash_sale.flash_sale_routes', 'flash_sale_routes'),
             ('backend.routes.flash_sale.flash_sale_routes', 'flash_sale_routes'),
         ],
+        'admin_settings_routes': [
+            ('app.routes.admin.admin_settings_routes', 'admin_settings_routes'),
+            ('routes.admin.admin_settings_routes', 'admin_settings_routes'),
+            ('backend.app.routes.admin.admin_settings_routes', 'admin_settings_routes'),
+            ('backend.routes.admin.admin_settings_routes', 'admin_settings_routes')
+        ],
     }
     
     # Import blueprints with clean logging
@@ -949,6 +956,7 @@ def create_app(config_name=None, enable_socketio=True):
         if 'admin_google_auth_routes' in final_blueprints:
             app.register_blueprint(final_blueprints['admin_google_auth_routes'], url_prefix='/api/admin/auth')
         app.register_blueprint(final_blueprints['admin_email_routes'], url_prefix='/api/admin')
+        app.register_blueprint(final_blueprints['admin_settings_routes'], url_prefix='/api/admin')
         app.register_blueprint(final_blueprints['dashboard_routes'], url_prefix='/api/admin/dashboard')
         
         app.register_blueprint(final_blueprints['order_routes'], url_prefix='/api/orders')
