@@ -239,40 +239,24 @@ const StatsCard = ({
   value,
   subtitle,
   icon: Icon,
-  trend,
-  trendValue,
+  colorClass = "bg-blue-500",
 }: {
   title: string
   value: string | number
   subtitle: string
   icon: any
-  trend?: "up" | "down" | "neutral"
-  trendValue?: string
+  colorClass?: string
 }) => (
-  <div className="bg-white rounded-2xl p-6 border border-gray-100 hover:border-gray-200 transition-all duration-200">
-    <div className="flex items-start justify-between mb-4">
-      <div className="p-2.5 bg-gray-50 rounded-xl">
-        <Icon className="h-5 w-5 text-gray-700" strokeWidth={1.5} />
+  <div className={`${colorClass} rounded-lg p-4 shadow-md hover:shadow-lg transition-all duration-200 text-white`}>
+    <div className="flex items-start justify-between mb-3">
+      <div className="p-2 bg-white/20 rounded-lg">
+        <Icon className="h-4 w-4 text-white" strokeWidth={1.5} />
       </div>
-      {trend && (
-        <span
-          className={cn(
-            "text-xs font-medium px-2.5 py-1 rounded-full",
-            trend === "up"
-              ? "bg-green-50 text-green-700"
-              : trend === "down"
-                ? "bg-red-50 text-red-700"
-                : "bg-gray-50 text-gray-600",
-          )}
-        >
-          {trendValue}
-        </span>
-      )}
     </div>
     <div className="space-y-1">
-      <p className="text-sm font-medium text-gray-500">{title}</p>
-      <p className="text-3xl font-semibold text-gray-900 tracking-tight">{value}</p>
-      <p className="text-xs text-gray-400 mt-1">{subtitle}</p>
+      <p className="text-xs font-medium text-white/85 uppercase tracking-wide">{title}</p>
+      <p className="text-lg sm:text-xl font-bold text-white tracking-tight">{value}</p>
+      <p className="text-xs text-white/70">{subtitle}</p>
     </div>
   </div>
 )
@@ -436,6 +420,16 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
   // Image and loading states
   const [productImages, setProductImages] = useState<Record<string, string>>({})
   const [itemLoadingStates, setItemLoadingStates] = useState<Record<string, boolean>>({})
+
+  // Auto-switch to list view on mobile
+  useEffect(() => {
+    if (isMobile && uiState.viewMode === "grid") {
+      setUiState(prev => ({ ...prev, viewMode: "list" }))
+    } else if (!isMobile && uiState.viewMode === "list" && !searchInput) {
+      // Optional: switch back to grid on desktop (only if grid is preferred)
+      // setUiState(prev => ({ ...prev, viewMode: "grid" }))
+    }
+  }, [isMobile])
 
   // Debounce search input (using ref for proper debouncing)
   useEffect(() => {
@@ -1089,24 +1083,24 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
   }, [filteredProducts, currentPage, filterState.pageSize])
 
   return (
-    <div className="min-h-screen bg-gray-50 p-3 md:p-6 space-y-6">
+    <div className="min-h-screen bg-white p-2 sm:p-3 md:p-6 space-y-3 sm:space-y-4 md:space-y-6 w-full overflow-x-hidden">
       {/* Header */}
-      <div className="bg-white rounded-lg md:rounded-lg p-4 md:p-6 shadow-sm border border-gray-100">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="bg-white rounded-lg p-3 sm:p-4 md:p-6 shadow-sm border border-gray-100">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 sm:gap-4">
           <div>
-            <h1 className="text-2xl md:text-4xl font-bold text-gray-900">Products</h1>
-            <p className="text-gray-600 text-sm md:text-lg mt-1">Manage your product catalog</p>
+            <h1 className="text-xl sm:text-2xl md:text-4xl font-bold text-gray-900">Products</h1>
+            <p className="text-gray-600 text-xs sm:text-sm md:text-base mt-1">Manage your product catalog</p>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
             {!isMobile && (
               <>
-                <Button variant="outline" size="sm" className="rounded-lg text-xs md:text-sm">
-                  <Download className="mr-1 h-4 w-4" />
-                  <span className="hidden sm:inline">Export</span>
+                <Button variant="outline" size="sm" className="rounded-lg text-xs h-8 sm:h-9">
+                  <Download className="mr-1 h-3 md:h-4 w-3 md:w-4" />
+                  <span className="hidden sm:inline text-xs md:text-sm">Export</span>
                 </Button>
-                <Button variant="outline" size="sm" className="rounded-lg text-xs md:text-sm">
-                  <Upload className="mr-1 h-4 w-4" />
-                  <span className="hidden sm:inline">Import</span>
+                <Button variant="outline" size="sm" className="rounded-lg text-xs h-8 sm:h-9">
+                  <Upload className="mr-1 h-3 md:h-4 w-3 md:w-4" />
+                  <span className="hidden sm:inline text-xs md:text-sm">Import</span>
                 </Button>
               </>
             )}
@@ -1115,15 +1109,15 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
               size="sm"
               onClick={handleRefresh}
               disabled={uiState.isLoading}
-              className="rounded-lg text-xs md:text-sm"
+              className="rounded-lg text-xs h-8 sm:h-9"
             >
-              {uiState.isLoading ? <MiniSpinner /> : <RefreshCw className="h-4 w-4" />}
-              <span className="ml-1 hidden sm:inline">Refresh</span>
+              {uiState.isLoading ? <MiniSpinner /> : <RefreshCw className="h-3 md:h-4 w-3 md:w-4" />}
+              <span className="ml-1 hidden sm:inline text-xs md:text-sm">Refresh</span>
             </Button>
             <Button
               onClick={() => router.push("/admin/products/new")}
               size="sm"
-              className="rounded-lg bg-gray-900 hover:bg-gray-800 text-white text-xs md:text-sm"
+              className="rounded-lg bg-gray-900 hover:bg-gray-800 text-white text-xs h-8 sm:h-9"
             >
               <Plus className="h-4 w-4" />
               <span className="ml-1 hidden sm:inline">Add Product</span>
@@ -1132,62 +1126,66 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
         </div>
       </div>
 
-      {/* Stats Grid - Responsive */}
-      <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+      {/* Stats Grid - Responsive with vibrant colors */}
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 mb-4">
         <StatsCard
           title="Total Products"
           value={productStats?.totalProducts || 0}
           subtitle={`${productStats?.categoriesCount || 0} categories`}
           icon={Package}
+          colorClass="bg-blue-600 hover:bg-blue-700"
         />
         <StatsCard
           title="In Stock"
           value={productStats?.inStock || 0}
           subtitle="Available products"
           icon={CheckCircle2}
-          trend={productStats?.inStock ? (productStats.inStock > 0 ? "up" : "neutral") : "neutral"}
-          trendValue={productStats?.inStock ? (productStats.inStock > 0 ? "Available" : "None") : "None"}
+          colorClass="bg-green-600 hover:bg-green-700"
         />
         <StatsCard
           title="Low Stock"
           value={productStats?.lowStock || 0}
           subtitle="Need attention"
           icon={AlertTriangle}
-          trend={productStats?.lowStock ? (productStats.lowStock > 0 ? "down" : "up") : "up"}
-          trendValue={productStats?.lowStock ? (productStats.lowStock > 0 ? "Alert" : "Good") : "Good"}
+          colorClass="bg-amber-500 hover:bg-amber-600"
         />
         <StatsCard
           title="On Sale"
           value={productStats?.onSale || 0}
           subtitle={`${productStats?.featured || 0} featured`}
           icon={Tag}
+          colorClass="bg-purple-600 hover:bg-purple-700"
         />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 mb-8">
         <StatsCard
           title="New Products"
           value={productStats?.newProducts || 0}
           subtitle="Recently added"
           icon={Sparkles}
+          colorClass="bg-indigo-600 hover:bg-indigo-700"
         />
         <StatsCard
           title="Inventory Value"
           value={`KSh ${(productStats?.totalInventoryValue || 0).toLocaleString()}`}
           subtitle="Total stock value"
           icon={DollarSign}
+          colorClass="bg-emerald-600 hover:bg-emerald-700"
         />
         <StatsCard
           title="Average Price"
           value={`KSh ${(productStats?.averagePrice || 0).toLocaleString()}`}
           subtitle="Per product"
           icon={TrendingUp}
+          colorClass="bg-rose-600 hover:bg-rose-700"
         />
         <StatsCard
           title="Luxury Deals"
           value={productStats?.luxuryDeal || 0}
           subtitle="Exclusive offers"
           icon={Crown}
+          colorClass="bg-cyan-600 hover:bg-cyan-700"
         />
       </div>
 
@@ -1492,7 +1490,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                 </SelectContent>
               </Select>
 
-              {/* View Mode Toggle */}
+              {/* View Mode Toggle - Hide grid/analytics on mobile */}
               <div className="flex items-center space-x-2">
                 <Button
                   variant={uiState.viewMode === "list" ? "default" : "outline"}
@@ -1502,19 +1500,21 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                 >
                   <FileText className="h-4 w-4" />
                 </Button>
+                {/* Grid button - hidden on mobile */}
                 <Button
                   variant={uiState.viewMode === "grid" ? "default" : "outline"}
                   size="sm"
                   onClick={() => handleUIStateChange("viewMode", "grid")}
-                  className="rounded-full"
+                  className="rounded-full hidden sm:inline-flex"
                 >
                   <Package className="h-4 w-4" />
                 </Button>
+                {/* Analytics button - hidden on mobile */}
                 <Button
                   variant={uiState.viewMode === "analytics" ? "default" : "outline"}
                   size="sm"
                   onClick={() => handleUIStateChange("viewMode", "analytics")}
-                  className="rounded-full"
+                  className="rounded-full hidden sm:inline-flex"
                 >
                   <TrendingUp className="h-4 w-4" />
                 </Button>
@@ -1639,32 +1639,40 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
               />
             )}
 
-            {/* Enhanced pagination */}
+            {/* Enhanced responsive pagination - compact on mobile */}
             {filteredProducts.length > 0 && totalPages > 1 && (
-              <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-100">
-                <div className="text-sm text-gray-600">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4 mt-3 sm:mt-8 pt-2 sm:pt-6 pb-2 sm:pb-0 border-t border-gray-100">
+                {/* Info text - hidden on mobile, visible on sm+ */}
+                <div className="hidden sm:block text-sm text-gray-600">
                   Showing <span className="font-semibold">{(currentPage - 1) * filterState.pageSize + 1}</span> to{" "}
                   <span className="font-semibold">{Math.min(currentPage * filterState.pageSize, filteredProducts.length)}</span> of{" "}
                   <span className="font-semibold">{filteredProducts.length}</span> products
                 </div>
-                <div className="flex items-center gap-2">
+
+                {/* Mobile info - visible on mobile only */}
+                <div className="sm:hidden text-xs text-gray-600 text-center w-full">
+                  Page <span className="font-semibold">{currentPage}</span> of <span className="font-semibold">{totalPages}</span>
+                </div>
+
+                {/* Pagination controls */}
+                <div className="flex items-center justify-center sm:justify-end gap-1 sm:gap-2 w-full sm:w-auto">
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => goToPage(currentPage - 1)}
                     disabled={currentPage === 1}
-                    className="rounded-full"
+                    className="rounded-lg h-7 w-7 sm:h-10 sm:w-10 sm:rounded-full p-0 text-xs sm:text-sm flex-shrink-0"
                   >
-                    <ChevronLeft className="h-4 w-4" />
+                    <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
                   </Button>
 
-                  {/* Page numbers */}
-                  <div className="flex gap-1">
+                  {/* Page numbers - hidden on mobile, visible on sm+ */}
+                  <div className="hidden sm:flex gap-1">
                     {getPaginationItems().map((pageItem, index) =>
                       pageItem === "ellipsis-start" || pageItem === "ellipsis-end" ? (
                         <span
                           key={pageItem + index}
-                          className="flex items-center justify-center w-10 h-10 text-sm text-gray-500"
+                          className="flex items-center justify-center w-8 h-8 sm:w-10 sm:h-10 text-xs sm:text-sm text-gray-500"
                         >
                           ...
                         </span>
@@ -1674,7 +1682,7 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                           variant={currentPage === pageItem ? "default" : "outline"}
                           size="sm"
                           onClick={() => goToPage(pageItem as number)}
-                          className="rounded-full w-10 h-10"
+                          className="rounded-full w-8 h-8 sm:w-10 sm:h-10 p-0 text-xs sm:text-sm"
                         >
                           {pageItem}
                         </Button>
@@ -1682,13 +1690,23 @@ export default function AdminProductsClient({ initialProducts }: AdminProductsCl
                     )}
                   </div>
 
+                  {/* Current page indicator - visible on mobile only */}
+                  <div className="sm:hidden flex items-center justify-center h-7 min-w-7 rounded-lg bg-primary text-white text-xs font-semibold flex-shrink-0">
+                    {currentPage}
+                  </div>
+
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => goToPage(currentPage + 1)}
                     disabled={currentPage === totalPages}
-                    className="rounded-full"
+                    className="rounded-lg h-7 w-7 sm:h-10 sm:w-10 sm:rounded-full p-0 text-xs sm:text-sm flex-shrink-0"
                   >
+                    <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
                     <ChevronRight className="h-4 w-4" />
                   </Button>
                 </div>

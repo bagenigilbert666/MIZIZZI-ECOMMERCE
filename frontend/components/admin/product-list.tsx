@@ -27,12 +27,12 @@ const ProductList = memo(function ProductList({
   onDeleteProduct,
   getProductImage,
 }: ProductListProps) {
-  // Auto-switch to grid on mobile
-  const displayMode = isMobile ? "grid" : viewMode
+  // Use viewMode directly, no auto-switch to grid on mobile
+  const displayMode = viewMode
 
   if (displayMode === "grid") {
     return (
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 sm:gap-3 md:gap-4">
         {products.map((product) => (
           <ProductCard
             key={product.id}
@@ -47,20 +47,20 @@ const ProductList = memo(function ProductList({
     )
   }
 
-  // Table view - desktop only with content-visibility for better performance
+  // Table view - responsive list with mobile optimizations
   return (
-    <div className="rounded-lg border border-gray-200 overflow-hidden" style={{ contain: "layout" }}>
+    <div className="rounded-lg border border-gray-200 overflow-x-auto">
       <Table>
-        <TableHeader className="bg-gray-50 border-b border-gray-200">
+        <TableHeader className="bg-gray-50 border-b border-gray-200 sticky top-0 z-40">
           <TableRow className="hover:bg-gray-50">
             <TableHead className="w-12 font-semibold text-gray-900">
               <input type="checkbox" className="w-4 h-4 rounded cursor-pointer" />
             </TableHead>
-            <TableHead className="font-semibold text-gray-900">Product</TableHead>
-            <TableHead className="text-right font-semibold text-gray-900">Price</TableHead>
-            <TableHead className="text-right font-semibold text-gray-900">Stock</TableHead>
-            <TableHead className="font-semibold text-gray-900">Status</TableHead>
-            <TableHead className="text-right font-semibold text-gray-900">Actions</TableHead>
+            <TableHead className="font-semibold text-gray-900 min-w-[200px]">Product</TableHead>
+            <TableHead className="text-right font-semibold text-gray-900 min-w-[80px]">Price</TableHead>
+            <TableHead className="text-right font-semibold text-gray-900 min-w-[70px]">Stock</TableHead>
+            <TableHead className="font-semibold text-gray-900 min-w-[80px]">Status</TableHead>
+            <TableHead className="text-right font-semibold text-gray-900 min-w-[60px]">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>

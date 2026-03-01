@@ -84,20 +84,23 @@ interface Theme {
 
 interface ThemeContextType {
   theme: Theme | null
-  isLoading: boolean
   refreshTheme: () => Promise<void>
   applyTheme: (theme: Theme) => void
+  triggerFastRefresh: () => void
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
 const THEME_STORAGE_KEY = "mizizzi_active_theme"
 
-export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const [theme, setTheme] = useState<Theme | null>(null)
-  const [isLoading, setIsLoading] = useState(true)
+export function ThemeProvider({ children, initialTheme }: { children: React.ReactNode; initialTheme?: Theme | null }) {
+  const [theme, setTheme] = useState<Theme | null>(initialTheme || null)
+  const [lastFetchedThemeId, setLastFetchedThemeId] = useState<number | null>(initialTheme?.id || null)
+  const [lastRefreshTime, setLastRefreshTime] = useState<number>(Date.now())
 
   const applyTheme = useCallback((themeData: Theme) => {
-    if (!themeData || !themeData.colors) return
+    if (!themeData || !themeData.colors) {
+      return
+    }
 
     const root = document.documentElement
     const { colors } = themeData
@@ -162,10 +165,18 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
 
   const refreshTheme = useCallback(async () => {
     try {
-      setIsLoading(true)
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"}/api/theme/active`,
-      )
+      const apiUrl = `${process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"}/api/theme/active`
+      
+      // Add cache-busting parameter to force fresh fetch
+      const timestamp = new Date().getTime()
+      const urlWithCacheBust = `${apiUrl}?t=${timestamp}`
+      
+      const response = await fetch(urlWithCacheBust, {
+        headers: {
+          'Cache-Control': 'no-cache, no-store, must-revalidate',
+          'Pragma': 'no-cache'
+        }
+      })
 
       if (!response.ok) {
         throw new Error("Failed to fetch theme")
@@ -174,21 +185,36 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       const data = await response.json()
 
       if (data.success && data.theme) {
-        applyTheme(data.theme)
+        // Always check and apply if any color values differ
+        const oldBg = theme?.colors?.background?.main
+        const newBg = data.theme?.colors?.background?.main
+        
+        if (lastFetchedThemeId !== data.theme.id || oldBg !== newBg) {
+          console.log(`[v0] 🎨 Theme refreshed - BG: ${oldBg} → ${newBg}`)
+          applyTheme(data.theme)
+          setLastFetchedThemeId(data.theme.id)
+        } else {
+          console.log("[v0] Theme up to date, no changes needed")
+        }
       }
     } catch (error) {
       console.error("[v0] Error fetching theme:", error)
-    } finally {
-      setIsLoading(false)
     }
-  }, [applyTheme])
+  }, [applyTheme, lastFetchedThemeId, theme])
 
   useEffect(() => {
+    // Apply initial theme from SSR immediately
+    if (initialTheme) {
+      applyTheme(initialTheme)
+      setLastFetchedThemeId(initialTheme.id)
+    }
+
     try {
       const cachedTheme = localStorage.getItem(THEME_STORAGE_KEY)
-      if (cachedTheme) {
+      if (cachedTheme && !initialTheme) {
         const parsedTheme = JSON.parse(cachedTheme) as Theme
         applyTheme(parsedTheme)
+        setLastFetchedThemeId(parsedTheme.id)
       }
     } catch (error) {
       console.error("[v0] Error loading cached theme:", error)
@@ -198,25 +224,35 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     refreshTheme()
 
     const unsubscribe = websocketService.on("theme_updated", (data: any) => {
-      console.log("[v0] Theme updated via WebSocket:", data)
       if (data.theme) {
         applyTheme(data.theme)
+        setLastFetchedThemeId(data.theme.id)
       }
     })
 
-    // Keep polling as fallback (increased to 15 seconds for better performance)
+    // Keep polling with dynamic interval (more frequent right after save, then back to normal)
+    let pollInterval = 3000 // 3 seconds (fast refresh after save)
+    const timeSinceLastRefresh = Date.now() - lastRefreshTime
+    
+    // After 30 seconds of no changes, switch to slower polling
+    if (timeSinceLastRefresh > 30000) {
+      pollInterval = 5000 // 5 seconds (slower polling after initial window)
+    }
+    
     const interval = setInterval(() => {
       refreshTheme()
-    }, 15000)
+    }, pollInterval)
 
     return () => {
       clearInterval(interval)
       unsubscribe()
     }
-  }, [refreshTheme, applyTheme])
+  }, [refreshTheme, applyTheme, initialTheme, lastRefreshTime])
 
   return (
-    <ThemeContext.Provider value={{ theme, isLoading, refreshTheme, applyTheme }}>{children}</ThemeContext.Provider>
+    <ThemeContext.Provider value={{ theme, refreshTheme, applyTheme, triggerFastRefresh: () => setLastRefreshTime(Date.now()) }}>
+      {children}
+    </ThemeContext.Provider>
   )
 }
 
