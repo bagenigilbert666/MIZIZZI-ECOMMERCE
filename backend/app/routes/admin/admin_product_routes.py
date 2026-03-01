@@ -474,7 +474,11 @@ def update_product(product_id):
 @cross_origin()
 @jwt_required()
 def delete_product(product_id):
-    """Delete a product"""
+    """Delete a product - supports soft delete and hard delete
+    
+    Query parameters:
+    - hard_delete: Set to true for permanent deletion (default: false for soft delete)
+    """
     if request.method == 'OPTIONS':
         return handle_options('DELETE, OPTIONS')
     # Check admin permissions
@@ -487,20 +491,75 @@ def delete_product(product_id):
 
         # Store product name for response
         product_name = product.name
+        
+        # Check if hard delete is requested
+        hard_delete = request.args.get('hard_delete', 'false').lower() == 'true'
 
-        # Delete the product
-        db.session.delete(product)
-        db.session.commit()
-
-        return jsonify({
-            'success': True,
-            'message': f'Product "{product_name}" deleted successfully'
-        }), 200
+        if hard_delete:
+            # Permanent deletion from database
+            db.session.delete(product)
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'message': f'Product "{product_name}" permanently deleted',
+                'type': 'hard_delete'
+            }), 200
+        else:
+            # Soft delete - mark as deleted with timestamp
+            from datetime import datetime
+            product.is_deleted = True
+            product.deleted_at = datetime.utcnow()
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'message': f'Product "{product_name}" moved to trash',
+                'type': 'soft_delete',
+                'deleted_at': product.deleted_at.isoformat() if product.deleted_at else None
+            }), 200
 
     except Exception as e:
         db.session.rollback()
         return jsonify({
             'error': 'Failed to delete product',
+            'details': str(e)
+        }), 500
+
+@admin_product_routes.route('/api/admin/products/<int:product_id>/restore', methods=['POST', 'OPTIONS'])
+@cross_origin()
+@jwt_required()
+def restore_product(product_id):
+    """Restore a soft-deleted product"""
+    if request.method == 'OPTIONS':
+        return handle_options('POST, OPTIONS')
+    # Check admin permissions
+    auth_check = admin_required()
+    if auth_check:
+        return auth_check
+
+    try:
+        product = Product.query.get_or_404(product_id)
+
+        if not product.is_deleted:
+            return jsonify({
+                'error': 'Product is not deleted',
+                'message': 'Only deleted products can be restored'
+            }), 400
+
+        # Restore the product
+        product.is_deleted = False
+        product.deleted_at = None
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': f'Product "{product.name}" restored successfully',
+            'product': product.to_dict()
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'error': 'Failed to restore product',
             'details': str(e)
         }), 500
 

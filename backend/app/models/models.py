@@ -728,6 +728,8 @@ class Product(db.Model):
     sort_order = db.Column(db.Integer, nullable=True)
     created_at = db.Column(db.DateTime, default=func.now())
     updated_at = db.Column(db.DateTime, default=func.now(), onupdate=func.now())
+    is_deleted = db.Column(db.Boolean, default=False)
+    deleted_at = db.Column(db.DateTime, nullable=True)
 
     # Relationships
     category = db.relationship('Category', back_populates='products')
