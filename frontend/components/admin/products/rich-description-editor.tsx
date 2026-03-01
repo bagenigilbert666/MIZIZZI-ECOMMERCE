@@ -80,8 +80,8 @@ export function RichDescriptionEditor({
       optimizedUrl = imageUrl.replace("/upload/", "/upload/c_limit,q_auto,f_auto/")
     }
 
-    // Insert image with proper styling and wrapper
-    const imgHtml = `<img src="${optimizedUrl}" alt="Product image" style="max-width: 100%; height: auto; border-radius: 8px; margin: 16px 0;" />`
+    // Insert image wrapped in paragraph for better display
+    const imgHtml = `<p><img src="${optimizedUrl}" alt="Product image" style="width: 100%; max-width: 100%; height: auto; display: block; border-radius: 8px; margin: 16px auto;" /></p>`
     document.execCommand("insertHTML", false, imgHtml)
     setImageUrl("")
     setShowImageModal(false)
@@ -147,8 +147,8 @@ export function RichDescriptionEditor({
 
       console.log("[v0] Inserting image with optimized URL:", cloudinaryOptimizedUrl)
 
-      // Insert the uploaded image with responsive styling
-      const imgHtml = `<img src="${cloudinaryOptimizedUrl}" alt="Product image" style="max-width: 100%; height: auto; border-radius: 8px; margin: 16px 0;" />`
+      // Insert image wrapped in a paragraph for better display in contentEditable
+      const imgHtml = `<p><img src="${cloudinaryOptimizedUrl}" alt="Product image" style="width: 100%; max-width: 100%; height: auto; display: block; border-radius: 8px; margin: 16px auto;" /></p>`
       document.execCommand("insertHTML", false, imgHtml)
       
       console.log("[v0] Image inserted successfully into description")
@@ -283,7 +283,7 @@ export function RichDescriptionEditor({
       </Card>
 
       {/* Editor */}
-      <div className="border-2 border-gray-300 rounded-lg overflow-hidden bg-white">
+      <div className="border-2 border-gray-300 rounded-lg overflow-auto bg-white">
         <div
           ref={editorRef}
           contentEditable
@@ -299,7 +299,7 @@ export function RichDescriptionEditor({
             [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:my-3 [&_ul]:text-gray-700
             [&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:my-3 [&_ol]:text-gray-700
             [&_li]:text-gray-700 [&_li]:my-1 [&_li]:mb-2
-            [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_img]:my-4
+            [&_img]:w-full [&_img]:max-w-full [&_img]:h-auto [&_img]:block [&_img]:rounded-lg [&_img]:my-4 [&_img]:mx-0
           "
         />
       </div>
@@ -417,7 +417,7 @@ export function RichDescriptionEditor({
       {showPreview && (
         <Card className="p-6 bg-gray-50 border-2 border-orange-100">
           <h3 className="text-lg font-semibold mb-4 text-gray-900">Preview - How customers will see it:</h3>
-          <div className="bg-white p-6 rounded-lg border border-gray-200 font-sans
+          <div className="bg-white p-6 rounded-lg border border-gray-200 font-sans overflow-auto max-h-96
             [&_h2]:text-2xl [&_h2]:font-bold [&_h2]:mt-6 [&_h2]:mb-3 [&_h2]:text-gray-900
             [&_h3]:text-xl [&_h3]:font-semibold [&_h3]:mt-4 [&_h3]:mb-2 [&_h3]:text-gray-800
             [&_p]:text-gray-700 [&_p]:leading-relaxed [&_p]:mb-3
@@ -426,7 +426,7 @@ export function RichDescriptionEditor({
             [&_ul]:list-disc [&_ul]:ml-6 [&_ul]:my-3 [&_ul]:text-gray-700
             [&_ol]:list-decimal [&_ol]:ml-6 [&_ol]:my-3 [&_ol]:text-gray-700
             [&_li]:text-gray-700 [&_li]:my-1 [&_li]:mb-2
-            [&_img]:max-w-full [&_img]:h-auto [&_img]:rounded-lg [&_img]:my-4
+            [&_img]:w-full [&_img]:max-w-full [&_img]:h-auto [&_img]:block [&_img]:rounded-lg [&_img]:my-4 [&_img]:mx-0
           ">
             <div dangerouslySetInnerHTML={{ __html: value }} />
           </div>
