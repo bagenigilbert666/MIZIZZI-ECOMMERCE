@@ -10,6 +10,7 @@ import { AlertCircle, Palette, Settings, RotateCcw, Check, LinkIcon, Mail, MapPi
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { motion, AnimatePresence } from 'framer-motion'
 import { FooterWithSettings } from '@/components/layout/footer-with-settings'
+import { Loader } from '@/components/ui/loader'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
 
@@ -238,56 +239,7 @@ export default function FooterAdminPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="relative w-16 h-16 sm:w-20 sm:h-20">
-          <svg
-            className="w-full h-full drop-shadow-lg"
-            viewBox="0 0 100 100"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            {/* Outer rotating arc - Dark Cherry Red */}
-            <motion.circle
-              cx="50"
-              cy="50"
-              r="40"
-              fill="none"
-              stroke="#8B1428"
-              strokeWidth="6"
-              strokeDasharray="62.8 188.4"
-              strokeLinecap="round"
-              animate={{ 
-                rotate: 360,
-              }}
-              transition={{
-                duration: 2,
-                repeat: Number.POSITIVE_INFINITY,
-                ease: "linear",
-              }}
-              style={{ transformOrigin: "50px 50px" }}
-            />
-            
-            {/* Secondary accent arc - subtle glow effect */}
-            <motion.circle
-              cx="50"
-              cy="50"
-              r="40"
-              fill="none"
-              stroke="#8B1428"
-              strokeWidth="2"
-              strokeDasharray="62.8 188.4"
-              strokeLinecap="round"
-              opacity={0.3}
-              animate={{ 
-                rotate: -360,
-              }}
-              transition={{
-                duration: 3,
-                repeat: Number.POSITIVE_INFINITY,
-                ease: "linear",
-              }}
-              style={{ transformOrigin: "50px 50px" }}
-            />
-          </svg>
-        </div>
+        <Loader size="lg" />
       </div>
     )
   }
