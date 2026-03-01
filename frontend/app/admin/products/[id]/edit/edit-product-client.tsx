@@ -40,38 +40,31 @@ const isValidProductId = (productId: string): boolean => {
   return !isNaN(Number(productId)) && Number(productId) > 0
 }
 
-// Client component that receives the unwrapped productId as a prop and initial data
-export function EditProductClient({ 
-  productId,
-  initialProduct,
-  initialCategories = [],
-  initialBrands = [],
-  initialImages = [],
-}: { 
-  productId: string
-  initialProduct?: any
-  initialCategories?: any[]
-  initialBrands?: any[]
-  initialImages?: any[]
-}) {
+// Client component that receives the unwrapped productId as a prop
+export function EditProductClient({ productId }: { productId: string }) {
   const router = useRouter()
   const { isAuthenticated, isLoading: authLoading, logout, refreshAccessToken, getToken } = useAdminAuth()
 
-  // Use initial data with SWR fallback for real-time updates
-  const { product = initialProduct, isLoading: isLoadingProduct, isError: productError, mutate: mutateProduct } = useProduct(productId, { initialData: initialProduct })
-  const { images: productImages = initialImages, mutate: mutateImages } = useProductImages(
+  const [isLoading, setIsLoading] = useState(true)
+  // Replace these state variables:
+  // const [product, setProduct] = useState<Product | null>(null)
+  // const [categories, setCategories] = useState<any[]>([])
+  // const [brands, setBrands] = useState<any[]>([])
+  // const [isLoadingCategories, setIsLoadingCategories] = useState(true)
+  // const [isLoadingBrands, setIsLoadingBrands] = useState(true)
+
+  // With SWR hooks:
+  const { product, isLoading: isLoadingProduct, isError: productError, mutate: mutateProduct } = useProduct(productId)
+  const { images: productImages, mutate: mutateImages } = useProductImages(
     isValidProductId(productId) ? productId : undefined,
-    { initialData: initialImages }
   )
   const {
-    categories = initialCategories,
+    categories,
     isLoading: isLoadingCategories,
     isError: categoriesError,
     mutate: mutateCategories,
-  } = useCategories({ initialData: initialCategories })
-  const { brands = initialBrands, isLoading: isLoadingBrands, isError: brandsError } = useBrands({ initialData: initialBrands })
-  
-  const [isLoading, setIsLoading] = useState(!initialProduct) // Only show loading if no initial data
+  } = useCategories()
+  const { brands, isLoading: isLoadingBrands, isError: brandsError } = useBrands()
   const [activeTab, setActiveTab] = useState("basic")
   const [unsavedChangesDialog, setUnsavedChangesDialog] = useState(false)
   const [navigateTo, setNavigateTo] = useState("")
@@ -640,7 +633,6 @@ export function EditProductClient({
                     brandError={brandError}
                     saveSectionChanges={saveSectionChanges}
                     mutateCategories={mutateCategories}
-                    productId={productId}
                   />
                 </TabsContent>
 

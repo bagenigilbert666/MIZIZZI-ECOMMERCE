@@ -344,17 +344,13 @@ export function useProduct(productId: string | undefined, config?: SWRConfigurat
     productFetcher,
     {
       ...defaultSWRConfig,
-      // Pass fallbackData from config if available (used for SSR initial data)
-      fallbackData: config?.fallbackData,
       ...config,
-      // Revalidate in background even if we have fallback data
-      revalidateOnMount: true,
     },
   )
 
   return {
     product: data,
-    isLoading: isLoading && !data,
+    isLoading,
     isError: error,
     mutate,
   }
@@ -366,15 +362,14 @@ export function useProductImages(productId: string | undefined, config?: SWRConf
     specialImagesFetcher,
     {
       ...defaultSWRConfig,
-      fallbackData: config?.fallbackData || [],
       ...config,
-      revalidateOnMount: true,
+      fallbackData: [], // Provide fallback data to avoid undefined errors
     },
   )
 
   return {
     images: data || [],
-    isLoading: isLoading && !data,
+    isLoading,
     isError: error,
     mutate,
   }
@@ -389,18 +384,17 @@ export function useCategories(config?: SWRConfiguration) {
     () => categoriesFetcher(),
     {
       ...defaultSWRConfig,
-      revalidateOnFocus: true,
+      revalidateOnFocus: true, // revalidate on focus so newly added categories show up when user focuses the tab
       dedupingInterval: 300000, // 5 minutes
       errorRetryCount: 1, // Only retry once for admin endpoints
-      fallbackData: config?.fallbackData || [],
+      fallbackData: [], // Provide fallback data to avoid undefined errors
       ...config,
-      revalidateOnMount: true,
     },
   )
 
   return {
     categories: data || [],
-    isLoading: isLoading && !data,
+    isLoading,
     isError: error,
     mutate, // Export mutate to allow cache invalidation
   }
@@ -430,20 +424,18 @@ export async function invalidateCategories() {
 
 // For brands, use adminService directly to avoid CORS
 export function useBrands(config?: SWRConfiguration) {
-  const { data, error, isLoading, mutate } = useSWR<any[]>("/api/admin/brands", fetcher, {
+  const { data, error, isLoading } = useSWR<any[]>("/api/admin/brands", fetcher, {
     ...defaultSWRConfig,
     dedupingInterval: 300000, // 5 minutes
     errorRetryCount: 1, // Only retry once for admin endpoints
-    fallbackData: config?.fallbackData || [],
+    fallbackData: [], // Provide fallback data to avoid undefined errors
     ...config,
-    revalidateOnMount: true,
   })
 
   return {
     brands: data || [],
-    isLoading: isLoading && !data,
+    isLoading,
     isError: error,
-    mutate,
   }
 }
 
