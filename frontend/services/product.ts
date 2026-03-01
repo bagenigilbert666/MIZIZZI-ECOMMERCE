@@ -635,7 +635,7 @@ export const productService = {
   },
 
   /**
-   * Get a product by slug
+   * Get a product by its slug with fallback mechanisms
    * @param slug The product slug
    * @returns Promise resolving to a product or null
    */
@@ -649,6 +649,25 @@ export const productService = {
       if (cachedItem && now - cachedItem.timestamp < CACHE_DURATION) {
         console.log(`Using cached product data for slug ${slug}`)
         return cachedItem.data[0] // Return the first product from the array
+      }
+
+      // Try extracting numeric ID from slug (format: name-id)
+      const slugParts = slug.split("-")
+      const possibleId = slugParts[slugParts.length - 1]
+      const isNumericId = /^\d+$/.test(possibleId)
+
+      // If slug ends with a number, try fetching by ID first
+      if (isNumericId) {
+        try {
+          console.log(`[v0] Attempting to fetch product by extracted ID: ${possibleId}`)
+          const product = await this.getProduct(possibleId)
+          if (product) {
+            console.log(`[v0] Product found by ID: ${possibleId}`)
+            return product
+          }
+        } catch (err) {
+          console.warn(`[v0] Failed to fetch by extracted ID, trying slug endpoints`, err)
+        }
       }
 
       // Try common endpoints (slug-specific first, then fallback)
