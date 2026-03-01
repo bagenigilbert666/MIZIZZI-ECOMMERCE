@@ -1,19 +1,12 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
-import { Textarea } from "@/components/ui/textarea"
-import { Switch } from "@/components/ui/switch"
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog"
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
-import { useToast } from "@/hooks/use-toast"
-import { Plus, Pencil, Trash2, Loader, ImageIcon, Upload, Save } from "lucide-react"
+import { Plus, Pencil, Trash2, Loader, ImageIcon } from "lucide-react"
 import Image from "next/image"
-import { websocketService } from "@/services/websocket"
-import { useSWRConfig } from "swr"
-import { categoryService } from "@/services/category"
+import { useToast } from "@/hooks/use-toast"
+import { CategoryFormDialog } from "@/components/admin/categories/category-form-dialog"
+import { CategoryDeleteDialog } from "@/components/admin/categories/category-delete-dialog"
 
 const getValidImageUrl = (url: string | null | undefined): string => {
   if (!url) return "/placeholder.svg"
@@ -48,32 +41,14 @@ interface Category {
 
 export default function ShopCategoriesAdminPage() {
   const { toast } = useToast()
-  const { mutate } = useSWRConfig()
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
-  const [deletingId, setDeletingId] = useState<number | null>(null)
 
   // Dialog states
-  const [isDialogOpen, setIsDialogOpen] = useState(false)
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [uploadingImage, setUploadingImage] = useState(false)
-  
-  // Form state
-  const [formData, setFormData] = useState({
-    name: "",
-    slug: "",
-    description: "",
-    image_url: "",
-    banner_url: "",
-    is_featured: false,
-    sort_order: 0,
-  })
-
-  const imageInputRef = useRef<HTMLInputElement>(null)
-  const bannerInputRef = useRef<HTMLInputElement>(null)
 
   // Fetch categories
   const fetchCategories = async () => {
@@ -113,200 +88,19 @@ export default function ShopCategoriesAdminPage() {
     fetchCategories()
   }, [])
 
-  const handleDelete = async (category: Category) => {
-    try {
-      setDeletingId(category.id)
-      const token = localStorage.getItem("admin_token") || localStorage.getItem("mizizzi_token")
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
-
-      const response = await fetch(`${baseUrl}/api/admin/shop-categories/categories/${category.id}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || "Failed to delete category")
-      }
-
-      toast({
-        title: "Success",
-        description: "Category deleted successfully",
-      })
-
-      await websocketService.emit("category_updated", {
-        type: "deleted",
-        category: { id: category.id },
-      })
-
-      fetchCategories()
-
-      categoryService.clearCache()
-      if (typeof sessionStorage !== "undefined") {
-        sessionStorage.removeItem("categories")
-      }
-
-      mutate((key: any) => typeof key === "string" && key.includes("categories"), undefined, { revalidate: true })
-    } catch (error) {
-      console.error("Error deleting category:", error)
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to delete category",
-        variant: "destructive",
-      })
-    } finally {
-      setDeletingId(null)
-    }
-  }
-
   const handleEdit = (category: Category) => {
     setEditingCategory(category)
-    setFormData({
-      name: category.name,
-      slug: category.slug,
-      description: category.description || "",
-      image_url: category.image_url || "",
-      banner_url: category.banner_url || "",
-      is_featured: category.is_featured,
-      sort_order: category.sort_order,
-    })
-    setIsDialogOpen(true)
+    setIsFormDialogOpen(true)
   }
 
   const openCreateDialog = () => {
     setEditingCategory(null)
-    setFormData({
-      name: "",
-      slug: "",
-      description: "",
-      image_url: "",
-      banner_url: "",
-      is_featured: false,
-      sort_order: 0,
-    })
-    setIsDialogOpen(true)
+    setIsFormDialogOpen(true)
   }
 
   const openDeleteDialog = (category: Category) => {
     setCategoryToDelete(category)
-    setDeleteDialogOpen(true)
-  }
-
-  const handleNameChange = (name: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      name,
-      slug: name.toLowerCase().replace(/\s+/g, "-"),
-    }))
-  }
-
-  const handleImageUpload = async (file: File, fieldName: "image_url" | "banner_url") => {
-    if (!file) return
-
-    try {
-      setUploadingImage(true)
-      const formDataObj = new FormData()
-      formDataObj.append("file", file)
-
-      const token = localStorage.getItem("admin_token") || localStorage.getItem("mizizzi_token")
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
-
-      const response = await fetch(`${baseUrl}/api/admin/shop-categories/upload`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formDataObj,
-      })
-
-      if (!response.ok) throw new Error("Upload failed")
-
-      const data = await response.json()
-      setFormData((prev) => ({
-        ...prev,
-        [fieldName]: data.url,
-      }))
-    } catch (error) {
-      console.error("Error uploading image:", error)
-      toast({
-        title: "Error",
-        description: "Failed to upload image",
-        variant: "destructive",
-      })
-    } finally {
-      setUploadingImage(false)
-    }
-  }
-
-  const handleSave = async () => {
-    if (!formData.name || !formData.image_url) {
-      toast({
-        title: "Validation Error",
-        description: "Please fill in all required fields",
-        variant: "destructive",
-      })
-      return
-    }
-
-    try {
-      setSaving(true)
-      const token = localStorage.getItem("admin_token") || localStorage.getItem("mizizzi_token")
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
-
-      const payload = {
-        name: formData.name,
-        slug: formData.slug || formData.name.toLowerCase().replace(/\s+/g, "-"),
-        description: formData.description,
-        image_url: formData.image_url,
-        banner_url: formData.banner_url,
-        is_featured: formData.is_featured,
-        sort_order: formData.sort_order,
-      }
-
-      const url = editingCategory
-        ? `${baseUrl}/api/admin/shop-categories/categories/${editingCategory.id}`
-        : `${baseUrl}/api/admin/shop-categories/categories`
-
-      const response = await fetch(url, {
-        method: editingCategory ? "PUT" : "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        throw new Error(errorData.error || "Failed to save category")
-      }
-
-      toast({
-        title: "Success",
-        description: editingCategory ? "Category updated successfully" : "Category created successfully",
-      })
-
-      setIsDialogOpen(false)
-      await websocketService.emit("category_updated", {
-        type: editingCategory ? "updated" : "created",
-        category: payload,
-      })
-
-      fetchCategories()
-      categoryService.clearCache()
-      mutate((key: any) => typeof key === "string" && key.includes("categories"), undefined, { revalidate: true })
-    } catch (error) {
-      console.error("Error saving category:", error)
-      toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to save category",
-        variant: "destructive",
-      })
-    } finally {
-      setSaving(false)
-    }
+    setIsDeleteDialogOpen(true)
   }
 
   return (
@@ -417,21 +211,11 @@ export default function ShopCategoriesAdminPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => openDeleteDialog(category)}
-                    disabled={deletingId === category.id}
-                    className="h-9 rounded-lg px-4 gap-2 border-red-200/50 hover:border-red-300 hover:bg-red-50 text-red-600 hover:text-red-700 font-medium text-sm transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="h-9 rounded-lg px-4 gap-2 border-red-200/50 hover:border-red-300 hover:bg-red-50 text-red-600 hover:text-red-700 font-medium text-sm transition-all duration-200"
                     title="Delete category"
                   >
-                    {deletingId === category.id ? (
-                      <>
-                        <Loader className="h-4 w-4 animate-spin" />
-                        <span className="hidden sm:inline">Deleting...</span>
-                      </>
-                    ) : (
-                      <>
-                        <Trash2 className="h-4 w-4" />
-                        <span className="hidden sm:inline">Delete</span>
-                      </>
-                    )}
+                    <Trash2 className="h-4 w-4" />
+                    <span className="hidden sm:inline">Delete</span>
                   </Button>
                 </div>
               </div>
@@ -440,262 +224,21 @@ export default function ShopCategoriesAdminPage() {
         )}
       </div>
 
-      {/* Create/Edit Dialog - Modern Apple-style Form */}
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="w-[95vw] max-w-2xl max-h-[80vh] p-0 gap-0">
-          {/* Fixed Header */}
-          <DialogHeader className="border-b border-border/40 px-6 sm:px-8 py-5 bg-background">
-            <DialogTitle className="text-2xl sm:text-3xl font-bold">
-              {editingCategory ? "Edit Category" : "Create Category"}
-            </DialogTitle>
-            <DialogDescription className="mt-2 text-sm sm:text-base">
-              {editingCategory ? "Update your category details and visibility settings" : "Set up a new category for your store with all necessary details"}
-            </DialogDescription>
-          </DialogHeader>
+      {/* Category Form Dialog */}
+      <CategoryFormDialog
+        open={isFormDialogOpen}
+        onOpenChange={setIsFormDialogOpen}
+        editingCategory={editingCategory}
+        onSaveSuccess={fetchCategories}
+      />
 
-          {/* Scrollable Content - Clean organized layout */}
-          <div className="overflow-y-auto flex-1 min-h-0 px-6 sm:px-8 py-6">
-            <div className="space-y-5 max-w-2xl">
-              {/* Section 1: Image Uploads */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                  <h3 className="text-xs font-bold text-foreground uppercase tracking-widest">Images</h3>
-                </div>
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Main Category Image */}
-                  <div className="space-y-2">
-                    <Label htmlFor="category-image" className="text-sm font-semibold">Category Image *</Label>
-                    <div className="relative rounded-lg overflow-hidden bg-gradient-to-br from-muted to-muted/50 border-2 border-border/40 h-28 group hover:border-border/60 transition-colors">
-                      <Image
-                        src={getValidImageUrl(formData.image_url)}
-                        alt="Category preview"
-                        fill
-                        className="object-cover group-hover:opacity-90 transition-opacity"
-                      />
-                      {!formData.image_url && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-muted/30">
-                          <ImageIcon className="h-7 w-7 text-muted-foreground/40" />
-                        </div>
-                      )}
-                    </div>
-                    <input
-                      ref={imageInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0]
-                        if (file) handleImageUpload(file, "image_url")
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => imageInputRef.current?.click()}
-                      disabled={uploadingImage}
-                      size="sm"
-                      className="w-full h-8 rounded-lg font-medium text-xs"
-                    >
-                      {uploadingImage ? (
-                        <>
-                          <Loader className="h-3 w-3 mr-2 animate-spin" />
-                          Uploading...
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="h-3 w-3 mr-2" />
-                          {formData.image_url ? "Change" : "Upload"} Image
-                        </>
-                      )}
-                    </Button>
-                  </div>
-
-                  {/* Banner Image */}
-                  <div className="space-y-2">
-                    <Label htmlFor="banner-image" className="text-sm font-semibold">Banner (Optional)</Label>
-                    <div className="relative rounded-lg overflow-hidden bg-muted border border-border/40 h-28 group hover:border-border/60 transition-colors">
-                      <Image
-                        src={getValidImageUrl(formData.banner_url)}
-                        alt="Banner preview"
-                        fill
-                        className="object-cover"
-                      />
-                    </div>
-                    <input
-                      ref={bannerInputRef}
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0]
-                        if (file) handleImageUpload(file, "banner_url")
-                      }}
-                    />
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => bannerInputRef.current?.click()}
-                      disabled={uploadingImage}
-                      size="sm"
-                      className="w-full h-8 rounded-lg font-medium text-xs"
-                    >
-                      {uploadingImage ? "Uploading..." : (formData.banner_url ? "Change" : "Upload")} Banner
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Divider */}
-              <div className="h-px bg-border/40" />
-
-              {/* Section 2: Basic Information */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                  <h3 className="text-xs font-bold text-foreground uppercase tracking-widest">Information</h3>
-                </div>
-
-                <div className="space-y-2">
-                  <div className="space-y-1">
-                    <Label htmlFor="name" className="text-sm font-medium">Category Name *</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => handleNameChange(e.target.value)}
-                      placeholder="e.g., Electronics"
-                      className="h-9 rounded-lg text-sm border-border/40"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label htmlFor="slug" className="text-sm font-medium">URL Slug</Label>
-                    <Input
-                      id="slug"
-                      value={formData.slug}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, slug: e.target.value }))}
-                      placeholder="e.g., electronics"
-                      className="h-9 rounded-lg text-sm font-mono text-xs border-border/40"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label htmlFor="description" className="text-sm font-medium">Description</Label>
-                    <Textarea
-                      id="description"
-                      value={formData.description}
-                      onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
-                      placeholder="Describe this category..."
-                      rows={2}
-                      className="rounded-lg text-sm border-border/40 resize-none"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              {/* Divider */}
-              <div className="h-px bg-border/40" />
-
-              {/* Section 3: Display Settings */}
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="h-1.5 w-1.5 rounded-full bg-primary" />
-                  <h3 className="text-xs font-bold text-foreground uppercase tracking-widest">Settings</h3>
-                </div>
-
-                {/* Featured Toggle */}
-                <div className="flex items-center justify-between p-3 rounded-lg bg-muted/40 border border-border/40 hover:bg-muted/50 transition-colors">
-                  <div className="space-y-0.5">
-                    <Label className="text-sm font-semibold cursor-pointer">Featured Category</Label>
-                    <p className="text-xs text-muted-foreground">Show on homepage</p>
-                  </div>
-                  <Switch
-                    checked={formData.is_featured}
-                    onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, is_featured: checked }))}
-                  />
-                </div>
-
-                {/* Sort Order */}
-                <div className="space-y-1">
-                  <Label htmlFor="sort_order" className="text-sm font-medium">Display Order</Label>
-                  <Input
-                    id="sort_order"
-                    type="number"
-                    value={formData.sort_order}
-                    onChange={(e) => setFormData((prev) => ({ ...prev, sort_order: Number.parseInt(e.target.value) || 0 }))}
-                    min={0}
-                    className="h-9 rounded-lg text-sm border-border/40"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Fixed Footer */}
-          <DialogFooter className="px-6 sm:px-8 py-4 border-t border-border/40">
-            <Button
-              variant="outline"
-              onClick={() => setIsDialogOpen(false)}
-              size="sm"
-              className="h-9 px-6 rounded-lg font-medium text-sm"
-            >
-              Cancel
-            </Button>
-            <Button
-              onClick={handleSave}
-              disabled={saving || !formData.name || !formData.image_url}
-              size="sm"
-              className="h-9 px-6 rounded-lg font-medium text-sm gap-2"
-            >
-              {saving ? (
-                <>
-                  <Loader className="h-3 w-3 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <Save className="h-3 w-3" />
-                  {editingCategory ? "Update" : "Create"}
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete Confirmation Dialog - Modern Style */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent className="max-w-sm rounded-2xl border-border/50">
-          <AlertDialogHeader className="space-y-4 text-center">
-            <div className="flex justify-center">
-              <div className="h-16 w-16 rounded-full bg-destructive/10 flex items-center justify-center">
-                <Trash2 className="h-8 w-8 text-destructive" />
-              </div>
-            </div>
-            <AlertDialogTitle className="text-2xl">Delete Category?</AlertDialogTitle>
-            <AlertDialogDescription className="text-base">
-              You're about to delete <span className="font-semibold text-foreground">"{categoryToDelete?.name}"</span>
-              <br />
-              <span className="text-sm">This action cannot be undone.</span>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col-reverse gap-3 sm:flex-row pt-4">
-            <AlertDialogCancel className="h-11 rounded-lg font-medium text-base">Keep Category</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (categoryToDelete) {
-                  handleDelete(categoryToDelete)
-                  setDeleteDialogOpen(false)
-                }
-              }}
-              className="h-11 rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90 font-medium text-base"
-            >
-              Delete Category
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Category Delete Dialog */}
+      <CategoryDeleteDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        category={categoryToDelete}
+        onDeleteSuccess={fetchCategories}
+      />
     </div>
   )
 }
