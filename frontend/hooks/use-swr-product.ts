@@ -482,7 +482,7 @@ export function prefetchProducts(productIds: string[]): void {
 }
 // Best-effort: subscribe to socket events to auto-invalidate categories cache when backend emits changes.
 // This uses runtime-only lookups to avoid bundler resolution errors for optional socket module.
-;(async function initCategorySocketListeners() {
+; (async function initCategorySocketListeners() {
   try {
     // Only run in browser
     if (typeof window === "undefined") return
@@ -490,11 +490,26 @@ export function prefetchProducts(productIds: string[]): void {
     // Wait for WebSocket to be ready (with timeout)
     const startTime = Date.now()
     const timeout = 5000 // 5 second timeout
-    let isReady = websocketService.getIsConnected()
+
+    // Safe accessor for websocket connection state: try multiple common APIs/properties.
+    const getSocketConnected = () => {
+      try {
+        const ws: any = websocketService
+        if (typeof ws.getIsConnected === "function") return ws.getIsConnected()
+        if (typeof ws.isConnected === "function") return ws.isConnected()
+        if (typeof ws.connected === "boolean") return ws.connected
+        if (typeof ws.isConnected === "boolean") return ws.isConnected
+      } catch (e) {
+        /* ignore */
+      }
+      return false
+    }
+
+    let isReady = getSocketConnected()
 
     while (!isReady && Date.now() - startTime < timeout) {
       await new Promise((resolve) => setTimeout(resolve, 200))
-      isReady = websocketService.getIsConnected()
+      isReady = getSocketConnected()
     }
 
     if (!isReady) {
@@ -510,7 +525,7 @@ export function prefetchProducts(productIds: string[]): void {
       const handleInvalidate = () => {
         try {
           // Use centralized helper to clear & revalidate category-related keys
-          invalidateCategories().catch(() => {})
+          invalidateCategories().catch(() => { })
         } catch (e) {
           /* ignore */
         }
