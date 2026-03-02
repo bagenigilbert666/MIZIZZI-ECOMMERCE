@@ -10,7 +10,7 @@ const DialogTrigger = DialogPrimitive.Trigger
 const DialogPortal = DialogPrimitive.Portal
 const DialogClose = DialogPrimitive.Close
 
-// Enhanced overlay with proper z-index and visibility
+// Clean backdrop with proper visibility
 const DialogOverlay = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Overlay>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Overlay>
@@ -19,10 +19,10 @@ const DialogOverlay = React.forwardRef<
     ref={ref}
     className={cn(
       "fixed inset-0 z-50",
-      "bg-black/50 backdrop-blur-sm",
+      "bg-black/40 backdrop-blur-sm",
       "data-[state=open]:animate-in data-[state=closed]:animate-out",
       "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
-      "transition-opacity duration-300",
+      "duration-200",
       className,
     )}
     {...props}
@@ -30,7 +30,7 @@ const DialogOverlay = React.forwardRef<
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
-// Responsive dialog content - centered and visible on all screen sizes
+// Professional dialog content - clean and modern like Amazon
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
@@ -40,28 +40,26 @@ const DialogContent = React.forwardRef<
     <DialogPrimitive.Content
       ref={ref}
       className={cn(
-        // Fixed positioning centered on screen
-        "fixed left-1/2 top-1/2 z-50",
-        "translate-x-[-50%] translate-y-[-50%]",
+        // Perfect centering on all screens
+        "fixed left-[50%] top-[50%] z-50 w-full translate-x-[-50%] translate-y-[-50%]",
         
-        // Size and max constraints
-        "w-full mx-4 max-w-2xl",
-        "rounded-2xl",
-        "bg-white dark:bg-slate-950",
-        "shadow-2xl dark:shadow-2xl",
-        "border border-gray-200 dark:border-slate-800",
+        // Responsive sizing - max-width adapts to screen
+        "max-w-md md:max-w-lg lg:max-w-2xl mx-4 sm:mx-6",
         
-        // Content layout - flex column for proper stacking
-        "flex flex-col max-h-[90vh]",
-        "overflow-hidden",
+        // Clean card styling
+        "rounded-xl bg-white shadow-2xl",
+        "border border-gray-200",
         
-        // Smooth animations
-        "duration-300",
+        // Flexbox for proper content distribution
+        "flex flex-col max-h-[90vh] overflow-hidden",
+        
+        // Smooth entrance animation
         "data-[state=open]:animate-in data-[state=closed]:animate-out",
         "data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
         "data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95",
         "data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%]",
         "data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%]",
+        "duration-300 ease-out",
         
         className,
       )}
@@ -69,34 +67,33 @@ const DialogContent = React.forwardRef<
     >
       {children}
 
-      {/* Close button - always visible and accessible */}
+      {/* Close button - clean and professional */}
       <DialogPrimitive.Close
         className={cn(
-          "absolute right-4 top-4",
-          "p-2 rounded-lg",
-          "bg-gray-100/50 dark:bg-slate-800/50",
-          "hover:bg-gray-200 dark:hover:bg-slate-700",
-          "text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200",
+          "absolute right-4 top-4 z-50",
+          "rounded-full p-1.5",
+          "text-gray-500 hover:text-gray-700 hover:bg-gray-100",
           "transition-all duration-200",
-          "focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500",
-          "z-50",
+          "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
+          "active:scale-95",
         )}
+        asChild
       >
-   
+        <button type="button" aria-label="Close dialog">
+          <X className="h-5 w-5" />
+        </button>
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>
   </DialogPortal>
 ))
 DialogContent.displayName = DialogPrimitive.Content.displayName
 
-// Header with clear separation
+// Clean header with subtle border
 const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      "flex-shrink-0",
-      "px-6 py-5 sm:px-8 sm:py-6",
-      "border-b border-gray-100 dark:border-slate-800",
-      "bg-white dark:bg-slate-950",
+      "flex-shrink-0 px-6 py-5 md:px-8 md:py-6",
+      "border-b border-gray-200",
       className,
     )}
     {...props}
@@ -104,17 +101,17 @@ const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivEleme
 )
 DialogHeader.displayName = "DialogHeader"
 
-// Scrollable body
+// Scrollable content body
 const DialogBody = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      "flex-1 overflow-y-auto",
-      "px-6 py-4 sm:px-8 sm:py-6",
-      "bg-white dark:bg-slate-950",
+      "flex-1 overflow-y-auto px-6 py-4 md:px-8 md:py-6",
+      // Custom scrollbar styling
       "[&::-webkit-scrollbar]:w-2",
       "[&::-webkit-scrollbar-track]:bg-transparent",
-      "[&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-slate-600",
+      "[&::-webkit-scrollbar-thumb]:bg-gray-300",
       "[&::-webkit-scrollbar-thumb]:rounded-full",
+      "[&::-webkit-scrollbar-thumb]:hover:bg-gray-400",
       className,
     )}
     {...props}
@@ -122,15 +119,14 @@ const DialogBody = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement
 )
 DialogBody.displayName = "DialogBody"
 
-// Footer with proper spacing
+// Footer with action buttons
 const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
   <div
     className={cn(
-      "flex-shrink-0",
-      "px-6 py-4 sm:px-8 sm:py-5",
-      "border-t border-gray-100 dark:border-slate-800",
-      "bg-gray-50/50 dark:bg-slate-950/50",
-      "flex flex-col-reverse sm:flex-row sm:justify-end gap-3",
+      "flex-shrink-0 px-6 py-4 md:px-8 md:py-5",
+      "border-t border-gray-200",
+      "bg-gray-50",
+      "flex flex-col-reverse gap-3 sm:flex-row sm:justify-end sm:gap-3",
       className,
     )}
     {...props}
@@ -138,7 +134,7 @@ const DialogFooter = ({ className, ...props }: React.HTMLAttributes<HTMLDivEleme
 )
 DialogFooter.displayName = "DialogFooter"
 
-// Title styling
+// Bold, clear title
 const DialogTitle = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Title>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>
@@ -146,8 +142,8 @@ const DialogTitle = React.forwardRef<
   <DialogPrimitive.Title
     ref={ref}
     className={cn(
-      "text-xl sm:text-2xl font-bold text-gray-900 dark:text-white",
-      "tracking-tight leading-tight",
+      "text-lg md:text-2xl font-bold text-gray-900",
+      "leading-tight",
       className,
     )}
     {...props}
@@ -155,7 +151,7 @@ const DialogTitle = React.forwardRef<
 ))
 DialogTitle.displayName = DialogPrimitive.Title.displayName
 
-// Description styling
+// Soft, readable description
 const DialogDescription = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Description>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Description>
@@ -163,7 +159,7 @@ const DialogDescription = React.forwardRef<
   <DialogPrimitive.Description
     ref={ref}
     className={cn(
-      "text-sm sm:text-base text-gray-600 dark:text-gray-400",
+      "text-sm md:text-base text-gray-600",
       "leading-relaxed mt-2",
       className,
     )}
