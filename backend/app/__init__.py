@@ -1029,6 +1029,15 @@ def create_app(config_name=None, enable_socketio=True):
             
             app.register_blueprint(fallback_google, url_prefix='/api/auth')
             app.logger.warning("⚠️ Using fallback Google OAuth routes")
+
+        # Register debug routes for email testing and configuration
+        try:
+            app.logger.debug("Importing debug routes...")
+            from app.routes.debug_routes import debug_routes
+            app.register_blueprint(debug_routes)
+            app.logger.info("✅ Debug routes registered successfully at /api/debug")
+        except Exception as e:
+            app.logger.warning(f"⚠️ Failed to register debug routes: {str(e)}")
         
         # Clean startup logging
         def log_startup_summary():

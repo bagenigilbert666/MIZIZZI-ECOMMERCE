@@ -33,11 +33,21 @@ def send_email(to_email, subject, html_content):
     try:
         import requests
         
+        logger.info(f"[v0] 📧 Starting email send process to: {to_email}")
+        
         # Get Brevo API key from environment
         api_key = current_app.config.get('BREVO_API_KEY')
         if not api_key:
-            logger.error("BREVO_API_KEY not configured")
+            logger.error("[v0] ❌ BREVO_API_KEY not configured in environment")
             return False
+        
+        logger.info(f"[v0] ✅ BREVO_API_KEY found (length: {len(api_key)} chars)")
+        
+        # Get sender email from config with fallback
+        sender_email = current_app.config.get('BREVO_SENDER_EMAIL', 'info.contactgilbertdev@gmail.com')
+        sender_name = current_app.config.get('BREVO_SENDER_NAME', 'MIZIZZI')
+        
+        logger.info(f"[v0] 📤 Sender: {sender_name} <{sender_email}>")
         
         # Brevo API endpoint
         url = "https://api.brevo.com/v3/smtp/email"
@@ -45,8 +55,8 @@ def send_email(to_email, subject, html_content):
         # Email payload
         payload = {
             "sender": {
-                "name": "MIZIZZI",
-                "email": "info.contactgilbertdev@gmail.com"
+                "name": sender_name,
+                "email": sender_email
             },
             "to": [
                 {
@@ -64,18 +74,40 @@ def send_email(to_email, subject, html_content):
             "api-key": api_key
         }
         
-        # Send request
-        response = requests.post(url, json=payload, headers=headers)
+        logger.info(f"[v0] 🚀 Sending request to Brevo API: {url}")
+        
+        # Send request with timeout
+        response = requests.post(url, json=payload, headers=headers, timeout=30)
+        
+        logger.info(f"[v0] 📨 Brevo response status code: {response.status_code}")
         
         if response.status_code in [200, 201]:
-            logger.info(f"Email sent successfully to {to_email}")
+            logger.info(f"[v0] ✅ Email sent successfully to {to_email}")
+            try:
+                response_data = response.json()
+                if 'messageId' in response_data:
+                    logger.info(f"[v0] Message ID: {response_data['messageId']}")
+            except:
+                pass
             return True
         else:
-            logger.error(f"Failed to send email. Status: {response.status_code}, Response: {response.text}")
+            logger.error(f"[v0] ❌ Failed to send email. Status: {response.status_code}")
+            logger.error(f"[v0] Response headers: {dict(response.headers)}")
+            try:
+                response_data = response.json()
+                logger.error(f"[v0] Error details: {response_data}")
+            except:
+                logger.error(f"[v0] Response text: {response.text}")
             return False
             
+    except requests.exceptions.Timeout:
+        logger.error(f"[v0] ⏱️ Timeout sending email to {to_email} (30s timeout)")
+        return False
+    except requests.exceptions.ConnectionError as e:
+        logger.error(f"[v0] 🔌 Connection error sending email: {str(e)}", exc_info=True)
+        return False
     except Exception as e:
-        logger.error(f"Error sending email: {str(e)}", exc_info=True)
+        logger.error(f"[v0] ❌ Exception sending email: {str(e)}", exc_info=True)
         return False
 
 def send_order_confirmation_email(order_id, to_email, customer_name):
