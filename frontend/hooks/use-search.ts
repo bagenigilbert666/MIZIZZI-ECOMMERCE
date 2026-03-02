@@ -168,7 +168,14 @@ export function useSearch({ initialQuery = "", delay = 50, onSearch }: UseSearch
 
   const fetchRecentSearches = useCallback(async () => {
     try {
-      const response = await fetch(`${BACKEND_URL}/api/products/recent-searches?limit=8`)
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 5000) // 5 second timeout
+
+      const response = await fetch(`${BACKEND_URL}/api/products/recent-searches?limit=8`, {
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
 
       if (response.ok) {
         const data = await response.json()
@@ -186,10 +193,14 @@ export function useSearch({ initialQuery = "", delay = 50, onSearch }: UseSearch
         const recent = JSON.parse(localStorage.getItem("recentSearches") || "[]")
         setRecentSearches(recent.slice(0, 8))
       }
-    } catch (error) {
-      console.error("[v0] Failed to fetch recent searches:", error)
-      const recent = JSON.parse(localStorage.getItem("recentSearches") || "[]")
-      setRecentSearches(recent.slice(0, 8))
+    } catch (error: any) {
+      console.warn("[v0] Failed to fetch recent searches (using local cache):", error.message)
+      try {
+        const recent = JSON.parse(localStorage.getItem("recentSearches") || "[]")
+        setRecentSearches(recent.slice(0, 8))
+      } catch {
+        setRecentSearches([])
+      }
     }
   }, [])
 
@@ -197,17 +208,40 @@ export function useSearch({ initialQuery = "", delay = 50, onSearch }: UseSearch
     try {
       await fetchRecentSearches()
 
-      const productsResponse = await fetch(`${BACKEND_URL}/api/products?limit=10&sort_by=popularity&sort_order=desc`)
+      // Trending products with timeout
+      try {
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 5000)
+        const productsResponse = await fetch(`${BACKEND_URL}/api/products?limit=10&sort_by=popularity&sort_order=desc`, {
+          signal: controller.signal,
+        })
+        clearTimeout(timeoutId)
 
-      if (productsResponse.ok) {
-        const data = await productsResponse.json()
-        setTrendingProducts(data.items || data || [])
+        if (productsResponse.ok) {
+          const data = await productsResponse.json()
+          setTrendingProducts(data.items || data || [])
+        }
+      } catch (error: any) {
+        console.warn("[v0] Failed to fetch trending products:", error.message)
+        setTrendingProducts([])
       }
 
-      const categoriesResponse = await fetch(`${BACKEND_URL}/api/categories`)
-      if (categoriesResponse.ok) {
-        const data = await categoriesResponse.json()
-        setCategories(data.items || data || [])
+      // Categories with timeout
+      try {
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 5000)
+        const categoriesResponse = await fetch(`${BACKEND_URL}/api/categories`, {
+          signal: controller.signal,
+        })
+        clearTimeout(timeoutId)
+
+        if (categoriesResponse.ok) {
+          const data = await categoriesResponse.json()
+          setCategories(data.items || data || [])
+        }
+      } catch (error: any) {
+        console.warn("[v0] Failed to fetch categories:", error.message)
+        setCategories([])
       }
     } catch (error) {
       console.error("[v0] Failed to fetch initial search data:", error)

@@ -1683,10 +1683,32 @@ api.get = async <T = any, R = AxiosResponse<T>>(url: string, config?: any): Prom
     })
   }
 
-  // For all other GET requests, just use the original implementation
-  try {
-    return (await originalGet.call(api, url, safeConfig)) as R
-  } catch (error) {
-    throw error
+  // For all other GET requests, just use the original implementation with retry logic for abort errors
+  let lastError: any
+  const MAX_GET_ATTEMPTS = 2
+
+  for (let attempt = 1; attempt <= MAX_GET_ATTEMPTS; attempt++) {
+    try {
+      return (await originalGet.call(api, url, safeConfig)) as R
+    } catch (error: any) {
+      lastError = error
+
+      const errMsg = (error && (error.message || "")).toString().toLowerCase()
+      const isAborted = errMsg.includes("aborted") || error?.code === "ERR_CANCELED" || error?.code === "ERR_ABORTED"
+      const isTimeout = error?.code === "ECONNABORTED" || errMsg.includes("timeout")
+
+      // If it's an abort or timeout error, try once more
+      if ((isAborted || isTimeout) && attempt < MAX_GET_ATTEMPTS) {
+        const delay = 500 * attempt // Progressive delay
+        console.warn(`[v0] GET request aborted/timeout for ${url} (attempt ${attempt}/${MAX_GET_ATTEMPTS}), retrying in ${delay}ms...`)
+        await new Promise((res) => setTimeout(res, delay))
+        continue
+      }
+
+      // Otherwise throw immediately
+      throw error
+    }
   }
+
+  throw lastError || new Error("Failed to fetch data")
 }

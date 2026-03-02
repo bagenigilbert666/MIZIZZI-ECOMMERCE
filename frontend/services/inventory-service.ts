@@ -157,6 +157,7 @@ class InventoryService {
   async getProductInventory(
     productId: number,
     variantId?: number,
+    retryCount = 0,
   ): Promise<EnhancedInventoryItem | EnhancedInventoryItem[]> {
     try {
       const params = new URLSearchParams()
@@ -165,7 +166,43 @@ class InventoryService {
       const response = await api.get(`${USER_INVENTORY_BASE}/product/${productId}?${params.toString()}`)
       return response.data
     } catch (error: any) {
-      console.error("Error getting product inventory:", error)
+      // Retry logic for network errors (not auth errors)
+      const isNetworkError = !error.response || error.code === "ECONNABORTED" || error.code === "ENOTFOUND"
+      const shouldRetry = isNetworkError && retryCount < 2
+
+      console.error("[v0] Error getting product inventory:", {
+        error: error.message,
+        status: error.response?.status,
+        retryCount,
+        willRetry: shouldRetry,
+      })
+
+      if (shouldRetry) {
+        const delay = Math.pow(2, retryCount) * 1000 // Exponential backoff
+        console.log(`[v0] Retrying inventory fetch after ${delay}ms...`)
+        await new Promise((resolve) => setTimeout(resolve, delay))
+        return this.getProductInventory(productId, variantId, retryCount + 1)
+      }
+
+      // Return fallback data when backend is unavailable
+      if (isNetworkError) {
+        console.warn("[v0] Backend unavailable, returning empty inventory fallback")
+        return {
+          id: -1,
+          product_id: productId,
+          stock_level: 0,
+          reserved_quantity: 0,
+          available_quantity: 0,
+          reorder_level: 0,
+          low_stock_threshold: 5,
+          status: "unknown",
+          last_updated: new Date().toISOString(),
+          created_at: new Date().toISOString(),
+          is_in_stock: false,
+          is_low_stock: false,
+        }
+      }
+
       throw new Error(error.response?.data?.error || "Failed to get product inventory")
     }
   }
