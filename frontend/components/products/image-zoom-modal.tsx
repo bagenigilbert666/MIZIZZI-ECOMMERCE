@@ -137,101 +137,108 @@ export function ImageZoomModal({ product, isOpen, onClose, selectedImageIndex }:
   }
 
   return (
-    <Modal open={isOpen} onOpenChange={(open) => !open && onClose()} title="Product Images" size="xl">
-      <div className="flex-1 relative bg-white flex items-center justify-center min-h-0 overflow-hidden">
-        {images.length > 1 && (
-          <>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handlePrevious}
-              className="absolute left-3 top-1/2 -translate-y-1/2 bg-white hover:bg-gray-50 rounded-full h-10 w-10 shadow-md z-10 border border-gray-200"
-              aria-label="Previous image"
-            >
-              <ChevronLeft className="h-5 w-5 text-gray-600" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleNext}
-              className="absolute right-3 top-1/2 -translate-y-1/2 bg-white hover:bg-gray-50 rounded-full h-10 w-10 shadow-md z-10 border border-gray-200"
-              aria-label="Next image"
-            >
-              <ChevronRight className="h-5 w-5 text-gray-600" />
-            </Button>
-          </>
-        )}
-
-        <div className="w-full h-full flex items-center justify-center px-16 py-4">
-          {imageError ? (
-            <div className="flex flex-col items-center justify-center text-gray-400">
-              <div className="w-20 h-20 bg-gray-100 rounded-lg flex items-center justify-center mb-3">
-                <svg className="w-10 h-10 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
-                  />
-                </svg>
-              </div>
-              <span className="text-sm">Image not available</span>
-            </div>
-          ) : (
+    <Modal open={isOpen} onOpenChange={(open) => !open && onClose()} title="Product Images" size="fullscreen">
+      <div className="w-full h-full flex flex-col gap-4">
+        {/* Main Image Area */}
+        <div className="flex-1 relative bg-white flex items-center justify-center overflow-hidden rounded-lg border border-gray-200">
+          {images.length > 1 && (
             <>
-              {!imageLoaded && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-8 h-8 border-2 border-gray-200 border-t-[#8B1538] rounded-full animate-spin" />
-                </div>
-              )}
-              <img
-                src={currentImageUrl || "/placeholder.svg"}
-                alt={`${productName} - Image ${currentIndex + 1}`}
-                className={cn(
-                  "h-full w-auto max-w-full object-contain transition-opacity duration-200",
-                  imageLoaded ? "opacity-100" : "opacity-0",
-                )}
-                onLoad={() => setImageLoaded(true)}
-                onError={() => setImageError(true)}
-                draggable={false}
-              />
+              <button
+                onClick={handlePrevious}
+                className="absolute left-4 top-1/2 -translate-y-1/2 bg-white hover:bg-gray-50 rounded-full h-12 w-12 shadow-lg z-10 border border-gray-200 flex items-center justify-center transition-all hover:scale-110"
+                aria-label="Previous image"
+              >
+                <ChevronLeft className="h-6 w-6 text-gray-600" />
+              </button>
+              <button
+                onClick={handleNext}
+                className="absolute right-4 top-1/2 -translate-y-1/2 bg-white hover:bg-gray-50 rounded-full h-12 w-12 shadow-lg z-10 border border-gray-200 flex items-center justify-center transition-all hover:scale-110"
+                aria-label="Next image"
+              >
+                <ChevronRight className="h-6 w-6 text-gray-600" />
+              </button>
             </>
           )}
-        </div>
-      </div>
 
-      {images.length > 1 && (
-        <div className="py-2 px-4 border-t shrink-0 bg-white">
-          <div className="flex gap-2 justify-center overflow-x-auto">
-            {images.map((image, index) => (
-              <button
-                key={index}
-                className={cn(
-                  "relative flex-shrink-0 w-12 h-12 rounded overflow-hidden transition-all",
-                  currentIndex === index
-                    ? "ring-2 ring-[#8B1538] ring-offset-1"
-                    : "border border-gray-200 opacity-70 hover:opacity-100",
+          <div className="w-full h-full flex items-center justify-center px-8 py-6">
+            {imageError ? (
+              <div className="flex flex-col items-center justify-center text-gray-400">
+                <div className="w-24 h-24 bg-gray-100 rounded-lg flex items-center justify-center mb-4">
+                  <svg className="w-12 h-12 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={1.5}
+                      d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                    />
+                  </svg>
+                </div>
+                <span className="text-sm font-medium">Image not available</span>
+              </div>
+            ) : (
+              <>
+                {!imageLoaded && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-white/50">
+                    <div className="w-10 h-10 border-3 border-gray-300 border-t-cherry-600 rounded-full animate-spin" />
+                  </div>
                 )}
-                onClick={() => setCurrentIndex(index)}
-                aria-label={`View image ${index + 1}`}
-              >
                 <img
-                  src={image || "/generic-product-display.png"}
-                  alt={`Thumbnail ${index + 1}`}
-                  className="w-full h-full object-cover"
-                  onError={(e) => {
-                    const target = e.target as HTMLImageElement
-                    // Only set fallback if not already set to prevent infinite loop
-                    if (!target.src.includes("generic-product-display")) {
-                      target.src = "/generic-product-display.png"
-                    }
-                  }}
+                  src={currentImageUrl || "/placeholder.svg"}
+                  alt={`${productName} - Image ${currentIndex + 1}`}
+                  className={cn(
+                    "h-full w-auto max-w-full object-contain transition-opacity duration-200",
+                    imageLoaded ? "opacity-100" : "opacity-0",
+                  )}
+                  onLoad={() => setImageLoaded(true)}
+                  onError={() => setImageError(true)}
+                  draggable={false}
                 />
-              </button>
-            ))}
+              </>
+            )}
           </div>
         </div>
-      )}
+
+        {/* Thumbnails Area */}
+        {images.length > 1 && (
+          <div className="flex-shrink-0 py-3 px-4 border-t border-gray-200 bg-gray-50/50 rounded-lg">
+            <div className="flex gap-3 justify-center overflow-x-auto pb-2">
+              {images.map((image, index) => (
+                <button
+                  key={index}
+                  className={cn(
+                    "relative flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden transition-all border-2",
+                    currentIndex === index
+                      ? "border-cherry-600 ring-2 ring-cherry-200"
+                      : "border-gray-200 opacity-70 hover:opacity-100 hover:border-gray-300",
+                  )}
+                  onClick={() => setCurrentIndex(index)}
+                  aria-label={`View image ${index + 1}`}
+                  title={`Image ${index + 1}`}
+                >
+                  <img
+                    src={image || "/generic-product-display.png"}
+                    alt={`Thumbnail ${index + 1}`}
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      const target = e.target as HTMLImageElement
+                      if (!target.src.includes("generic-product-display")) {
+                        target.src = "/generic-product-display.png"
+                      }
+                    }}
+                  />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Counter */}
+        {images.length > 1 && (
+          <div className="text-center text-sm text-gray-500">
+            Image {currentIndex + 1} of {images.length}
+          </div>
+        )}
+      </div>
     </Modal>
   )
 }

@@ -12,7 +12,7 @@ interface ModalProps {
   description?: React.ReactNode
   children: React.ReactNode
   footer?: React.ReactNode
-  size?: "sm" | "md" | "lg" | "xl"
+  size?: "sm" | "md" | "lg" | "xl" | "fullscreen"
   closeOnEscape?: boolean
   closeOnClickOutside?: boolean
   className?: string
@@ -23,6 +23,7 @@ const sizeClasses = {
   md: "max-w-md",
   lg: "max-w-lg",
   xl: "max-w-2xl",
+  fullscreen: "w-[95vw] h-[95vh] max-w-[95vw] max-h-[95vh]",
 }
 
 export function Modal({
