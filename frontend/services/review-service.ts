@@ -69,7 +69,7 @@ class ReviewService {
     this.baseUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "https://mizizzi-ecommerce-1.onrender.com"
   }
 
-  private async makeRequest<T>(endpoint: string, options: RequestInit = {}, retryCount = 0): Promise<T> {
+  private async makeRequest<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const url = `${this.baseUrl}/api/reviews/user${endpoint}`
 
     const defaultHeaders: HeadersInit = {
@@ -90,7 +90,6 @@ class ReviewService {
         ...defaultHeaders,
         ...options.headers,
       },
-      signal: AbortSignal.timeout(15000), // 15 second timeout
     }
 
     try {
@@ -108,31 +107,12 @@ class ReviewService {
           throw new Error("Please sign in to continue")
         }
 
-        // Return empty response for non-critical endpoints when backend is unavailable
-        if (response.status >= 500 && retryCount < 1) {
-          const delay = Math.pow(2, retryCount) * 1000 // Exponential backoff
-          console.log(`[v0] Server error, retrying after ${delay}ms...`)
-          await new Promise((resolve) => setTimeout(resolve, delay))
-          return this.makeRequest<T>(endpoint, options, retryCount + 1)
-        }
-
         throw new Error(errorData.error || `HTTP error! status: ${response.status}`)
       }
 
       return await response.json()
-    } catch (error: any) {
-      // Graceful fallback for network errors
-      if (error.name === "AbortError" || error.code === "ENOTFOUND" || error.message?.includes("Failed to fetch")) {
-        console.warn(`[v0] Review API request failed (${endpoint}):`, error.message)
-        
-        // Return empty results for GET requests to gracefully degrade
-        if (options.method === undefined || options.method === "GET") {
-          console.log(`[v0] Returning empty fallback for ${endpoint}`)
-          return { items: [], pagination: { page: 1, per_page: 10, total_pages: 0, total_items: 0 } } as T
-        }
-      }
-
-      console.error(`[v0] Review API request failed: ${endpoint}`, error)
+    } catch (error) {
+      console.error(`Review API request failed: ${endpoint}`, error)
       throw error
     }
   }
