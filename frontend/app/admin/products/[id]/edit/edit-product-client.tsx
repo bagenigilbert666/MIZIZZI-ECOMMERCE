@@ -41,30 +41,36 @@ const isValidProductId = (productId: string): boolean => {
 }
 
 // Client component that receives the unwrapped productId as a prop
-export function EditProductClient({ productId }: { productId: string }) {
+export function EditProductClient({ 
+  productId,
+  initialProduct,
+  initialCategories = [],
+  initialBrands = [],
+  initialImages = [],
+}: { 
+  productId: string
+  initialProduct?: any
+  initialCategories?: any[]
+  initialBrands?: any[]
+  initialImages?: any[]
+}) {
   const router = useRouter()
   const { isAuthenticated, isLoading: authLoading, logout, refreshAccessToken, getToken } = useAdminAuth()
 
-  const [isLoading, setIsLoading] = useState(true)
-  // Replace these state variables:
-  // const [product, setProduct] = useState<Product | null>(null)
-  // const [categories, setCategories] = useState<any[]>([])
-  // const [brands, setBrands] = useState<any[]>([])
-  // const [isLoadingCategories, setIsLoadingCategories] = useState(true)
-  // const [isLoadingBrands, setIsLoadingBrands] = useState(true)
-
-  // With SWR hooks:
-  const { product, isLoading: isLoadingProduct, isError: productError, mutate: mutateProduct } = useProduct(productId)
+  const [isLoading, setIsLoading] = useState(!initialProduct || initialCategories.length === 0 || initialBrands.length === 0)
+  // Use SWR with initial data from SSR
+  const { product, isLoading: isLoadingProduct, isError: productError, mutate: mutateProduct } = useProduct(productId, { fallbackData: initialProduct })
   const { images: productImages, mutate: mutateImages } = useProductImages(
     isValidProductId(productId) ? productId : undefined,
+    { fallbackData: initialImages }
   )
   const {
     categories,
     isLoading: isLoadingCategories,
     isError: categoriesError,
     mutate: mutateCategories,
-  } = useCategories()
-  const { brands, isLoading: isLoadingBrands, isError: brandsError } = useBrands()
+  } = useCategories({ fallbackData: initialCategories })
+  const { brands, isLoading: isLoadingBrands, isError: brandsError } = useBrands({ fallbackData: initialBrands })
   const [activeTab, setActiveTab] = useState("basic")
   const [unsavedChangesDialog, setUnsavedChangesDialog] = useState(false)
   const [navigateTo, setNavigateTo] = useState("")
@@ -263,7 +269,25 @@ export function EditProductClient({ productId }: { productId: string }) {
           productData.brand_id = null
         }
 
+        // Remove fields that the backend doesn't handle
+        // The backend only handles specific fields defined in the update_product route
+        const allowedFields = [
+          'name', 'slug', 'description', 'price', 'sale_price', 'stock',
+          'category_id', 'brand_id', 'sku', 'weight',
+          'is_featured', 'is_new', 'is_sale', 'is_flash_sale', 'is_luxury_deal',
+          'meta_title', 'meta_description', 'material',
+          'image_urls', 'thumbnail_url', 'tags'
+        ]
+
+        const cleanedData = Object.keys(productData).reduce((acc: Record<string, any>, key) => {
+          if (allowedFields.includes(key)) {
+            acc[key] = productData[key]
+          }
+          return acc
+        }, {})
+
         console.log(`[v0] Submitting ${section} data for product ID: ${productId}`)
+        console.log("[v0] Cleaned payload being sent:", JSON.stringify(cleanedData, null, 2))
 
         // Dispatch event to notify that update is starting
         if (typeof window !== "undefined") {
@@ -294,7 +318,7 @@ export function EditProductClient({ productId }: { productId: string }) {
           const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || ""}/api/admin/products/${productId}`, {
             method: "PUT",
             headers: headers,
-            body: JSON.stringify(productData),
+            body: JSON.stringify(cleanedData),
             signal: controller.signal,
           })
 
@@ -317,7 +341,7 @@ export function EditProductClient({ productId }: { productId: string }) {
                       "Content-Type": "application/json",
                       Authorization: `Bearer ${newToken}`,
                     },
-                    body: JSON.stringify(productData),
+                    body: JSON.stringify(cleanedData),
                   },
                 )
 
@@ -372,6 +396,16 @@ export function EditProductClient({ productId }: { productId: string }) {
                   mutateProduct(undefined, { revalidate: true })
                   mutateImages(undefined, { revalidate: true })
                   return true
+                } else {
+                  // Retry also failed
+                  let retryErrorData = {}
+                  try {
+                    const retryErrorText = await retryResponse.text()
+                    retryErrorData = JSON.parse(retryErrorText)
+                  } catch {
+                    retryErrorData = { status: retryResponse.status }
+                  }
+                  console.error("[v0] Retry request also failed:", retryErrorData)
                 }
               }
             }
@@ -382,9 +416,17 @@ export function EditProductClient({ productId }: { productId: string }) {
 
           // Check if the response is ok
           if (!response.ok) {
-            const errorData = await response.json().catch(() => ({}))
-            console.error("[v0] API error response:", errorData)
-            throw new Error(errorData.message || `Failed to update product. Status: ${response.status}`)
+            let errorData = {}
+            let errorText = ""
+            try {
+              errorText = await response.text()
+              errorData = JSON.parse(errorText)
+            } catch {
+              errorData = { raw_error: errorText }
+            }
+            console.error("[v0] API error response status:", response.status)
+            console.error("[v0] API error response data:", errorData)
+            throw new Error(errorData.message || errorData.error || `Failed to update product. Status: ${response.status}`)
           }
 
           // Parse the response
@@ -424,23 +466,20 @@ export function EditProductClient({ productId }: { productId: string }) {
             })
             console.log(`[v0] WebSocket notification sent for product ID: ${productId}`)
 
-            // Also dispatch a custom event that components can listen for
-            if (typeof window !== "undefined") {
-              const event = new CustomEvent("product-updated", {
-                detail: { id: productId, product: updatedProduct, section },
-              })
-              window.dispatchEvent(event)
-              console.log(`[v0] Custom event dispatched for product ID: ${productId}`)
-            }
+            // Don't dispatch custom event here to prevent infinite loops
+            // SWR revalidation is sufficient for data sync
           } catch (notifyError) {
             console.warn("[v0] Failed to notify about product update:", notifyError)
           }
 
           productService.invalidateProductCache(productId)
-          await new Promise((resolve) => setTimeout(resolve, 500))
+          
+          // Shorter delay before revalidation
+          await new Promise((resolve) => setTimeout(resolve, 300))
 
-          mutateProduct(undefined, { revalidate: true })
-          mutateImages(undefined, { revalidate: true })
+          // Soft revalidate in background without triggering events
+          mutateProduct()
+          mutateImages()
 
           return true
         } catch (fetchError: any) {

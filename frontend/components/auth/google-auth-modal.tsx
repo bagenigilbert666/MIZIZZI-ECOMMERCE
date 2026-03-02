@@ -1,14 +1,13 @@
 "use client"
 
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
+import { Modal } from "@/components/ui/modal"
 import { motion, AnimatePresence } from "framer-motion"
-import { Loader2, CheckCircle2, X, Shield, Sparkles } from "lucide-react"
-import { useState, useEffect } from "react"
+import { Check } from "lucide-react"
+import { useEffect, useMemo, useState } from "react"
 import { GoogleOAuthAPI } from "@/lib/api/google-oauth"
 import { useAuth } from "@/contexts/auth/auth-context"
 import { useRouter } from "next/navigation"
-import { toast } from "@/components/ui/use-toast"
+import { useToast } from "@/components/ui/use-toast"
 
 interface GoogleAuthModalProps {
   isOpen: boolean
@@ -16,14 +15,67 @@ interface GoogleAuthModalProps {
   mode?: "signup" | "signin"
 }
 
+type Status = "idle" | "loading" | "success" | "error"
+
+function AppleSpinner({ className = "" }: { className?: string }) {
+  return (
+    <svg
+      className={`animate-spin ${className}`}
+      viewBox="0 0 24 24"
+      fill="none"
+      aria-hidden="true"
+    >
+      <circle
+        cx="12"
+        cy="12"
+        r="9"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        opacity="0.18"
+      />
+      <path
+        d="M21 12a9 9 0 0 0-9-9"
+        stroke="currentColor"
+        strokeWidth="2.5"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
+
+function GoogleIcon({ className = "" }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+        fill="#4285F4"
+      />
+      <path
+        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+        fill="#34A853"
+      />
+      <path
+        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
+        fill="#FBBC05"
+      />
+      <path
+        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
+        fill="#EA4335"
+      />
+    </svg>
+  )
+}
+
 export function GoogleAuthModal({ isOpen, onClose, mode = "signup" }: GoogleAuthModalProps) {
-  const [status, setStatus] = useState<"idle" | "loading" | "success" | "error">("idle")
+  const [status, setStatus] = useState<Status>("idle")
   const [errorMessage, setErrorMessage] = useState("")
   const { refreshAuthState } = useAuth()
   const router = useRouter()
-  const googleOAuth = new GoogleOAuthAPI()
+  const { toast } = useToast()
 
-  // Reset status when modal opens
+  // avoid re-creating class instance every render
+  const googleOAuth = useMemo(() => new GoogleOAuthAPI(), [])
+
   useEffect(() => {
     if (isOpen) {
       setStatus("idle")
@@ -31,211 +83,163 @@ export function GoogleAuthModal({ isOpen, onClose, mode = "signup" }: GoogleAuth
     }
   }, [isOpen])
 
+  const title = mode === "signup" ? "Continue with Google" : "Sign in with Google"
+  const subtitle =
+    mode === "signup"
+      ? "Create your account in one step."
+      : "Welcome back — you’re one tap away."
+
   const handleGoogleAuth = async () => {
     setStatus("loading")
     setErrorMessage("")
 
     try {
-      console.log("[v0] Starting Google OAuth flow from modal...")
-
       const result = await googleOAuth.authenticateWithGoogle()
-
-      console.log("[v0] Google OAuth successful:", result)
-
-      // Refresh auth state
       await refreshAuthState()
-
       setStatus("success")
 
       toast({
-        title: result.is_new_user ? "Welcome to MIZIZZI!" : "Welcome back!",
-        description: result.is_new_user
-          ? "Your account has been created successfully."
-          : "You've successfully signed in.",
+        title: result.is_new_user ? "Welcome to MIZIZZI" : "Welcome back",
+        description: result.is_new_user ? "Account created successfully." : "Signed in successfully.",
       })
 
-      // Close modal and redirect after brief success animation
       setTimeout(() => {
         onClose()
         router.push("/")
-      }, 1500)
+      }, 900) // snappier, more “Apple”
     } catch (error) {
-      console.error("[v0] Google auth error:", error)
       setStatus("error")
-      setErrorMessage(error instanceof Error ? error.message : "Something went wrong with Google sign-in")
+      const msg = error instanceof Error ? error.message : "Authentication failed"
+      setErrorMessage(msg)
+
+      toast({
+        title: "Couldn’t sign in",
+        description: msg,
+        variant: "destructive",
+      })
     }
   }
 
+  const isBusy = status === "loading"
+  const isSuccess = status === "success"
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md bg-gradient-to-br from-white via-cherry-50/30 to-white border-2 border-cherry-200/50 shadow-2xl">
-        <DialogHeader>
-          <div className="flex items-center justify-between">
-            <DialogTitle className="text-2xl font-playfair text-cherry-900">
-              {mode === "signup" ? "Create Your Account" : "Welcome Back"}
-            </DialogTitle>
-            <Button variant="ghost" size="icon" onClick={onClose} className="h-8 w-8 rounded-full">
-              <X className="h-4 w-4" />
-            </Button>
+    <Modal open={isOpen} onOpenChange={onClose} size="sm" closeOnEscape closeOnClickOutside>
+      <div className="w-full">
+        {/* Apple-like card */}
+        <div className="rounded-2xl bg-white text-neutral-900 shadow-[0_24px_80px_rgba(0,0,0,0.18)] ring-1 ring-black/5 overflow-hidden">
+          {/* Header */}
+          <div className="px-6 pt-6 pb-4">
+            <div className="space-y-1">
+              <h2 className="text-[20px] font-semibold tracking-tight">{title}</h2>
+              <p className="text-[13px] text-neutral-500">{subtitle}</p>
+            </div>
           </div>
-          <DialogDescription className="text-gray-600">
-            {mode === "signup"
-              ? "Join MIZIZZI and discover luxury fashion"
-              : "Sign in to continue your shopping experience"}
-          </DialogDescription>
-        </DialogHeader>
 
-        <div className="space-y-6 py-4">
-          <AnimatePresence mode="wait">
-            {status === "idle" && (
-              <motion.div
-                key="idle"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="space-y-4"
-              >
-                {/* Benefits Section */}
-                <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-cherry-100 space-y-3">
-                  <div className="flex items-start gap-3">
-                    <div className="mt-0.5 p-2 bg-cherry-100 rounded-lg">
-                      <Shield className="h-4 w-4 text-cherry-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-sm text-gray-900">Secure & Fast</h4>
-                      <p className="text-xs text-gray-600">Your data is protected with enterprise-grade security</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <div className="mt-0.5 p-2 bg-cherry-100 rounded-lg">
-                      <Sparkles className="h-4 w-4 text-cherry-600" />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-sm text-gray-900">Instant Access</h4>
-                      <p className="text-xs text-gray-600">
-                        {mode === "signup" ? "Create your account in seconds" : "Sign in with one click"}
-                      </p>
-                    </div>
-                  </div>
-                </div>
+          {/* Divider */}
+          <div className="h-px bg-neutral-100" />
 
-                {/* Google Sign-In Button */}
-                <Button
-                  onClick={handleGoogleAuth}
-                  className="w-full h-12 bg-white hover:bg-gray-50 text-gray-900 border-2 border-gray-200 hover:border-cherry-400 shadow-md hover:shadow-lg transition-all duration-300 group"
-                  variant="outline"
+          {/* Body */}
+          <div className="px-6 py-6">
+            <AnimatePresence mode="wait">
+              {isSuccess ? (
+                <motion.div
+                  key="success"
+                  initial={{ opacity: 0, scale: 0.98, y: 6 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.98, y: 6 }}
+                  transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
+                  className="py-6 flex flex-col items-center justify-center text-center"
                 >
                   <motion.div
-                    className="flex items-center justify-center gap-3"
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.98 }}
+                    initial={{ scale: 0.85 }}
+                    animate={{ scale: 1 }}
+                    transition={{ type: "spring", stiffness: 260, damping: 18 }}
+                    className="w-14 h-14 rounded-full bg-neutral-900 flex items-center justify-center"
                   >
-                    <svg className="h-5 w-5 group-hover:scale-110 transition-transform" viewBox="0 0 24 24">
-                      <path
-                        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                        fill="#4285F4"
-                      />
-                      <path
-                        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                        fill="#34A853"
-                      />
-                      <path
-                        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-                        fill="#FBBC05"
-                      />
-                      <path
-                        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-                        fill="#EA4335"
-                      />
-                    </svg>
-                    <span className="font-semibold">
-                      {mode === "signup" ? "Continue with Google" : "Sign in with Google"}
-                    </span>
+                    <Check className="w-7 h-7 text-white" strokeWidth={2.5} />
                   </motion.div>
-                </Button>
-
-                <p className="text-xs text-center text-gray-500 px-4">
-                  By continuing, you agree to MIZIZZI's Terms of Service and Privacy Policy
-                </p>
-              </motion.div>
-            )}
-
-            {status === "loading" && (
-              <motion.div
-                key="loading"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.9 }}
-                className="flex flex-col items-center justify-center py-12 space-y-4"
-              >
-                <motion.div
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1, repeat: Number.POSITIVE_INFINITY, ease: "linear" }}
-                  className="p-4 bg-cherry-100 rounded-full"
-                >
-                  <Loader2 className="h-8 w-8 text-cherry-600" />
+                  <div className="mt-4 space-y-1">
+                    <p className="text-[15px] font-semibold">
+                      {mode === "signup" ? "You’re all set." : "Signed in."}
+                    </p>
+                    <p className="text-[13px] text-neutral-500">Taking you back…</p>
+                  </div>
                 </motion.div>
-                <div className="text-center space-y-2">
-                  <h3 className="font-semibold text-lg text-gray-900">Connecting to Google</h3>
-                  <p className="text-sm text-gray-600">Please complete the sign-in process...</p>
-                </div>
+              ) : (
                 <motion.div
-                  className="w-48 h-1 bg-gray-200 rounded-full overflow-hidden"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
+                  key="main"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
+                  className="space-y-4"
                 >
-                  <motion.div
-                    className="h-full bg-gradient-to-r from-cherry-400 via-cherry-600 to-cherry-400"
-                    animate={{ x: ["-100%", "100%"] }}
-                    transition={{ duration: 1.5, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }}
-                  />
-                </motion.div>
-              </motion.div>
-            )}
+                  {/* Button */}
+                  <button
+                    onClick={handleGoogleAuth}
+                    disabled={isBusy}
+                    className={[
+                      "w-full rounded-xl px-4 py-3",
+                      "flex items-center justify-center gap-3",
+                      "text-[14px] font-medium",
+                      "transition-all",
+                      "ring-1 ring-black/10",
+                      "bg-white hover:bg-neutral-50 active:bg-neutral-100",
+                      "shadow-[0_1px_0_rgba(0,0,0,0.03)]",
+                      "disabled:opacity-60 disabled:cursor-not-allowed",
+                    ].join(" ")}
+                  >
+                    {isBusy ? (
+                      <>
+                        <AppleSpinner className="w-5 h-5 text-neutral-900" />
+                        <span>Signing in…</span>
+                      </>
+                    ) : (
+                      <>
+                        <GoogleIcon className="w-5 h-5" />
+                        <span>{mode === "signup" ? "Continue with Google" : "Continue with Google"}</span>
+                      </>
+                    )}
+                  </button>
 
-            {status === "success" && (
-              <motion.div
-                key="success"
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                className="flex flex-col items-center justify-center py-12 space-y-4"
-              >
-                <motion.div
-                  initial={{ scale: 0, rotate: -180 }}
-                  animate={{ scale: 1, rotate: 0 }}
-                  transition={{ type: "spring", stiffness: 200, damping: 15 }}
-                  className="p-4 bg-green-100 rounded-full"
-                >
-                  <CheckCircle2 className="h-12 w-12 text-green-600" />
-                </motion.div>
-                <div className="text-center space-y-2">
-                  <h3 className="font-semibold text-xl text-gray-900">Success!</h3>
-                  <p className="text-sm text-gray-600">Redirecting you to MIZIZZI...</p>
-                </div>
-              </motion.div>
-            )}
+                  {/* Error (minimal, Apple-ish) */}
+                  <AnimatePresence>
+                    {status === "error" && errorMessage ? (
+                      <motion.div
+                        initial={{ opacity: 0, y: 6 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: 6 }}
+                        transition={{ duration: 0.18 }}
+                        className="rounded-xl bg-red-50 ring-1 ring-red-500/15 px-4 py-3"
+                      >
+                        <p className="text-[13px] text-red-700 font-medium">Couldn’t sign in</p>
+                        <p className="text-[12px] text-red-700/80 mt-1">{errorMessage}</p>
+                      </motion.div>
+                    ) : null}
+                  </AnimatePresence>
 
-            {status === "error" && (
-              <motion.div
-                key="error"
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                className="space-y-4"
-              >
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                  <h4 className="font-semibold text-red-900 mb-2">Authentication Failed</h4>
-                  <p className="text-sm text-red-700">{errorMessage}</p>
-                </div>
-                <Button onClick={handleGoogleAuth} className="w-full bg-transparent" variant="outline">
-                  Try Again
-                </Button>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                  {/* Fine print */}
+                  <p className="text-[12px] text-neutral-500 leading-relaxed">
+                    By continuing, you agree to MIZIZZI’s{" "}
+                    <a className="text-neutral-900 underline underline-offset-4" href="/terms">
+                      Terms
+                    </a>{" "}
+                    and{" "}
+                    <a className="text-neutral-900 underline underline-offset-4" href="/privacy">
+                      Privacy Policy
+                    </a>
+                    .
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
-      </DialogContent>
-    </Dialog>
+
+        {/* Optional: subtle backdrop vibe if your Modal doesn’t already add one */}
+        <div className="pointer-events-none" aria-hidden="true" />
+      </div>
+    </Modal>
   )
 }
