@@ -118,11 +118,12 @@ def send_email(to_email, subject, html_content):
         sender_name = current_app.config.get('BREVO_SENDER_NAME', 'MIZIZZI')
 
         if not brevo_api_key:
-            logger.error("[v0] BREVO_API_KEY not configured in config")
+            logger.error("[v0] ❌ BREVO_API_KEY not configured. Set BREVO_API_KEY environment variable on Render backend.")
+            logger.error("[v0] 📖 See BREVO_SETUP_GUIDE.md for detailed setup instructions")
             return False
 
         if not sender_email:
-            logger.error("[v0] BREVO_SENDER_EMAIL not configured in config")
+            logger.error("[v0] ❌ BREVO_SENDER_EMAIL not configured in config")
             return False
 
         url = "https://api.brevo.com/v3/smtp/email"
@@ -147,7 +148,9 @@ def send_email(to_email, subject, html_content):
             "api-key": brevo_api_key
         }
 
-        logger.info(f"[v0] Sending email via Brevo API")
+        logger.info(f"[v0] 📧 Sending email via Brevo API to {to_email}")
+        logger.info(f"[v0] Sender: {sender_email}")
+        logger.info(f"[v0] Subject: {subject}")
         logger.info(f"[v0] To: {to_email}")
         logger.info(f"[v0] From: {sender_email} ({sender_name})")
         logger.info(f"[v0] Subject: {subject}")
