@@ -11,7 +11,7 @@ import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import { Modal } from "@/components/ui/modal"
 import { Textarea } from "@/components/ui/textarea"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -339,17 +339,18 @@ function ReviewForm({ productId, onReviewSubmitted }: ReviewFormProps) {
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger asChild>
-        <Button className="bg-primary hover:bg-secondary text-white">
-          <Plus size={16} className="mr-2" />
-          Write a Review
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle>Write a Review</DialogTitle>
-        </DialogHeader>
+    <>
+      <Button onClick={() => setIsOpen(true)} className="bg-primary hover:bg-secondary text-white">
+        <Plus size={16} className="mr-2" />
+        Write a Review
+      </Button>
+      <Modal
+        open={isOpen}
+        onOpenChange={setIsOpen}
+        title="Write a Review"
+        description="Share your experience with this product"
+        size="md"
+      >
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <Label htmlFor="rating">Rating *</Label>
@@ -408,8 +409,8 @@ function ReviewForm({ productId, onReviewSubmitted }: ReviewFormProps) {
             </Button>
           </div>
         </form>
-      </DialogContent>
-    </Dialog>
+      </Modal>
+    </>
   )
 }
 
