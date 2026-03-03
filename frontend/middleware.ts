@@ -8,6 +8,15 @@ export function middleware(request: NextRequest) {
   // Set a custom header with the pathname
   requestHeaders.set('x-pathname', pathname)
   
+  // Optimization: Check auth tokens before rendering auth pages
+  const token = request.cookies.get('mizizzi_token')?.value
+  const isAuthPage = pathname.startsWith('/auth')
+  
+  // If user is authenticated and tries to access auth pages, redirect to home
+  if (token && isAuthPage) {
+    return NextResponse.redirect(new URL('/', request.url))
+  }
+  
   return NextResponse.next({
     request: {
       headers: requestHeaders,

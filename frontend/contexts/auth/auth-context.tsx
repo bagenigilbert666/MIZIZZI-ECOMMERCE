@@ -307,7 +307,6 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     const initializeAuth = async () => {
-      setIsLoading(true)
       try {
         // First, try to restore auth state from localStorage without making API calls
         const storedToken = localStorage.getItem("mizizzi_token")
@@ -324,6 +323,9 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
                 setIsAuthenticated(true)
                 setToken(storedToken)
                 setupRefreshTimer(storedToken)
+                // Set loading to false immediately after restoring from cache
+                setIsLoading(false)
+                return
               }
             }
           } catch (error) {
@@ -340,9 +342,10 @@ const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             router.push("/auth")
           }
         }
+        
+        setIsLoading(false)
       } catch (error) {
         console.error("Auth initialization error:", error)
-      } finally {
         setIsLoading(false)
       }
     }
