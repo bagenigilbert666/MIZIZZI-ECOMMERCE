@@ -67,7 +67,8 @@ export function AuthLayout({ children, className }: AuthLayoutProps) {
             width={800}
             height={800}
             className="h-full w-full object-cover"
-            priority
+            priority={false}
+            loading="lazy"
           />
           <div className="absolute inset-0 bg-gradient-to-br from-black/40 via-black/10 to-transparent flex flex-col justify-end p-4">
             <AnimatePresence mode="wait">
@@ -101,6 +102,7 @@ export function AuthLayout({ children, className }: AuthLayoutProps) {
                 width={40}
                 height={40}
                 className="mr-2"
+                loading="eager"
               />
               <span className="text-xl font-bold text-gray-800">Mizizzi Store</span>
             </Link>
