@@ -1,1 +1,30 @@
 node_modules
+
+# Environment variables (never commit local configs)
+.env.local
+.env.local.backup
+.env.*.local
+
+# Next.js
+.next/
+out/
+dist/
+build/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
