@@ -113,12 +113,21 @@ def paginate_response(query, schema, page, per_page):
 def send_email(to_email, subject, html_content):
     """Send email using Brevo API directly - single method, no fallbacks."""
     try:
-        brevo_api_key = current_app.config.get('BREVO_API_KEY')
-        sender_email = current_app.config.get('BREVO_SENDER_EMAIL')
-        sender_name = "MIZIZZI"
+        # Try to get from Flask config first, then fall back to os.environ
+        brevo_api_key = current_app.config.get('BREVO_API_KEY') or os.environ.get('BREVO_API_KEY')
+        sender_email = current_app.config.get('BREVO_SENDER_EMAIL') or os.environ.get('BREVO_SENDER_EMAIL') or 'info.contactgilbertdev@gmail.com'
+        sender_name = current_app.config.get('BREVO_SENDER_NAME') or os.environ.get('BREVO_SENDER_NAME') or "MIZIZZI"
+
+        # Debug logging
+        logger.info(f"[v0] Attempting to send email to {to_email}")
+        logger.info(f"[v0] Sender: {sender_email}")
+        logger.info(f"[v0] BREVO_API_KEY from config: {bool(current_app.config.get('BREVO_API_KEY'))}")
+        logger.info(f"[v0] BREVO_API_KEY from environ: {bool(os.environ.get('BREVO_API_KEY'))}")
+        logger.info(f"[v0] Final BREVO_API_KEY available: {bool(brevo_api_key)}")
 
         if not brevo_api_key:
-            logger.error("[v0] BREVO_API_KEY not configured")
+            logger.error("[v0] BREVO_API_KEY not found in config or environment variables")
+            logger.error("[v0] Please set BREVO_API_KEY environment variable on Render")
             return False
 
         if not sender_email:
@@ -147,7 +156,7 @@ def send_email(to_email, subject, html_content):
             "api-key": brevo_api_key
         }
 
-        logger.info(f"[v0] Sending email via Brevo API to {to_email} from {sender_email}")
+        logger.info(f"[v0] Sending email via Brevo API to {to_email}")
         response = requests.post(url, json=payload, headers=headers, timeout=10)
 
         if response.status_code == 201:
@@ -162,7 +171,7 @@ def send_email(to_email, subject, html_content):
         logger.error(f"[v0] Timeout sending email to {to_email}")
         return False
     except Exception as e:
-        logger.error(f"[v0] Error sending email: {str(e)}")
+        logger.error(f"[v0] Error sending email: {str(e)}", exc_info=True)
         return False
 
 def send_sms(phone_number, message):
