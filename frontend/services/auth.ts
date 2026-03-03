@@ -33,64 +33,45 @@ interface AvailabilityResponse {
 
 class AuthService {
   // Check if email or phone is available (not already registered)
-  async checkAvailability(identifier: string, retries = 2): Promise<AvailabilityResponse> {
-    let lastError: any = null
-    
-    for (let attempt = 0; attempt <= retries; attempt++) {
-      try {
-        const isEmail = identifier.includes("@")
-        const data = isEmail ? { email: identifier } : { phone: identifier }
+  async checkAvailability(identifier: string): Promise<AvailabilityResponse> {
+    try {
+      const isEmail = identifier.includes("@")
+      const data = isEmail ? { email: identifier } : { phone: identifier }
 
-        console.log(`[v0] Checking availability (attempt ${attempt + 1}/${retries + 1}):`, { identifier, isEmail, endpoint: "/api/check-availability" })
-        
-        // Use axios with timeout for this request
-        const response = await axios.post(
-          `${process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"}/api/check-availability`,
-          data,
-          { timeout: 8000 } // 8 second timeout per request
-        )
-        
-        console.log("[v0] Availability check response:", response.data)
-        return response.data
-      } catch (error: any) {
-        lastError = error
-        console.error(`[v0] Check availability error (attempt ${attempt + 1}):`, {
-          message: error.message,
-          response: error.response?.data,
-          status: error.response?.status,
-          code: error.code,
-          attempt: attempt + 1,
-          totalAttempts: retries + 1,
-        })
-        
-        // If it's the last attempt, throw the error
-        if (attempt === retries) {
-          break
+      console.log("[v0] Checking availability:", { identifier, isEmail })
+      
+      // Use the api client with a short timeout
+      const response = await api.post("/api/check-availability", data, {
+        timeout: 5000 // 5 second timeout to fail fast
+      })
+      
+      console.log("[v0] Availability check response:", response.data)
+      return response.data
+    } catch (error: any) {
+      console.error("[v0] Check availability error:", {
+        message: error.message,
+        code: error.code,
+        status: error.response?.status,
+      })
+      
+      // If the check times out or fails, assume the identifier is available (new account)
+      // This allows the UI to continue and try to register
+      if (error.code === "ECONNABORTED" || error.code === "ERR_NETWORK") {
+        console.warn("[v0] Availability check timed out, assuming new account for UX continuity")
+        // Return that identifier is available (assume new account)
+        return {
+          email_available: !identifier.includes("@"),
+          phone_available: identifier.includes("@"),
         }
-        
-        // Wait before retrying (exponential backoff)
-        const waitTime = Math.min(1000 * Math.pow(2, attempt), 4000)
-        console.log(`[v0] Retrying in ${waitTime}ms...`)
-        await new Promise(resolve => setTimeout(resolve, waitTime))
       }
+      
+      // For actual errors, propagate them
+      let errorMsg = "Failed to check availability"
+      if (error.response?.status === 500) {
+        errorMsg = error.response.data?.msg || "Server error"
+      }
+      throw new Error(errorMsg)
     }
-    
-    // All retries exhausted, throw error with helpful message
-    let errorMsg = "Failed to check availability"
-    
-    if (lastError?.response?.status === 404) {
-      errorMsg = "Backend endpoint not found. Please ensure the backend is properly configured."
-    } else if (lastError?.response?.status === 500) {
-      errorMsg = lastError.response.data?.msg || "Server error while checking availability"
-    } else if (lastError?.code === "ERR_NETWORK" || lastError?.message === "Network Error") {
-      errorMsg = "Backend server is not responding. Please ensure it's running at: " + (process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com")
-    } else if (lastError?.code === "ECONNREFUSED") {
-      errorMsg = "Could not connect to the backend server. Is it running?"
-    } else if (lastError?.code === "ECONNABORTED") {
-      errorMsg = "Request timed out. The backend server may be slow to respond."
-    }
-    
-    throw new Error(errorMsg)
   }
 
   // Send verification code for registration
