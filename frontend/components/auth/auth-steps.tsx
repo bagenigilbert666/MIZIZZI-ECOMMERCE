@@ -100,14 +100,20 @@ export function AuthSteps({ initialFlow = "login" }: AuthStepsProps) {
     const trimmedIdentifier = value.trim()
     setIdentifier(trimmedIdentifier)
 
+    console.log("[v0] Starting identifier check:", { trimmedIdentifier, isEmail })
+
     try {
       const [response] = await Promise.all([
         authService.checkAvailability(trimmedIdentifier),
         new Promise((resolve) => setTimeout(resolve, 1000)),
       ])
 
+      console.log("[v0] Availability check completed:", response)
+
       const emailExists = isEmail && response.email_available === false
       const phoneExists = !isEmail && response.phone_available === false
+
+      console.log("[v0] Account existence check:", { emailExists, phoneExists })
 
       if (emailExists || phoneExists) {
         setFlow("login")
@@ -126,6 +132,7 @@ export function AuthSteps({ initialFlow = "login" }: AuthStepsProps) {
       }
     } catch (error: any) {
       console.error("[v0] Identifier check error:", error)
+      console.error("[v0] Error stack:", error.stack)
       toast({
         title: "Error",
         description: error.message || "Failed to process your request",
