@@ -111,85 +111,19 @@ def paginate_response(query, schema, page, per_page):
 
 # Helper functions
 def send_email(to_email, subject, html_content):
-    """Send email using SMTP (Brevo) - more reliable than API."""
+    """Send email using Brevo API directly - single method, no fallbacks."""
     try:
-        # Get sender configuration
-        sender_email = current_app.config.get('BREVO_SENDER_EMAIL')
+        brevo_api_key = current_app.config.get('BREVO_API_KEY')
+        sender_email = current_app.config.get('BREVO_SENDER_EMAIL', 'noreply@mizizzi.com')
         sender_name = current_app.config.get('BREVO_SENDER_NAME', 'MIZIZZI')
 
-        # Validate configuration
-        if not sender_email:
-            logger.error("[v0] ❌ BREVO_SENDER_EMAIL not configured. Must be a verified sender in your Brevo account")
-            logger.error("[v0] 📖 Set BREVO_SENDER_EMAIL in environment variables to a verified Brevo sender email")
+        if not brevo_api_key:
+            logger.error("[v0] ❌ BREVO_API_KEY not configured. Set BREVO_API_KEY environment variable on Render backend.")
+            logger.error("[v0] 📖 See BREVO_SETUP_GUIDE.md for detailed setup instructions")
             return False
-
-        # Validate email format
-        if '@' not in sender_email or '@' not in to_email:
-            logger.error(f"[v0] ❌ Invalid email format. From: {sender_email}, To: {to_email}")
-            return False
-
-        # Check SMTP configuration
-        smtp_server = current_app.config.get('MAIL_SERVER')
-        smtp_port = current_app.config.get('MAIL_PORT')
-        smtp_username = current_app.config.get('MAIL_USERNAME')
-        smtp_password = current_app.config.get('MAIL_PASSWORD')
-
-        if not all([smtp_server, smtp_port, smtp_username, smtp_password]):
-            logger.error("[v0] ❌ SMTP configuration incomplete")
-            logger.error(f"[v0]   Server: {'✓' if smtp_server else '✗'}")
-            logger.error(f"[v0]   Port: {'✓' if smtp_port else '✗'}")
-            logger.error(f"[v0]   Username: {'✓' if smtp_username else '✗'}")
-            logger.error(f"[v0]   Password: {'✓' if smtp_password else '✗'}")
-            logger.error("[v0] 📖 Environment variables needed:")
-            logger.error("[v0]    - MAIL_SERVER (default: smtp-relay.brevo.com)")
-            logger.error("[v0]    - MAIL_PORT (default: 587)")
-            logger.error("[v0]    - MAIL_USERNAME (your Brevo SMTP login)")
-            logger.error("[v0]    - MAIL_PASSWORD (your Brevo SMTP password)")
-            return False
-
-        logger.info(f"[v0] 📧 Sending email via SMTP")
-        logger.info(f"[v0]   To: {to_email}")
-        logger.info(f"[v0]   From: {sender_email} ({sender_name})")
-        logger.info(f"[v0]   Subject: {subject}")
-        logger.info(f"[v0]   SMTP Server: {smtp_server}:{smtp_port}")
-
-        # Send email using Flask-Mail (which handles SMTP)
-        try:
-            msg = mail.Message(
-                subject=subject,
-                recipients=[to_email],
-                html=html_content,
-                sender=(sender_name, sender_email)
-            )
-            mail.send(msg)
-            logger.info(f"[v0] ✅ Email sent successfully to {to_email}")
-            return True
-
-        except ConnectionRefusedError as e:
-            logger.error(f"[v0] ❌ Connection refused to SMTP server {smtp_server}:{smtp_port}")
-            logger.error(f"[v0]   Error: {str(e)}")
-            logger.error("[v0] 💡 Check that MAIL_SERVER and MAIL_PORT are correct")
-            return False
-        except Exception as e:
-            logger.error(f"[v0] ❌ SMTP error: {str(e)}")
-            logger.error(f"[v0]   Error type: {type(e).__name__}")
-            # Log more details for authentication errors
-            if 'auth' in str(e).lower() or '535' in str(e):
-                logger.error("[v0] 💡 Authentication failed. Check MAIL_USERNAME and MAIL_PASSWORD")
-            return False
-
-    except Exception as e:
-        logger.error(f"[v0] ❌ Unexpected error: {str(e)}", exc_info=True)
-        return False
 
         if not sender_email:
-            logger.error("[v0] ❌ BREVO_SENDER_EMAIL not configured. Must be a verified sender in your Brevo account")
-            logger.error("[v0] 📖 Set BREVO_SENDER_EMAIL in environment variables to a verified Brevo sender email")
-            return False
-
-        # Validate email format
-        if '@' not in sender_email:
-            logger.error(f"[v0] ❌ Invalid sender email format: {sender_email}")
+            logger.error("[v0] ❌ BREVO_SENDER_EMAIL not configured in config")
             return False
 
         url = "https://api.brevo.com/v3/smtp/email"
@@ -214,39 +148,38 @@ def send_email(to_email, subject, html_content):
             "api-key": brevo_api_key
         }
 
-        logger.info(f"[v0] 📧 Sending email via Brevo API")
-        logger.info(f"[v0]   To: {to_email}")
-        logger.info(f"[v0]   From: {sender_email} ({sender_name})")
-        logger.info(f"[v0]   Subject: {subject}")
-        logger.info(f"[v0]   API Key configured: {bool(brevo_api_key)}")
+        logger.info(f"[v0] 📧 Sending email via Brevo API to {to_email}")
+        logger.info(f"[v0] Sender: {sender_email}")
+        logger.info(f"[v0] Subject: {subject}")
+        logger.info(f"[v0] To: {to_email}")
+        logger.info(f"[v0] From: {sender_email} ({sender_name})")
+        logger.info(f"[v0] Subject: {subject}")
+        logger.info(f"[v0] API Key length: {len(brevo_api_key)} chars")
+        logger.info(f"[v0] API Key last chars: {brevo_api_key[-10:] if brevo_api_key else 'NOT SET'}")
         
         response = requests.post(url, json=payload, headers=headers, timeout=15)
 
-        logger.info(f"[v0] Brevo API response: {response.status_code}")
+        logger.info(f"[v0] Brevo response status code: {response.status_code}")
         
         if response.status_code in [200, 201]:
-            logger.info(f"[v0] ✅ Email sent successfully to {to_email}")
+            logger.info(f"[v0] ✅ Email sent successfully to {to_email}. Status: {response.status_code}")
             try:
                 response_data = response.json()
-                if 'messageId' in response_data:
-                    logger.info(f"[v0] Message ID: {response_data['messageId']}")
+                logger.info(f"[v0] Brevo response: {response_data}")
             except:
-                pass
+                logger.info(f"[v0] Brevo response (non-JSON): {response.text}")
             return True
         else:
-            logger.error(f"[v0] ❌ Brevo API failed with status {response.status_code}")
-            logger.error(f"[v0] Response: {response.text}")
+            logger.error(f"[v0] ❌ Brevo API error: Status {response.status_code}")
+            logger.error(f"[v0] Response headers: {dict(response.headers)}")
+            logger.error(f"[v0] Response body: {response.text}")
             
-            # Parse error details for common issues
+            # Try to parse error details
             try:
                 error_data = response.json()
+                logger.error(f"[v0] Error details: {error_data}")
                 if 'message' in error_data:
-                    logger.error(f"[v0] Brevo Error: {error_data['message']}")
-                    # Check for common Brevo errors
-                    if 'sender' in error_data['message'].lower():
-                        logger.error("[v0] 💡 TIP: Make sure the sender email is verified in your Brevo account")
-                    if 'invalid' in error_data['message'].lower():
-                        logger.error(f"[v0] 💡 TIP: Check that all email fields are valid")
+                    logger.error(f"[v0] Error message: {error_data['message']}")
                 if 'code' in error_data:
                     logger.error(f"[v0] Error code: {error_data['code']}")
             except:
@@ -255,16 +188,16 @@ def send_email(to_email, subject, html_content):
             return False
 
     except requests.exceptions.ConnectionError as e:
-        logger.error(f"[v0] ❌ Connection error to Brevo API: {str(e)}")
+        logger.error(f"[v0] ❌ Connection error sending email to {to_email}: {str(e)}")
         return False
     except requests.exceptions.Timeout as e:
-        logger.error(f"[v0] �� Request timed out (15s): {str(e)}")
+        logger.error(f"[v0] ❌ Timeout sending email to {to_email}: {str(e)}")
         return False
     except requests.exceptions.RequestException as e:
-        logger.error(f"[v0] ❌ Request failed: {str(e)}")
+        logger.error(f"[v0] ❌ Request exception sending email: {str(e)}")
         return False
     except Exception as e:
-        logger.error(f"[v0] ❌ Unexpected error: {str(e)}", exc_info=True)
+        logger.error(f"[v0] ❌ Unexpected error sending email: {str(e)}", exc_info=True)
         return False
 
 def send_sms(phone_number, message):
@@ -1471,16 +1404,8 @@ def resend_verification():
 
             email_sent = send_email(identifier, "Verify Your MIZIZZI Email", email_template)
             if not email_sent:
-                logger.error(f"[v0] Failed to send verification email to {identifier}")
-                logger.error("[v0] 💡 Troubleshooting steps:")
-                logger.error("[v0]    1. Check Render environment: BREVO_API_KEY is set")
-                logger.error("[v0]    2. Verify BREVO_SENDER_EMAIL is a validated sender in your Brevo account")
-                logger.error("[v0]    3. Check your Brevo account isn't rate-limited or suspended")
-                logger.error("[v0]    4. Ensure the API key has email sending permissions")
-                return jsonify({
-                    'msg': 'Failed to send verification email. Please try again.',
-                    'hint': 'Email service is temporarily unavailable. Check server logs.'
-                }), 500
+                logger.error(f"Failed to send verification email to {identifier}")
+                return jsonify({'msg': 'Failed to send verification email. Please try again.'}), 500
 
             return jsonify({
                 'msg': 'Verification email sent successfully',
