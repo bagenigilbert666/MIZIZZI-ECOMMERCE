@@ -100,35 +100,31 @@ export function AuthSteps() {
     setIdentifier(trimmedIdentifier)
 
     try {
-      // Instant validation - no API call needed here
-      // Just verify email format is valid
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      const phoneRegex = /^\d{10,}$/
-      
-      const isValidIdentifier = isEmail ? emailRegex.test(trimmedIdentifier) : phoneRegex.test(trimmedIdentifier)
-      
-      if (!isValidIdentifier) {
-        toast({
-          title: "Invalid format",
-          description: isEmail ? "Please enter a valid email address" : "Please enter a valid phone number",
-          variant: "destructive",
-        })
-        setIsLoading(false)
-        return
-      }
+      const [response] = await Promise.all([
+        authService.checkAvailability(trimmedIdentifier),
+        new Promise((resolve) => setTimeout(resolve, 1000)),
+      ])
 
-      // Fast path: Skip availability check entirely
-      // The backend will determine if account exists during password/registration step
-      // This makes the UI feel instant (no API wait)
-      setFlow("login")
-      setStep("password")
-      
-      toast({
-        title: "Enter your password",
-        description: "We'll check if your account exists next",
-      })
+      const emailExists = isEmail && response.email_available === false
+      const phoneExists = !isEmail && response.phone_available === false
+
+      if (emailExists || phoneExists) {
+        setFlow("login")
+        setStep("password")
+        toast({
+          title: "Account found",
+          description: "Please enter your password to continue",
+        })
+      } else {
+        setFlow("register")
+        setStep("register")
+        toast({
+          title: "Create an account",
+          description: "Please complete your registration to continue",
+        })
+      }
     } catch (error: any) {
-      console.error("[v0] Identifier validation error:", error)
+      console.error("[v0] Identifier check error:", error)
       toast({
         title: "Error",
         description: error.message || "Failed to process your request",
@@ -170,8 +166,10 @@ export function AuthSteps() {
     setIsLoading(true)
     const trimmedIdentifier = identifier.trim()
     try {
-      // Remove artificial delay - login should be as fast as possible
-      const response = await authService.login(trimmedIdentifier, password)
+      const [response] = await Promise.all([
+        authService.login(trimmedIdentifier, password),
+        new Promise((resolve) => setTimeout(resolve, 1200)),
+      ])
 
       await safeRefreshAuthState()
 
@@ -221,44 +219,20 @@ export function AuthSteps() {
       }
 
       let errorMessage = "Invalid credentials"
-      let showResendOption = false
-      let isVerificationNeeded = false
 
-      // Use the full error message from the service if available
-      if (error.message) {
-        errorMessage = error.message
-        // Check if this is a verification error
-        if (errorMessage.includes("verified") || errorMessage.includes("verify")) {
-          showResendOption = true
-          isVerificationNeeded = true
-        }
-      } else if (error.response?.data?.msg) {
-        errorMessage = error.response.data.msg
+      if (error.message?.includes("not found")) {
+        errorMessage = "Account not found. Please check your email or phone number."
+      } else if (error.message?.includes("password")) {
+        errorMessage = "Incorrect password. Please try again."
+      } else if (error.message?.includes("locked")) {
+        errorMessage = "Your account has been locked. Please contact support."
       }
 
       toast({
         title: "Login failed",
         description: errorMessage,
         variant: "destructive",
-        duration: showResendOption ? 8000 : 5000,
       })
-
-      // If account needs verification, offer to go back and resend code
-      if (isVerificationNeeded) {
-        setTimeout(() => {
-          toast({
-            title: "Account not verified",
-            description: "Go back to resend your verification code, then use it to verify your account.",
-            action: {
-              label: "Go Back",
-              onClick: () => {
-                setStep("identifier")
-                setIdentifier("")
-              },
-            },
-          })
-        }, 500)
-      }
     } finally {
       setIsLoading(false)
     }
@@ -269,13 +243,15 @@ export function AuthSteps() {
     try {
       const trimmedIdentifier = identifier.trim()
 
-      // Remove artificial delay - registration should complete as fast as API allows
-      const response = await authService.register({
-        name,
-        email: trimmedIdentifier.includes("@") ? trimmedIdentifier : undefined,
-        phone: !trimmedIdentifier.includes("@") ? trimmedIdentifier : undefined,
-        password,
-      })
+      const [response] = await Promise.all([
+        authService.register({
+          name,
+          email: trimmedIdentifier.includes("@") ? trimmedIdentifier : undefined,
+          phone: !trimmedIdentifier.includes("@") ? trimmedIdentifier : undefined,
+          password,
+        }),
+        new Promise((resolve) => setTimeout(resolve, 2000)),
+      ])
 
       const userId = response.user_id
 
@@ -297,14 +273,24 @@ export function AuthSteps() {
 
         setStep("verification")
 
-        // Important: The backend already sent a verification code during registration.
-        // Do NOT send another one here to avoid rate limiting.
-        // The user should enter the code they received, and can use "Resend code" if needed.
-        toast({
-          title: "Account created successfully",
-          description: `We sent a verification code to your ${trimmedIdentifier.includes("@") ? "email" : "phone"}. Please enter it below to verify your account.`,
-          duration: 6000,
-        })
+        try {
+          await authService.sendVerificationCode(trimmedIdentifier)
+
+          toast({
+            title: "Verification code sent",
+            description: `Please check your ${trimmedIdentifier.includes("@") ? "email" : "phone"} for the verification code.`,
+            duration: 5000,
+          })
+        } catch (verificationError: any) {
+          console.error("[v0] Verification code sending failed:", verificationError)
+          toast({
+            title: "Account created",
+            description:
+              "Your account was created successfully. Please use the 'Resend Code' button to receive your verification code.",
+            duration: 8000,
+          })
+          setStep("verification")
+        }
       } else {
         setStep("welcome")
 
@@ -366,51 +352,35 @@ export function AuthSteps() {
       setResendCountdown(60)
 
       toast({
-        title: "Code sent",
-        description: `A new verification code has been sent to ${identifier}. Check your ${
+        title: "Verification code sent",
+        description: `A new verification code has been sent to ${identifier}. Please check your ${
           identifier.includes("@") ? "inbox and spam folder" : "messages"
-        }.`,
-        duration: 4000,
+        }`,
+        duration: 5000,
       })
     } catch (error: any) {
-      // Extract error message from various error structures
-      const errorMsg = error.response?.data?.message || error.message || ""
-
-      // Extract wait time from rate limit errors
-      const waitTimeMatch = errorMsg.match(/wait\s+(\d+)\s+seconds?/i)
-      if (waitTimeMatch) {
-        const waitSeconds = parseInt(waitTimeMatch[1], 10)
-        setResendCountdown(Math.max(waitSeconds, 1))
-        
-        // Don't show error toast for rate limits - just show the countdown in the button
-        // The UI already displays "Resend in Xs" so users understand they need to wait
-        return
-      }
-
-      // Only show error toasts for actual errors, not rate limits
       let errorMessage = "Failed to resend verification code"
+      let toastDuration = 5000
 
-      if (error.response?.status === 429) {
-        setResendCountdown(60)
-        return // Silent rate limit - UI shows countdown
-      } else if (errorMsg?.includes("Server error") || errorMsg?.includes("email service")) {
-        errorMessage = errorMsg || "Email service error. Please try again later."
-      } else if (errorMsg?.includes("not found")) {
-        errorMessage = "Account not found. Please go back and check your information."
-      } else if (errorMsg?.includes("already verified")) {
-        errorMessage = "This account is already verified. Please login instead."
-      } else if (errorMsg) {
-        errorMessage = errorMsg
+      if (error.message?.includes("Server error") || error.message?.includes("email service")) {
+        errorMessage = error.message
+        toastDuration = 8000
+      } else if (error.message?.includes("too many")) {
+        errorMessage = "Too many attempts. Please try again in a few minutes."
+      } else if (error.message?.includes("not found")) {
+        errorMessage = "Account not found. Please check your information."
+      } else if (error.message?.includes("already verified")) {
+        errorMessage = "This account is already verified. Please login."
+      } else if (error.message) {
+        errorMessage = error.message
       }
 
-      if (errorMessage) {
-        toast({
-          title: "Unable to resend",
-          description: errorMessage,
-          variant: "destructive",
-          duration: 5000,
-        })
-      }
+      toast({
+        title: "Error",
+        description: errorMessage,
+        variant: "destructive",
+        duration: toastDuration,
+      })
     } finally {
       setIsLoading(false)
     }

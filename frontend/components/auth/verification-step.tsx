@@ -65,9 +65,7 @@ export function VerificationStep({
       setCode("")
       setError("")
     } catch (err: any) {
-      // Extract error message from API response or error object
-      const errorMsg = err.response?.data?.message || err.message || "Failed to resend code"
-      setError(errorMsg)
+      setError(err.message || "Failed to resend code")
     }
   }
 

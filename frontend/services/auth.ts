@@ -1,7 +1,6 @@
 import api from "@/lib/api"
 import type { User } from "@/types/auth"
 import axios from "axios"
-import { validateLoginResponse, clearAuthTokens } from "@/lib/token-validator"
 
 // Define the response types
 interface LoginResponse {
@@ -201,28 +200,26 @@ class AuthService {
     try {
       const response = await api.post("/api/login", { identifier, password })
 
-      // Validate that we got proper tokens back
-      const validation = validateLoginResponse(response.data)
-      if (!validation.isValid) {
-        console.error("[v0] Login token validation failed:", validation.message)
-        clearAuthTokens()
-        throw new Error(validation.message)
-      }
-
       // Store tokens in localStorage
       if (response.data.access_token) {
         localStorage.setItem("mizizzi_token", response.data.access_token)
-        console.log("[v0] Access token stored successfully")
+        console.log("Access token stored:", response.data.access_token.substring(0, 10) + "...")
+      } else {
+        console.error("No access token received from server")
       }
 
       if (response.data.refresh_token) {
         localStorage.setItem("mizizzi_refresh_token", response.data.refresh_token)
-        console.log("[v0] Refresh token stored")
+        console.log("Refresh token stored")
+      } else {
+        console.error("No refresh token received from server")
       }
 
       if (response.data.csrf_token) {
         localStorage.setItem("mizizzi_csrf_token", response.data.csrf_token)
-        console.log("[v0] CSRF token stored")
+        console.log("CSRF token stored:", response.data.csrf_token)
+      } else {
+        console.error("No CSRF token received from server")
       }
 
       // Store user data
@@ -254,12 +251,14 @@ class AuthService {
       if (error.response?.status === 403) {
         const errorMessage = error.response?.data?.msg || "Access forbidden"
 
+        // Check for specific error messages
         if (errorMessage.includes("verified")) {
           throw new Error("This account needs to be verified. Please check your email for a verification link or code.")
         } else if (errorMessage.includes("inactive")) {
           throw new Error("This account is inactive. Please contact the system administrator.")
         }
 
+        // If this is an admin login attempt, provide a more specific error
         if (window.location.pathname.includes("/admin")) {
           throw new Error(
             "You don't have permission to access the admin area. This account doesn't have admin privileges.",
@@ -267,27 +266,6 @@ class AuthService {
         }
 
         throw new Error(errorMessage)
-      }
-
-      // Handle 401 Unauthorized errors
-      if (error.response?.status === 401) {
-        const errorMessage = error.response?.data?.msg || "Unauthorized"
-        
-        // Check if account needs verification
-        if (errorMessage.includes("verified") || errorMessage.includes("not verified") || errorMessage.includes("verify")) {
-          throw new Error("Your account needs to be verified first. Please check your email or phone for the verification code.")
-        } else if (errorMessage.includes("not found") || errorMessage.includes("does not exist")) {
-          throw new Error("This account doesn't exist. Please create an account first.")
-        } else if (errorMessage.includes("password") || errorMessage.includes("incorrect")) {
-          throw new Error("Incorrect password. Please try again.")
-        } else if (errorMessage.includes("invalid")) {
-          throw new Error("Invalid credentials. Please check your email and password.")
-        } else if (errorMessage.includes("inactive") || errorMessage.includes("disabled")) {
-          throw new Error("This account is inactive. Please contact support.")
-        }
-        
-        // Generic unauthorized message
-        throw new Error("Login failed. Please verify your account has been registered and verified.")
       }
 
       const errorMessage = error.response?.data?.msg || "Login failed"
