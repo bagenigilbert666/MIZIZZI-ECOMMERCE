@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from "react"
 import Link from "next/link"
 import { NetworkStatus } from "@/components/shared/network-status"
 import { CategoryGrid } from "@/components/features/category-grid-enhanced"
@@ -22,6 +23,7 @@ import type {
   FeatureCard,
   ProductShowcaseCategory,
 } from "@/lib/server/get-carousel-data"
+import { useCategoriesCache } from "@/hooks/use-categories-cache"
 
 interface HomeContentProps {
   flashSaleProducts: Product[]
@@ -56,6 +58,8 @@ export function HomeContent({
   featureCards = [],
   productShowcase = [],
 }: HomeContentProps) {
+  // Apply 3-layer cache strategy: sessionStorage > localStorage > server data
+  const { categories: cachedCategories } = useCategoriesCache(categories)
   return (
     <>
       <div className="page-root flex flex-col pb-8 w-full" style={{ backgroundColor: "var(--color-background)" }}>
@@ -74,7 +78,7 @@ export function HomeContent({
 
         <div className="mx-auto w-full max-w-[1200px] px-0 sm:px-3 md:px-4 mt-3 sm:mt-4">
           <div className="mb-3 sm:rounded-lg bg-white overflow-hidden shadow-sm">
-            <CategoryGrid categories={categories} />
+            <CategoryGrid categories={cachedCategories} />
           </div>
         </div>
 
