@@ -222,12 +222,11 @@ export function AuthSteps() {
 
       let errorMessage = "Invalid credentials"
 
-      if (error.message?.includes("not found")) {
-        errorMessage = "Account not found. Please check your email or phone number."
-      } else if (error.message?.includes("password")) {
-        errorMessage = "Incorrect password. Please try again."
-      } else if (error.message?.includes("locked")) {
-        errorMessage = "Your account has been locked. Please contact support."
+      // Use the full error message from the service if available
+      if (error.message) {
+        errorMessage = error.message
+      } else if (error.response?.data?.msg) {
+        errorMessage = error.response.data.msg
       }
 
       toast({

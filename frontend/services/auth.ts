@@ -268,6 +268,23 @@ class AuthService {
         throw new Error(errorMessage)
       }
 
+      // Handle 401 Unauthorized errors
+      if (error.response?.status === 401) {
+        const errorMessage = error.response?.data?.msg || "Unauthorized"
+        
+        if (errorMessage.includes("verified") || errorMessage.includes("not verified")) {
+          throw new Error("Your account hasn't been verified yet. Please check your email or phone for the verification code.")
+        } else if (errorMessage.includes("not found")) {
+          throw new Error("This account doesn't exist. Please create an account first.")
+        } else if (errorMessage.includes("password")) {
+          throw new Error("Incorrect password. Please try again.")
+        } else if (errorMessage.includes("invalid")) {
+          throw new Error("Invalid credentials. Please check your email and password.")
+        }
+        
+        throw new Error("Login failed. Please check your credentials and try again.")
+      }
+
       const errorMessage = error.response?.data?.msg || "Login failed"
 
       // Provide more specific error messages based on the error
