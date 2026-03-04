@@ -364,61 +364,34 @@ export function AuthSteps() {
       setResendCountdown(60)
 
       toast({
-        title: "Code sent",
-        description: `A new verification code has been sent to your ${identifier.includes("@") ? "email" : "phone"}`,
-        duration: 4000,
+        title: "Verification code sent",
+        description: `A new verification code has been sent to ${identifier}. Please check your ${
+          identifier.includes("@") ? "inbox and spam folder" : "messages"
+        }`,
+        duration: 5000,
       })
     } catch (error: any) {
-      console.error("[v0] Resend verification error:", error)
-
-      // Extract wait time from rate limit error message
-      const errorMsg = error.response?.data?.message || error.message || ""
-      const waitTimeMatch = errorMsg.match(/wait\s+(\d+)\s+seconds?/i)
-
-      if (waitTimeMatch) {
-        const waitSeconds = parseInt(waitTimeMatch[1], 10)
-        setResendCountdown(Math.max(waitSeconds, 1))
-
-        // Show informative message about rate limit with countdown
-        toast({
-          title: "Too many requests",
-          description: `Please wait ${waitSeconds} second${waitSeconds === 1 ? "" : "s"} before requesting another code. The countdown will update in real-time.`,
-          variant: "destructive",
-          duration: 6000,
-        })
-        return
-      }
-
-      // Handle 429 without specific wait time
-      if (error.response?.status === 429) {
-        setResendCountdown(60)
-        toast({
-          title: "Rate limited",
-          description: "Too many attempts. Please wait 60 seconds before trying again.",
-          variant: "destructive",
-          duration: 5000,
-        })
-        return
-      }
-
-      // Handle other errors
       let errorMessage = "Failed to resend verification code"
+      let toastDuration = 5000
 
-      if (errorMsg.includes("Server error") || errorMsg.includes("email service")) {
-        errorMessage = errorMsg || "Email service error. Please try again later."
-      } else if (errorMsg.includes("not found")) {
+      if (error.message?.includes("Server error") || error.message?.includes("email service")) {
+        errorMessage = error.message
+        toastDuration = 8000
+      } else if (error.message?.includes("too many")) {
+        errorMessage = "Too many attempts. Please try again in a few minutes."
+      } else if (error.message?.includes("not found")) {
         errorMessage = "Account not found. Please check your information."
-      } else if (errorMsg.includes("already verified")) {
+      } else if (error.message?.includes("already verified")) {
         errorMessage = "This account is already verified. Please login."
-      } else if (errorMsg) {
-        errorMessage = errorMsg
+      } else if (error.message) {
+        errorMessage = error.message
       }
 
       toast({
         title: "Error",
         description: errorMessage,
         variant: "destructive",
-        duration: 5000,
+        duration: toastDuration,
       })
     } finally {
       setIsLoading(false)
