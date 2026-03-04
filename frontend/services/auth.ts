@@ -38,39 +38,10 @@ class AuthService {
       const isEmail = identifier.includes("@")
       const data = isEmail ? { email: identifier } : { phone: identifier }
 
-      console.log("[v0] Checking availability:", { identifier, isEmail })
-      
-      // Use the api client with a short timeout
-      const response = await api.post("/api/check-availability", data, {
-        timeout: 5000 // 5 second timeout to fail fast
-      })
-      
-      console.log("[v0] Availability check response:", response.data)
+      const response = await api.post("/api/check-availability", data)
       return response.data
     } catch (error: any) {
-      console.error("[v0] Check availability error:", {
-        message: error.message,
-        code: error.code,
-        status: error.response?.status,
-      })
-      
-      // If the check times out or fails, assume the identifier is available (new account)
-      // This allows the UI to continue and try to register
-      if (error.code === "ECONNABORTED" || error.code === "ERR_NETWORK") {
-        console.warn("[v0] Availability check timed out, assuming new account for UX continuity")
-        // Return that identifier is available (assume new account)
-        return {
-          email_available: !identifier.includes("@"),
-          phone_available: identifier.includes("@"),
-        }
-      }
-      
-      // For actual errors, propagate them
-      let errorMsg = "Failed to check availability"
-      if (error.response?.status === 500) {
-        errorMsg = error.response.data?.msg || "Server error"
-      }
-      throw new Error(errorMsg)
+      throw new Error(error.response?.data?.msg || "Failed to check availability")
     }
   }
 

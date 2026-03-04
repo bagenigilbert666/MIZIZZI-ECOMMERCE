@@ -35,19 +35,39 @@ const testimonials = [
 
 export function AuthLayout({ children, className }: AuthLayoutProps) {
   const [current, setCurrent] = useState(0)
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!mounted) return
+    
     const interval = setInterval(() => {
       setCurrent((prev) => (prev + 1) % testimonials.length)
     }, 6000)
 
     return () => clearInterval(interval)
-  }, [])
+  }, [mounted])
+
+  if (!mounted) {
+    return (
+      <div className="flex justify-center items-start pt-3 px-3 min-h-screen bg-gradient-to-br from-cherry-50 via-white to-gold-50">
+        <div className="w-full max-w-[900px] grid grid-cols-1 md:grid-cols-7 bg-white rounded-lg shadow-sm overflow-hidden">
+          <div className="hidden md:block md:col-span-3 bg-gradient-to-br from-cherry-600 to-cherry-800 p-6"></div>
+          <div className="p-4 md:col-span-4 flex flex-col justify-center">
+            <div className="mx-auto w-full max-w-sm h-64 bg-gray-100 rounded animate-pulse"></div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="flex justify-center items-start pt-2 px-3 min-h-screen bg-gradient-to-br from-cherry-50 via-white to-gold-50">
       <div className="w-full max-w-[900px] grid grid-cols-1 md:grid-cols-7 bg-white rounded-lg shadow-sm overflow-hidden">
-        {/* Image Section - Desktop Only */}
+        {/* Image Section - Compact */}
         <div className="relative hidden md:flex md:col-span-3 bg-gradient-to-br from-cherry-600 to-cherry-800 flex-col items-center justify-between p-4 min-h-[500px]">
           {/* Logo */}
           <div className="relative z-10 flex flex-col items-center justify-center flex-1 w-full">
@@ -109,7 +129,7 @@ export function AuthLayout({ children, className }: AuthLayoutProps) {
           </div>
         </div>
 
-        {/* Form Section - Fast Render */}
+        {/* Form Section - Compact */}
         <div className={cn("p-4 md:p-5 md:col-span-4 flex flex-col justify-center", className)}>
           <div className="mx-auto w-full max-w-sm">
             <Link href="/" className="mb-4 flex items-center gap-2 hover:opacity-80 transition-opacity">
