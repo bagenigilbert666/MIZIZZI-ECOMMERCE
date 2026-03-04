@@ -50,12 +50,12 @@ export function useFlashSalesCache(serverProducts: FlashSaleProduct[], serverEve
     if (typeof window === 'undefined') return
 
     const startTime = performance.now()
-    let cacheSource = 'server'
+    let cacheSource: 'server' | 'sessionStorage' | 'localStorage' = 'server'
     let cacheHit = false
 
     try {
       // ===== PRODUCTS CACHE =====
-      
+
       // Layer 1: Check sessionStorage (fastest)
       const sessionCache = sessionStorage.getItem(CACHE_KEY)
       if (sessionCache) {
@@ -118,7 +118,7 @@ export function useFlashSalesCache(serverProducts: FlashSaleProduct[], serverEve
       }
 
       // ===== EVENT CACHE =====
-      
+
       let eventCacheHit = false
 
       // Layer 1: Check sessionStorage
