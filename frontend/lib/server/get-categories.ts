@@ -47,9 +47,10 @@ export const getCategories = cache(async (limit = 20): Promise<Category[]> => {
     const timeoutId = setTimeout(() => controller.abort(), 8000) // 8 second timeout
 
     // Fetch with include_product_count to get real-time item counts
+    // Extended cache: 3600s (1 hour) for optimal performance without staleness
     const response = await fetch(`${API_BASE_URL}/api/categories?parent_id=null&per_page=${limit}&include_product_count=true`, {
       signal: controller.signal,
-      next: { revalidate: 30, tags: ["categories"] }, // Even faster cache + real-time counts
+      next: { revalidate: 3600, tags: ["categories"] }, // Extended from 30s to 3600s
       headers: {
         "Content-Type": "application/json",
       },
@@ -111,7 +112,7 @@ export const getCategoriesWithSubcategories = cache(
     try {
       // Fetch top-level categories
       const response = await fetch(`${API_BASE_URL}/api/categories?parent_id=null&per_page=${limit}`, {
-        next: { revalidate: 300, tags: ["categories"] },
+        next: { revalidate: 3600, tags: ["categories"] }, // Extended to 3600s
         headers: { "Content-Type": "application/json" },
       })
 
@@ -129,7 +130,7 @@ export const getCategoriesWithSubcategories = cache(
         categories.slice(0, limit).map(async (category: Category) => {
           try {
             const subResponse = await fetch(`${API_BASE_URL}/api/categories?parent_id=${category.id}&per_page=20`, {
-              next: { revalidate: 300, tags: ["categories"] },
+              next: { revalidate: 3600, tags: ["categories"] }, // Extended to 3600s
               headers: { "Content-Type": "application/json" },
             })
 
