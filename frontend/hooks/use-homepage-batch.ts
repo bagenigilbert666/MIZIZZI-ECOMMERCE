@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import useSWR from 'swr'
 import type { Product } from '@/types'
+import { recordCacheMetric } from '@/lib/performance-metrics'
 
 interface HomepageSectionCache {
   flashSales: { products: Product[]; event: any } | null
@@ -134,6 +135,7 @@ export function useHomepageBatch(options: {
 
       if (Object.values(cached).some((v) => v !== null)) {
         setCachedData(cached)
+        recordCacheMetric(true, 'localStorage', 5, 'homepage-batch')
         console.log('[v0] Loaded homepage sections from localStorage cache')
       }
     } catch (error) {
@@ -168,10 +170,14 @@ export function useHomepageBatch(options: {
   const { data, error, isLoading, mutate } = useSWR(
     enabled && isHydrated ? `/api/homepage/batch?${getQueryParams()}` : null,
     async (url: string) => {
+      const startTime = performance.now()
       try {
         const response = await fetch(url)
         if (!response.ok) throw new Error(`HTTP ${response.status}`)
-        return response.json()
+        const result = await response.json()
+        const fetchTime = performance.now() - startTime
+        recordCacheMetric(false, 'server', fetchTime, 'homepage-batch')
+        return result
       } catch (error) {
         console.error('[v0] Batch fetch error:', error)
         throw error
