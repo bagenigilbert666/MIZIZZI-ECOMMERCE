@@ -100,34 +100,31 @@ export function AuthSteps() {
     setIdentifier(trimmedIdentifier)
 
     try {
-      // Instant validation - no API call needed here
-      // Just verify email format is valid
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      const phoneRegex = /^\d{10,}$/
-      
-      const isValidIdentifier = isEmail ? emailRegex.test(trimmedIdentifier) : phoneRegex.test(trimmedIdentifier)
-      
-      if (!isValidIdentifier) {
-        toast({
-          title: "Invalid format",
-          description: isEmail ? "Please enter a valid email address" : "Please enter a valid phone number",
-          variant: "destructive",
-        })
-        setIsLoading(false)
-        return
-      }
+      const [response] = await Promise.all([
+        authService.checkAvailability(trimmedIdentifier),
+        new Promise((resolve) => setTimeout(resolve, 1000)),
+      ])
 
-      // Fast path: Skip availability check entirely
-      // The backend will determine if account exists during password/registration step
-      setFlow("login")
-      setStep("password")
-      
-      toast({
-        title: "Enter your password",
-        description: "We'll check if your account exists next",
-      })
+      const emailExists = isEmail && response.email_available === false
+      const phoneExists = !isEmail && response.phone_available === false
+
+      if (emailExists || phoneExists) {
+        setFlow("login")
+        setStep("password")
+        toast({
+          title: "Account found",
+          description: "Please enter your password to continue",
+        })
+      } else {
+        setFlow("register")
+        setStep("register")
+        toast({
+          title: "Create an account",
+          description: "Please complete your registration to continue",
+        })
+      }
     } catch (error: any) {
-      console.error("[v0] Identifier validation error:", error)
+      console.error("[v0] Identifier check error:", error)
       toast({
         title: "Error",
         description: error.message || "Failed to process your request",
@@ -169,7 +166,10 @@ export function AuthSteps() {
     setIsLoading(true)
     const trimmedIdentifier = identifier.trim()
     try {
-      const response = await authService.login(trimmedIdentifier, password)
+      const [response] = await Promise.all([
+        authService.login(trimmedIdentifier, password),
+        new Promise((resolve) => setTimeout(resolve, 1200)),
+      ])
 
       await safeRefreshAuthState()
 
@@ -184,83 +184,6 @@ export function AuthSteps() {
         router.push("/")
       }, 2000)
     } catch (error: any) {
-      // Handle 401 errors by checking account status
-      if (error.response?.status === 401) {
-        console.log("[v0] Login returned 401, checking account status...")
-        setIsLoading(true)
-        
-        try {
-          // Check if account exists and is verified
-          const accountStatus = await authService.checkAccountStatus(trimmedIdentifier)
-          
-          if (!accountStatus.exists) {
-            // Account doesn't exist - guide to registration
-            toast({
-              title: "Account not found",
-              description: "This email/phone isn't registered. Let's create an account for you.",
-              duration: 5000,
-            })
-            setFlow("register")
-            setStep("register")
-            return
-          }
-          
-          if (accountStatus.exists && !accountStatus.verified) {
-            // Account exists but not verified - guide to verification
-            console.log("[v0] Account exists but not verified, sending verification code...")
-            
-            try {
-              const verificationResponse = await authService.sendVerificationCode(trimmedIdentifier)
-              setUserId(verificationResponse.user_id || null)
-              
-              localStorage.setItem(
-                "auth_verification_state",
-                JSON.stringify({
-                  identifier: trimmedIdentifier,
-                  step: "verification",
-                  userId: verificationResponse.user_id,
-                  timestamp: new Date().toISOString(),
-                }),
-              )
-              
-              setFlow("register")
-              setStep("verification")
-              
-              toast({
-                title: "Account not verified",
-                description: `We sent a verification code to your ${trimmedIdentifier.includes("@") ? "email" : "phone"}. Please verify your account.`,
-                duration: 6000,
-              })
-            } catch (verificationError: any) {
-              toast({
-                title: "Verification setup failed",
-                description: verificationError.message || "Couldn't send verification code",
-                variant: "destructive",
-              })
-            }
-            return
-          }
-          
-          // Account exists and is verified but password is wrong
-          toast({
-            title: "Incorrect password",
-            description: "Please check your password and try again.",
-            variant: "destructive",
-          })
-        } catch (statusCheckError: any) {
-          console.error("[v0] Error checking account status:", statusCheckError)
-          toast({
-            title: "Login failed",
-            description: "Please verify your credentials and try again.",
-            variant: "destructive",
-          })
-        } finally {
-          setIsLoading(false)
-        }
-        return
-      }
-
-      // Handle other verification_required responses
       if (error.response?.data?.verification_required) {
         setUserId(error.response.data.user_id || null)
 
@@ -297,50 +220,22 @@ export function AuthSteps() {
 
       let errorMessage = "Invalid credentials"
 
-      // Determine the specific error
-      if (error.message) {
-        errorMessage = error.message
-      } else if (error.response?.data?.msg) {
-        errorMessage = error.response.data.msg
+      if (error.message?.includes("not found")) {
+        errorMessage = "Account not found. Please check your email or phone number."
+      } else if (error.message?.includes("password")) {
+        errorMessage = "Incorrect password. Please try again."
+      } else if (error.message?.includes("locked")) {
+        errorMessage = "Your account has been locked. Please contact support."
       }
 
       toast({
         title: "Login failed",
         description: errorMessage,
         variant: "destructive",
-        duration: showVerificationOption ? 8000 : 5000,
       })
-
-      // If might be verification issue, offer to resend verification code
-      if (showVerificationOption) {
-        setTimeout(() => {
-          toast({
-            title: "Need verification?",
-            description: "If your account needs verification, click the button below to resend your verification code.",
-            action: {
-              label: "Verify Account",
-              onClick: async () => {
-                try {
-                  await authService.sendVerificationCode(trimmedIdentifier)
-                  setUserId(null)
-                  setStep("verification")
-                  toast({
-                    title: "Verification code sent",
-                    description: `Check your ${identifier.includes("@") ? "email" : "phone"} for the verification code.`,
-                    duration: 5000,
-                  })
-                } catch (err: any) {
-                  toast({
-                    title: "Error",
-                    description: err.message || "Failed to send verification code",
-                    variant: "destructive",
-                  })
-                }
-              },
-            },
-          })
-        }, 500)
-      }
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const handleRegisterSubmit = async (name: string, password: string) => {
