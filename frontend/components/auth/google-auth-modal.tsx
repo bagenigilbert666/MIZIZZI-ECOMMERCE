@@ -126,21 +126,10 @@ export function GoogleAuthModal({ isOpen, onClose, mode = "signup" }: GoogleAuth
   return (
     <Modal open={isOpen} onOpenChange={onClose} size="sm" closeOnEscape closeOnClickOutside>
       <div className="w-full">
-        {/* Apple-like card */}
-        <div className="rounded-2xl bg-white text-neutral-900 shadow-[0_24px_80px_rgba(0,0,0,0.18)] ring-1 ring-black/5 overflow-hidden">
-          {/* Header */}
-          <div className="px-6 pt-6 pb-4">
-            <div className="space-y-1">
-              <h2 className="text-[20px] font-semibold tracking-tight">{title}</h2>
-              <p className="text-[13px] text-neutral-500">{subtitle}</p>
-            </div>
-          </div>
-
-          {/* Divider */}
-          <div className="h-px bg-neutral-100" />
-
-          {/* Body */}
-          <div className="px-6 py-6">
+        {/* Clean unified card - no divider */}
+        <div className="rounded-3xl bg-white text-neutral-900 shadow-[0_24px_80px_rgba(0,0,0,0.12)] ring-1 ring-black/5 overflow-hidden">
+          {/* Unified content area */}
+          <div className="px-6 py-8 sm:px-8 sm:py-10">
             <AnimatePresence mode="wait">
               {isSuccess ? (
                 <motion.div
@@ -161,7 +150,7 @@ export function GoogleAuthModal({ isOpen, onClose, mode = "signup" }: GoogleAuth
                   </motion.div>
                   <div className="mt-4 space-y-1">
                     <p className="text-[15px] font-semibold">
-                      {mode === "signup" ? "You’re all set." : "Signed in."}
+                      {mode === "signup" ? "You're all set." : "Signed in."}
                     </p>
                     <p className="text-[13px] text-neutral-500">Taking you back…</p>
                   </div>
@@ -173,8 +162,14 @@ export function GoogleAuthModal({ isOpen, onClose, mode = "signup" }: GoogleAuth
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 10 }}
                   transition={{ duration: 0.22, ease: [0.2, 0.8, 0.2, 1] }}
-                  className="space-y-4"
+                  className="space-y-6"
                 >
+                  {/* Title & Subtitle - now cohesive */}
+                  <div className="space-y-2">
+                    <h2 className="text-xl font-semibold tracking-tight">{title}</h2>
+                    <p className="text-[14px] text-neutral-600">{subtitle}</p>
+                  </div>
+
                   {/* Button */}
                   <button
                     onClick={handleGoogleAuth}
@@ -183,10 +178,10 @@ export function GoogleAuthModal({ isOpen, onClose, mode = "signup" }: GoogleAuth
                       "w-full rounded-xl px-4 py-3",
                       "flex items-center justify-center gap-3",
                       "text-[14px] font-medium",
-                      "transition-all",
+                      "transition-all duration-200",
                       "ring-1 ring-black/10",
                       "bg-white hover:bg-neutral-50 active:bg-neutral-100",
-                      "shadow-[0_1px_0_rgba(0,0,0,0.03)]",
+                      "shadow-[0_1px_0_rgba(0,0,0,0.03)] hover:shadow-[0_2px_8px_rgba(0,0,0,0.08)]",
                       "disabled:opacity-60 disabled:cursor-not-allowed",
                     ].join(" ")}
                   >
@@ -211,22 +206,22 @@ export function GoogleAuthModal({ isOpen, onClose, mode = "signup" }: GoogleAuth
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 6 }}
                         transition={{ duration: 0.18 }}
-                        className="rounded-xl bg-red-50 ring-1 ring-red-500/15 px-4 py-3"
+                        className="rounded-lg bg-red-50 ring-1 ring-red-500/15 px-4 py-3"
                       >
-                        <p className="text-[13px] text-red-700 font-medium">Couldn’t sign in</p>
+                        <p className="text-[13px] text-red-700 font-medium">Couldn't sign in</p>
                         <p className="text-[12px] text-red-700/80 mt-1">{errorMessage}</p>
                       </motion.div>
                     ) : null}
                   </AnimatePresence>
 
-                  {/* Fine print */}
-                  <p className="text-[12px] text-neutral-500 leading-relaxed">
-                    By continuing, you agree to MIZIZZI’s{" "}
-                    <a className="text-neutral-900 underline underline-offset-4" href="/terms">
+                  {/* Fine print - cleaner */}
+                  <p className="text-[12px] text-neutral-500 leading-relaxed text-center">
+                    By continuing, you agree to MIZIZZI's{" "}
+                    <a className="text-neutral-900 hover:underline underline-offset-4" href="/terms">
                       Terms
                     </a>{" "}
                     and{" "}
-                    <a className="text-neutral-900 underline underline-offset-4" href="/privacy">
+                    <a className="text-neutral-900 hover:underline underline-offset-4" href="/privacy">
                       Privacy Policy
                     </a>
                     .
@@ -237,7 +232,7 @@ export function GoogleAuthModal({ isOpen, onClose, mode = "signup" }: GoogleAuth
           </div>
         </div>
 
-        {/* Optional: subtle backdrop vibe if your Modal doesn’t already add one */}
+        {/* Optional: subtle backdrop vibe if your Modal doesn't already add one */}
         <div className="pointer-events-none" aria-hidden="true" />
       </div>
     </Modal>
