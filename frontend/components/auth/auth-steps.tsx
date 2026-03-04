@@ -283,12 +283,26 @@ export function AuthSteps() {
           })
         } catch (verificationError: any) {
           console.error("[v0] Verification code sending failed:", verificationError)
-          toast({
-            title: "Account created",
-            description:
-              "Your account was created successfully. Please use the 'Resend Code' button to receive your verification code.",
-            duration: 8000,
-          })
+          
+          // Extract wait time from rate limit errors
+          const waitTimeMatch = verificationError.message?.match(/wait\s+(\d+)\s+seconds?/i)
+          if (waitTimeMatch) {
+            const waitSeconds = parseInt(waitTimeMatch[1], 10)
+            setResendCountdown(waitSeconds)
+            toast({
+              title: "Rate limited",
+              description: `Too many requests. Please wait ${waitSeconds} seconds before resending the code.`,
+              variant: "destructive",
+              duration: 5000,
+            })
+          } else {
+            toast({
+              title: "Account created",
+              description:
+                "Your account was created successfully. Please use the 'Resend Code' button to receive your verification code.",
+              duration: 8000,
+            })
+          }
           setStep("verification")
         }
       } else {
@@ -361,12 +375,20 @@ export function AuthSteps() {
     } catch (error: any) {
       let errorMessage = "Failed to resend verification code"
       let toastDuration = 5000
+      let waitSeconds = 0
 
-      if (error.message?.includes("Server error") || error.message?.includes("email service")) {
-        errorMessage = error.message
-        toastDuration = 8000
+      // Extract wait time from rate limit errors
+      const waitTimeMatch = error.message?.match(/wait\s+(\d+)\s+seconds?/i)
+      if (waitTimeMatch) {
+        waitSeconds = parseInt(waitTimeMatch[1], 10)
+        setResendCountdown(waitSeconds) // Set proper countdown based on server response
+        errorMessage = `Too many attempts. Please wait ${waitSeconds} seconds before trying again.`
       } else if (error.message?.includes("too many")) {
         errorMessage = "Too many attempts. Please try again in a few minutes."
+        setResendCountdown(300) // 5 minutes as fallback
+      } else if (error.message?.includes("Server error") || error.message?.includes("email service")) {
+        errorMessage = error.message
+        toastDuration = 8000
       } else if (error.message?.includes("not found")) {
         errorMessage = "Account not found. Please check your information."
       } else if (error.message?.includes("already verified")) {
