@@ -342,50 +342,51 @@ export function AuthSteps() {
       setResendCountdown(60)
 
       toast({
-        title: "Verification code sent",
-        description: `A new verification code has been sent to ${identifier}. Please check your ${
+        title: "Code sent",
+        description: `A new verification code has been sent to ${identifier}. Check your ${
           identifier.includes("@") ? "inbox and spam folder" : "messages"
-        }`,
-        duration: 5000,
+        }.`,
+        duration: 4000,
       })
     } catch (error: any) {
-      let errorMessage = "Failed to resend verification code"
-      let toastDuration = 5000
-      let waitSeconds = 0
-
       // Extract error message from various error structures
       const errorMsg = error.response?.data?.message || error.message || ""
 
       // Extract wait time from rate limit errors
       const waitTimeMatch = errorMsg.match(/wait\s+(\d+)\s+seconds?/i)
       if (waitTimeMatch) {
-        waitSeconds = parseInt(waitTimeMatch[1], 10)
-        setResendCountdown(Math.max(waitSeconds, 1)) // Ensure at least 1 second
-        errorMessage = `Too many requests. Please wait ${waitSeconds} second${waitSeconds === 1 ? "" : "s"} before trying again.`
-      } else if (error.response?.status === 429) {
-        // Handle 429 without specific wait time
+        const waitSeconds = parseInt(waitTimeMatch[1], 10)
+        setResendCountdown(Math.max(waitSeconds, 1))
+        
+        // Don't show error toast for rate limits - just show the countdown in the button
+        // The UI already displays "Resend in Xs" so users understand they need to wait
+        return
+      }
+
+      // Only show error toasts for actual errors, not rate limits
+      let errorMessage = "Failed to resend verification code"
+
+      if (error.response?.status === 429) {
         setResendCountdown(60)
-        errorMessage = "Too many requests. Please wait 60 seconds before trying again."
-      } else if (errorMsg?.includes("too many")) {
-        errorMessage = "Too many attempts. Please try again in a few minutes."
-        setResendCountdown(300) // 5 minutes as fallback
+        return // Silent rate limit - UI shows countdown
       } else if (errorMsg?.includes("Server error") || errorMsg?.includes("email service")) {
         errorMessage = errorMsg || "Email service error. Please try again later."
-        toastDuration = 8000
       } else if (errorMsg?.includes("not found")) {
-        errorMessage = "Account not found. Please check your information."
+        errorMessage = "Account not found. Please go back and check your information."
       } else if (errorMsg?.includes("already verified")) {
-        errorMessage = "This account is already verified. Please login."
+        errorMessage = "This account is already verified. Please login instead."
       } else if (errorMsg) {
         errorMessage = errorMsg
       }
 
-      toast({
-        title: "Error",
-        description: errorMessage,
-        variant: "destructive",
-        duration: toastDuration,
-      })
+      if (errorMessage) {
+        toast({
+          title: "Unable to resend",
+          description: errorMessage,
+          variant: "destructive",
+          duration: 5000,
+        })
+      }
     } finally {
       setIsLoading(false)
     }
