@@ -9,6 +9,7 @@ import sys
 import logging
 from pathlib import Path
 import ast
+import traceback
 
 # Optional dotenv loader (no-op fallback)
 try:
@@ -24,11 +25,16 @@ def import_create_app():
     try:
         from app import create_app
         return create_app
-    except Exception:
+    except Exception as e:
+        # Print traceback to stderr to help debugging import-time failures (missing deps, syntax errors)
+        print("Error importing 'app' (from top-level):", file=sys.stderr)
+        traceback.print_exc()
         try:
             from .app import create_app
             return create_app
-        except Exception:
+        except Exception as e2:
+            print("Error importing 'app' (from package-relative):", file=sys.stderr)
+            traceback.print_exc()
             return None
 
 def _normalize_env_value(val: str):

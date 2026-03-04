@@ -189,6 +189,19 @@ def create_app(config_name=None, enable_socketio=True):
             # leave as-is; init_app will raise a clear error if still absent
             pass
     app.config.setdefault('SQLALCHEMY_TRACK_MODIFICATIONS', False)
+    
+    # Enhanced database connection pool configuration for reliability
+    app.config.setdefault('SQLALCHEMY_ENGINE_OPTIONS', {
+        'pool_size': 10,
+        'pool_recycle': 300,  # Recycle connections after 5 minutes to prevent "server closed the connection" errors
+        'pool_pre_ping': True,  # Test connections before using them
+        'pool_timeout': 10,  # 10 second timeout for acquiring a connection
+        'max_overflow': 20,  # Allow up to 20 overflow connections
+        'connect_args': {
+            'connect_timeout': 10,
+            'application_name': 'mizizzi-ecommerce'
+        }
+    })
 
     # Initialize extensions
     db.init_app(app)
@@ -488,6 +501,7 @@ def create_app(config_name=None, enable_socketio=True):
         'topbar_routes': Blueprint('topbar_routes', __name__),
         'contact_cta_routes': Blueprint('contact_cta_routes', __name__),
         'featured_routes': Blueprint('featured_routes', __name__),
+        'homepage_batch_routes': Blueprint('homepage_batch_bp', __name__),
         'meilisearch_routes': Blueprint('meilisearch_routes', __name__),
         'admin_meilisearch_routes': Blueprint('admin_meilisearch_routes', __name__),
         'flash_sale_routes': Blueprint('flash_sale_routes', __name__),
@@ -631,6 +645,10 @@ def create_app(config_name=None, enable_socketio=True):
     @fallback_blueprints['flash_sale_routes'].route('/health', methods=['GET'])
     def fallback_flash_sale_health():
         return jsonify({"status": "ok", "message": "Fallback flash sale routes active"}), 200
+    
+    @fallback_blueprints['homepage_batch_routes'].route('/homepage/batch', methods=['GET'])
+    def fallback_homepage_batch():
+        return jsonify({"status": "ok", "message": "Fallback homepage batch routes active"}), 200
     
     # Blueprint import paths dictionary
     blueprint_imports = {
@@ -819,10 +837,10 @@ def create_app(config_name=None, enable_socketio=True):
             ('backend.routes.products.featured_routes', 'featured_bp'),
         ],
         'homepage_batch_routes': [
-            ('app.routes.products.homepage_batch_routes', 'homepage_batch_routes'),
-            ('routes.products.homepage_batch_routes', 'homepage_batch_routes'),
-            ('backend.app.routes.products.homepage_batch_routes', 'homepage_batch_routes'),
-            ('backend.routes.products.homepage_batch_routes', 'homepage_batch_routes'),
+            ('app.routes.products.homepage_batch_routes', 'homepage_batch_bp'),
+            ('routes.products.homepage_batch_routes', 'homepage_batch_bp'),
+            ('backend.app.routes.products.homepage_batch_routes', 'homepage_batch_bp'),
+            ('backend.routes.products.homepage_batch_routes', 'homepage_batch_bp'),
         ],
         'meilisearch_routes': [
             ('app.routes.meilisearch', 'meilisearch_routes'),
@@ -1007,10 +1025,10 @@ def create_app(config_name=None, enable_socketio=True):
         app.register_blueprint(final_blueprints['side_panel_routes'], url_prefix='/api/panels')
         app.register_blueprint(final_blueprints['topbar_routes'], url_prefix='/api/topbar')
         app.register_blueprint(final_blueprints['contact_cta_routes'], url_prefix='/api/contact-cta')
-    app.register_blueprint(final_blueprints['featured_routes'], url_prefix='/api/products/featured')
-    app.register_blueprint(final_blueprints['homepage_batch_routes'], url_prefix='/api')
+        app.register_blueprint(final_blueprints['featured_routes'], url_prefix='/api/products/featured')
+        app.register_blueprint(final_blueprints['homepage_batch_routes'], url_prefix='/api')
 
-    app.register_blueprint(final_blueprints['meilisearch_routes'], url_prefix='/api/meilisearch')
+        app.register_blueprint(final_blueprints['meilisearch_routes'], url_prefix='/api/meilisearch')
         app.register_blueprint(final_blueprints['admin_meilisearch_routes'], url_prefix='/api/admin/meilisearch')
         app.logger.info("✅ Meilisearch routes registered successfully")
 
