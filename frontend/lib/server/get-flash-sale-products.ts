@@ -123,6 +123,11 @@ function getDefaultEvent(): FlashSaleEvent {
 /**
  * Server-side function to fetch flash sale products with event timing
  * Returns products with items_left, progress bar data, and countdown timer info
+ * 
+ * Caching Strategy:
+ * - next: { revalidate: 60, tags: ["flash-sales"] } → Server cache for 60 seconds
+ * - Browser cache (sessionStorage/localStorage) → Additional 15min persistence
+ * - Webhook invalidation → Clears cache when admin updates products
  */
 export async function getFlashSaleProducts(limit = 50): Promise<FlashSaleProduct[]> {
   console.log("[v0] getFlashSaleProducts: Starting fetch from", API_BASE_URL)

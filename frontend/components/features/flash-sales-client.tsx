@@ -11,6 +11,7 @@ import { useRouter } from "next/navigation"
 import { useMediaQuery } from "@/hooks/use-media-query"
 import { cloudinaryService } from "@/services/cloudinary-service"
 import type { FlashSaleEvent, FlashSaleProduct } from "@/lib/server/get-flash-sale-products"
+import { useFlashSalesCache } from "@/hooks/use-flash-sales-cache"
 
 const LogoPlaceholder = () => (
   <div className="absolute inset-0 flex items-center justify-center bg-white">
@@ -227,7 +228,9 @@ interface FlashSalesClientProps {
  * - Drag-to-scroll functionality
  */
 export function FlashSalesClient({ initialProducts, initialEvent }: FlashSalesClientProps) {
-  const products = initialProducts || []
+  // 3-layer cache: sessionStorage → localStorage → server
+  const { products: cachedProducts, event: cachedEvent, isFromCache } = useFlashSalesCache(initialProducts, initialEvent)
+  const products = cachedProducts || initialProducts || []
 
   const getInitialTimeLeft = () => {
     if (initialEvent?.time_remaining) {
