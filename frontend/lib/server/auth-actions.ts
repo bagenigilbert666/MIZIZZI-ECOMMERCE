@@ -38,6 +38,8 @@ export async function serverCheckAvailability(identifier: string): Promise<Avail
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 8000) // 8 second timeout
 
+    console.log("[v0] Server: Availability check URL:", `${API_BASE_URL}/api/check-availability`)
+
     const response = await fetch(`${API_BASE_URL}/api/check-availability`, {
       method: "POST",
       headers: {
@@ -57,7 +59,11 @@ export async function serverCheckAvailability(identifier: string): Promise<Avail
       throw new Error(`API returned ${response.status}`)
     }
   } catch (error: any) {
-    console.error("[v0] Server: Availability check failed:", error.message)
+    console.error("[v0] Server: Availability check failed:", {
+      message: error.message,
+      code: error.code,
+      name: error.name
+    })
     
     // Graceful degradation: if check fails, assume identifier is available (new account)
     // This allows registration flow to proceed even if backend is slow
@@ -80,6 +86,8 @@ export async function serverLogin(identifier: string, password: string): Promise
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 10000) // 10 second timeout
 
+    console.log("[v0] Server: Fetching from", `${API_BASE_URL}/api/login`)
+    
     const response = await fetch(`${API_BASE_URL}/api/login`, {
       method: "POST",
       headers: {
@@ -94,11 +102,13 @@ export async function serverLogin(identifier: string, password: string): Promise
 
     clearTimeout(timeoutId)
 
+    console.log("[v0] Server: Login response status:", response.status)
+
     const data: AuthResponse = await response.json()
 
     if (!response.ok) {
       const errorMsg = data.msg || data.message || "Login failed"
-      console.error("[v0] Server: Login failed:", errorMsg)
+      console.error("[v0] Server: Login failed with status", response.status, ":", errorMsg)
       return { success: false, error: errorMsg }
     }
 
@@ -118,8 +128,23 @@ export async function serverLogin(identifier: string, password: string): Promise
 
     return { success: true }
   } catch (error: any) {
-    console.error("[v0] Server: Login error:", error.message)
-    return { success: false, error: "Connection failed. Please try again." }
+    console.error("[v0] Server: Login error details:", {
+      message: error.message,
+      code: error.code,
+      name: error.name,
+      stack: error.stack?.split('\n')[0]
+    })
+    
+    // Provide more specific error message based on error type
+    let userMessage = error.message || "Connection failed. Please try again."
+    
+    if (error.code === "ECONNREFUSED" || error.code === "ERR_NETWORK") {
+      userMessage = "Backend server is not responding. Please try again in a moment."
+    } else if (error.name === "AbortError") {
+      userMessage = "Request timed out. The server is taking too long to respond."
+    }
+    
+    return { success: false, error: userMessage }
   }
 }
 
