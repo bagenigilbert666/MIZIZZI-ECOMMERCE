@@ -36,6 +36,7 @@ export function useCategoriesCache(serverData: Category[]) {
     if (typeof window === 'undefined') return
 
     const startTime = performance.now()
+    console.log('[v0] Cache check started for categories')
 
     try {
       // Layer 1: Check sessionStorage (fastest - same session)
@@ -46,7 +47,9 @@ export function useCategoriesCache(serverData: Category[]) {
         if (Array.isArray(parsed.data) && parsed.data.length > 0) {
           setCategories(parsed.data)
           setIsFromCache(true)
-          recordCacheMetric(true, 'sessionStorage', performance.now() - startTime)
+          const loadTime = performance.now() - startTime
+          console.log(`[v0] Cache HIT: sessionStorage (${loadTime.toFixed(2)}ms) - ${parsed.data.length} categories`)
+          recordCacheMetric(true, 'sessionStorage', loadTime)
           return
         }
       }
@@ -71,11 +74,15 @@ export function useCategoriesCache(serverData: Category[]) {
               data: parsed.data,
               timestamp: parsed.timestamp,
             }))
-            recordCacheMetric(true, 'localStorage', performance.now() - startTime)
+            const loadTime = performance.now() - startTime
+            const timeRemaining = Math.round((expiryTime - now) / 1000)
+            console.log(`[v0] Cache HIT: localStorage (${loadTime.toFixed(2)}ms) - ${parsed.data.length} categories, expires in ${timeRemaining}s`)
+            recordCacheMetric(true, 'localStorage', loadTime)
             return
           }
         } else {
           // Cache expired, clear it
+          console.log('[v0] Cache EXPIRED: localStorage cache expired, clearing')
           localStorage.removeItem(CACHE_KEY)
           localStorage.removeItem(CACHE_EXPIRY_KEY)
         }
@@ -92,7 +99,12 @@ export function useCategoriesCache(serverData: Category[]) {
         sessionStorage.setItem(CACHE_KEY, JSON.stringify(cacheEntry))
         localStorage.setItem(CACHE_KEY, JSON.stringify(cacheEntry))
         localStorage.setItem(CACHE_EXPIRY_KEY, (Date.now() + CACHE_TTL).toString())
-        recordCacheMetric(false, 'server', performance.now() - startTime)
+        
+        const loadTime = performance.now() - startTime
+        console.log(`[v0] Cache MISS: Using fresh server data (${loadTime.toFixed(2)}ms) - ${serverData.length} categories cached`)
+        recordCacheMetric(false, 'server', loadTime)
+      } else {
+        console.log('[v0] No server data available and no cache found')
       }
     } catch (error) {
       // Gracefully handle storage errors (quota exceeded, etc)
