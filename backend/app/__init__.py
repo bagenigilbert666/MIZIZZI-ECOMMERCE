@@ -194,7 +194,8 @@ def create_app(config_name=None, enable_socketio=True):
     db.init_app(app)
     ma.init_app(app)
     mail.init_app(app)
-    cache.init_app(app)
+    # Skip Flask-Caching init - using custom Upstash Redis instead
+    # cache.init_app(app)  # Disabled: using app.cache.cache_manager directly
     limiter.init_app(app)
 
     # Disable strict slashes to avoid Flask redirecting requests which breaks CORS preflight
@@ -1573,12 +1574,13 @@ def create_app(config_name=None, enable_socketio=True):
                 }), 503
         return None
 
-    # Initialize Redis cache on startup
-    @app.before_first_request
-    def initialize_redis_cache():
-        """Initialize Redis cache connection on first request."""
+    # Initialize Redis cache immediately and on first request
+    def init_redis_cache():
+        """Initialize Redis cache connection."""
         try:
             from app.cache.redis_client import get_redis_client, is_redis_connected
+            from app.cache.cache import cache_manager
+            
             client = get_redis_client()
             if is_redis_connected():
                 app.logger.info("✅ Redis Cache: CONNECTED - Upstash Redis is ready")
@@ -1586,6 +1588,43 @@ def create_app(config_name=None, enable_socketio=True):
                 app.logger.warning("⚠️ Redis Cache: FALLBACK - Using in-memory cache")
         except Exception as e:
             app.logger.warning(f"⚠️ Redis Cache initialization: {e} - Using in-memory cache")
+    
+    # Initialize on startup
+    try:
+        init_redis_cache()
+    except Exception as e:
+        app.logger.warning(f"Deferred Redis initialization (will retry on first request): {e}")
+    
+    # Also set up deferred initialization for first request in a way that
+    # works across Flask versions. Some Flask builds (or wrappers) may not
+    # expose the `before_serving` or `before_first_request` decorator
+    # attributes directly, which used to raise AttributeError at import
+    # time when used as decorators. Use hasattr/getattr and register the
+    # handler programmatically to avoid AttributeError.
+    def _deferred_init_wrapper():
+        try:
+            init_redis_cache()
+        except Exception as e:
+            app.logger.warning(f"Deferred Redis initialization failed: {e}")
+
+    # Prefer `before_serving` when available (Flask 2.0+), fall back to
+    # `before_first_request`, otherwise register a no-op warning.
+    if hasattr(app, 'before_serving') and callable(getattr(app, 'before_serving')):
+        try:
+            # register the wrapper using the decorator-like call
+            getattr(app, 'before_serving')(_deferred_init_wrapper)
+            app.logger.info("Registered deferred init with before_serving")
+        except Exception:
+            # As a last resort, log and continue
+            app.logger.warning("Failed to register before_serving handler; will attempt other hooks")
+    elif hasattr(app, 'before_first_request') and callable(getattr(app, 'before_first_request')):
+        try:
+            getattr(app, 'before_first_request')(_deferred_init_wrapper)
+            app.logger.info("Registered deferred init with before_first_request")
+        except Exception:
+            app.logger.warning("Failed to register before_first_request handler; deferred init may not run until first request")
+    else:
+        app.logger.warning("No deferred init hooks (before_serving/before_first_request) available on this Flask app; deferred init skipped")
     
     # Add cache status endpoint
     @app.route('/api/cache/status', methods=['GET'])
@@ -1605,38 +1644,3 @@ def create_app(config_name=None, enable_socketio=True):
     
     app.logger.info(f"Application created successfully with config: {config_name}")
     return app
-
-# Initialize Flask app factory
-def create_app_with_search():
-    """Create Flask app (Meilisearch handles search)."""
-    try:
-        # Use the directly imported create_app function
-        app = create_app()
-        
-        with app.app_context():
-            app.logger.info("✅ App initialized - Meilisearch handles search.")
-        
-        return app
-        
-    except Exception as e:
-        logger.error(f"Error creating app: {str(e)}")
-        
-        try:
-            # Fallback to calling create_app directly again
-            return create_app()
-        except Exception as fallback_error:
-            logger.error(f"Fallback app creation failed: {str(fallback_error)}")
-            # As a last resort, return a minimal Flask app to avoid import-time crashes.
-            try:
-                fallback_app = Flask(__name__)
-                # Apply minimal default configuration if available
-                if isinstance(config, dict) and 'default' in config:
-                    try:
-                        fallback_app.config.from_object(config['default'])
-                    except Exception:
-                        pass
-                logger.info("Created minimal fallback Flask app")
-                return fallback_app
-            except Exception as final_err:
-                logger.error(f"Unable to create fallback Flask app: {str(final_err)}")
-                return None

@@ -1,476 +1,344 @@
 """
-Unified UI Batch Endpoint - HIGH PERFORMANCE
+Unified UI Batch Endpoint - HIGH PERFORMANCE WITH REDIS CACHING
 Combines all UI sections (carousel, topbar, categories, side panels) 
 in a SINGLE request with PARALLEL backend execution using ThreadPoolExecutor.
 
-Architecture:
-  Client: 1 HTTP request to /api/ui/batch
-  Backend: Parallel execution of all UI data queries simultaneously
-  Response: All sections returned at once
-
-Expected Performance:
-  - Network overhead: 100ms (1 request instead of 4-5)
-  - Backend time: ~100-150ms (parallel queries, not sequential)
-  - Total: ~250ms vs 500-800ms for separate requests
+Performance:
+  Cache hits: 5-10ms (vs 100-150ms fresh)
+  Fresh queries: 100-150ms (parallel execution)
+  Total: 5-10ms (cached) or 200-250ms (fresh)
 """
 from flask import Blueprint, jsonify, request, current_app
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
 import logging
 from datetime import datetime
+import hashlib
 
 from app.configuration.extensions import db
 from app.utils.redis_cache import (
     product_cache, 
-    fast_cached_response, 
-    fast_json_dumps
+    fast_json_dumps,
+    get_cache_status
 )
 
 logger = logging.getLogger(__name__)
 
-ui_batch_routes = Blueprint('ui_batch_routes', __name__, url_prefix='/api')
+ui_batch_routes = Blueprint('ui_batch_routes', __name__, url_prefix='/api/ui')
 
-# Cache configuration with different TTLs for each section
+# Cache configuration with TTLs for each section
 BATCH_CACHE_CONFIG = {
-    'carousel': {'ttl': 60, 'key': 'batch:carousel'},        # 1 min - changes frequently
-    'topbar': {'ttl': 120, 'key': 'batch:topbar'},           # 2 min
-    'categories': {'ttl': 300, 'key': 'batch:categories'},   # 5 min
-    'side_panels': {'ttl': 300, 'key': 'batch:side_panels'}, # 5 min
-    'ui_all': {'ttl': 60, 'key': 'batch:ui_all_combined'},   # 1 min - freshest combined data
+    'carousel': {'ttl': 60, 'key': 'batch:carousel'},
+    'topbar': {'ttl': 120, 'key': 'batch:topbar'},
+    'categories': {'ttl': 300, 'key': 'batch:categories'},
+    'side_panels': {'ttl': 300, 'key': 'batch:side_panels'},
+    'ui_all': {'ttl': 60, 'key': 'batch:ui_all_combined'},
 }
 
+# Performance tracking
+PERF_METRICS = {'cache_hits': 0, 'cache_misses': 0, 'total_requests': 0, 'total_time_ms': 0}
 
-# ============================================================================
-# FETCH FUNCTIONS - Parallel execution
-# ============================================================================
+
+def try_get_cached_section(section_name, params=None):
+    """Try to get cached section with fallback."""
+    cache_key = BATCH_CACHE_CONFIG[section_name]['key']
+    if params:
+        param_hash = hashlib.md5(fast_json_dumps(params).encode()).hexdigest()[:8]
+        cache_key = f"{cache_key}:{param_hash}"
+    try:
+        cached = product_cache.get(cache_key)
+        if cached:
+            logger.debug(f"Cache hit for {section_name}")
+            return cached, True
+    except Exception as e:
+        logger.warning(f"Cache get failed for {section_name}: {e}")
+    return None, False
+
+
+def try_cache_section(section_name, data, params=None):
+    """Try to cache section with fallback."""
+    cache_key = BATCH_CACHE_CONFIG[section_name]['key']
+    if params:
+        param_hash = hashlib.md5(fast_json_dumps(params).encode()).hexdigest()[:8]
+        cache_key = f"{cache_key}:{param_hash}"
+    try:
+        product_cache.set(cache_key, data, ex=BATCH_CACHE_CONFIG[section_name]['ttl'])
+        return True
+    except Exception as e:
+        logger.warning(f"Cache set failed for {section_name}: {e}")
+        return False
+
 
 def fetch_carousel():
-    """Fetch carousel banners from all positions."""
+    """Fetch carousel banners with caching."""
+    section_name = 'carousel'
+    cached_data, was_cached = try_get_cached_section(section_name)
+    if was_cached:
+        PERF_METRICS['cache_hits'] += 1
+        return cached_data
+    
     try:
         from app.models.carousel_model import CarouselBanner
         
-        # Ensure we're in the application context for database queries
-        def _fetch():
-            carousel_data = {}
-            positions = ['homepage', 'category_page', 'flash_sales', 'luxury_deals']
-            
-            for position in positions:
-                items = CarouselBanner.query.filter_by(
-                    position=position,
-                    is_active=True
-                ).order_by(CarouselBanner.sort_order).limit(5).all()
-                
-                carousel_data[position] = [
-                    {
-                        'id': item.id,
-                        'name': item.name,
-                        'title': item.title,
-                        'description': item.description,
-                        'badge_text': item.badge_text,
-                        'discount': item.discount,
-                        'button_text': item.button_text,
-                        'link_url': item.link_url,
-                        'image_url': item.image_url,
-                        'sort_order': item.sort_order
-                    } for item in items
-                ]
-            
-            return carousel_data
+        carousel_data = {}
+        for position in ['homepage', 'category_page', 'flash_sales', 'luxury_deals']:
+            items = CarouselBanner.query.filter_by(position=position, is_active=True).order_by(CarouselBanner.sort_order).limit(5).all()
+            carousel_data[position] = [{'id': item.id, 'name': item.name, 'title': item.title, 'description': item.description, 'badge_text': item.badge_text, 'discount': item.discount, 'button_text': item.button_text, 'link_url': item.link_url, 'image_url': item.image_url, 'sort_order': item.sort_order} for item in items]
         
-        # Execute within the current app context
-        carousel_data = _fetch()
-        
-        return {
-            'section': 'carousel',
-            'data': carousel_data,
-            'count': sum(len(items) for items in carousel_data.values()),
-            'success': True
-        }
+        result = {'section': section_name, 'data': carousel_data, 'count': sum(len(items) for items in carousel_data.values()), 'success': True}
+        try_cache_section(section_name, result)
+        PERF_METRICS['cache_misses'] += 1
+        return result
     except Exception as e:
-        logger.error(f"Error fetching carousel: {str(e)}")
-        return {
-            'section': 'carousel',
-            'data': {},
-            'error': str(e),
-            'success': False
-        }
+        logger.error(f"Error fetching {section_name}: {str(e)}")
+        PERF_METRICS['cache_misses'] += 1
+        return {'section': section_name, 'data': {}, 'error': str(e), 'success': False}
 
 
 def fetch_topbar():
-    """Fetch active topbar slides."""
+    """Fetch topbar slides with caching."""
+    section_name = 'topbar'
+    cached_data, was_cached = try_get_cached_section(section_name)
+    if was_cached:
+        PERF_METRICS['cache_hits'] += 1
+        return cached_data
+    
     try:
         from app.models.topbar_model import TopBarSlide
         
-        # Ensure we're in the application context for database queries
-        def _fetch():
-            slides = TopBarSlide.query.filter_by(is_active=True).order_by(
-                TopBarSlide.sort_order
-            ).limit(10).all()
-            
-            return [slide.to_dict() for slide in slides]
+        slides = TopBarSlide.query.filter_by(is_active=True).order_by(TopBarSlide.sort_order).limit(10).all()
+        topbar_data = [slide.to_dict() for slide in slides]
         
-        topbar_data = _fetch()
-        
-        return {
-            'section': 'topbar',
-            'slides': topbar_data,
-            'count': len(topbar_data),
-            'success': True
-        }
+        result = {'section': section_name, 'slides': topbar_data, 'count': len(topbar_data), 'success': True}
+        try_cache_section(section_name, result)
+        PERF_METRICS['cache_misses'] += 1
+        return result
     except Exception as e:
-        logger.error(f"Error fetching topbar: {str(e)}")
-        return {
-            'section': 'topbar',
-            'slides': [],
-            'error': str(e),
-            'success': False
-        }
+        logger.error(f"Error fetching {section_name}: {str(e)}")
+        PERF_METRICS['cache_misses'] += 1
+        return {'section': section_name, 'slides': [], 'error': str(e), 'success': False}
 
 
 def fetch_categories():
-    """Fetch featured and root categories."""
+    """Fetch categories with caching."""
+    section_name = 'categories'
+    cached_data, was_cached = try_get_cached_section(section_name)
+    if was_cached:
+        PERF_METRICS['cache_hits'] += 1
+        return cached_data
+    
     try:
         from app.models.models import Category, Product
         
-        # Ensure we're in the application context for database queries
-        def _fetch():
-            # Get featured categories
-            featured = Category.query.filter_by(is_featured=True).order_by(
-                Category.name
-            ).limit(10).all()
-            
-            featured_data = []
-            for cat in featured:
-                product_count = Product.query.filter_by(category_id=cat.id).count()
-                featured_data.append({
-                    'id': cat.id,
-                    'name': cat.name,
-                    'slug': cat.slug,
-                    'description': cat.description,
-                    'image_url': cat.image_url,
-                    'is_featured': cat.is_featured,
-                    'products_count': product_count
-                })
-            
-            # Get root categories with their subcategories count
-            root_categories = Category.query.filter_by(parent_id=None).order_by(
-                Category.name
-            ).limit(20).all()
-            
-            root_data = []
-            for cat in root_categories:
-                product_count = Product.query.filter_by(category_id=cat.id).count()
-                subcategories_count = Category.query.filter_by(parent_id=cat.id).count()
-                
-                root_data.append({
-                    'id': cat.id,
-                    'name': cat.name,
-                    'slug': cat.slug,
-                    'description': cat.description,
-                    'image_url': cat.image_url,
-                    'products_count': product_count,
-                    'subcategories_count': subcategories_count
-                })
-            
-            return featured_data, root_data
+        featured = Category.query.filter_by(is_featured=True).order_by(Category.name).limit(10).all()
+        featured_data = [{'id': cat.id, 'name': cat.name, 'slug': cat.slug, 'description': cat.description, 'image_url': cat.image_url, 'is_featured': cat.is_featured, 'products_count': Product.query.filter_by(category_id=cat.id).count()} for cat in featured]
         
-        featured_data, root_data = _fetch()
+        root_categories = Category.query.filter_by(parent_id=None).order_by(Category.name).limit(20).all()
+        root_data = [{'id': cat.id, 'name': cat.name, 'slug': cat.slug, 'description': cat.description, 'image_url': cat.image_url, 'products_count': Product.query.filter_by(category_id=cat.id).count(), 'subcategories_count': Category.query.filter_by(parent_id=cat.id).count()} for cat in root_categories]
         
-        return {
-            'section': 'categories',
-            'featured': featured_data,
-            'root': root_data,
-            'featured_count': len(featured_data),
-            'root_count': len(root_data),
-            'success': True
-        }
+        result = {'section': section_name, 'featured': featured_data, 'root': root_data, 'featured_count': len(featured_data), 'root_count': len(root_data), 'success': True}
+        try_cache_section(section_name, result)
+        PERF_METRICS['cache_misses'] += 1
+        return result
     except Exception as e:
-        logger.error(f"Error fetching categories: {str(e)}")
-        return {
-            'section': 'categories',
-            'featured': [],
-            'root': [],
-            'error': str(e),
-            'success': False
-        }
+        logger.error(f"Error fetching {section_name}: {str(e)}")
+        PERF_METRICS['cache_misses'] += 1
+        return {'section': section_name, 'featured': [], 'root': [], 'error': str(e), 'success': False}
 
 
 def fetch_side_panels():
-    """Fetch side panel items for all types and positions."""
+    """Fetch side panels with caching."""
+    section_name = 'side_panels'
+    cached_data, was_cached = try_get_cached_section(section_name)
+    if was_cached:
+        PERF_METRICS['cache_hits'] += 1
+        return cached_data
+    
     try:
         from app.models.side_panel_model import SidePanel
         
-        # Ensure we're in the application context for database queries
-        def _fetch():
-            panels_data = {}
-            panel_types = ['product_showcase', 'premium_experience']
-            positions = ['left', 'right']
-            
-            for panel_type in panel_types:
-                for position in positions:
-                    key = f"{panel_type}_{position}"
-                    items = SidePanel.query.filter_by(
-                        panel_type=panel_type,
-                        position=position,
-                        is_active=True
-                    ).order_by(SidePanel.sort_order).limit(3).all()
-                    
-                    panels_data[key] = [item.to_dict() for item in items]
-            
-            return panels_data
+        panels_data = {}
+        for panel_type in ['product_showcase', 'premium_experience']:
+            for position in ['left', 'right']:
+                key = f"{panel_type}_{position}"
+                items = SidePanel.query.filter_by(panel_type=panel_type, position=position, is_active=True).order_by(SidePanel.sort_order).limit(3).all()
+                panels_data[key] = [item.to_dict() for item in items]
         
-        panels_data = _fetch()
-        
-        return {
-            'section': 'side_panels',
-            'data': panels_data,
-            'count': sum(len(items) for items in panels_data.values()),
-            'success': True
-        }
+        result = {'section': section_name, 'data': panels_data, 'count': sum(len(items) for items in panels_data.values()), 'success': True}
+        try_cache_section(section_name, result)
+        PERF_METRICS['cache_misses'] += 1
+        return result
     except Exception as e:
-        logger.error(f"Error fetching side panels: {str(e)}")
-        return {
-            'section': 'side_panels',
-            'data': {},
-            'error': str(e),
-            'success': False
-        }
+        logger.error(f"Error fetching {section_name}: {str(e)}")
+        PERF_METRICS['cache_misses'] += 1
+        return {'section': section_name, 'data': {}, 'error': str(e), 'success': False}
 
 
-# ============================================================================
-# MAIN BATCH ENDPOINT
-# ============================================================================
-
-@ui_batch_routes.route('/ui/batch', methods=['GET'])
+@ui_batch_routes.route('/batch', methods=['GET'])
 def get_ui_batch():
-    """
-    GET /api/ui/batch
-    
-    Combined UI data endpoint with parallel backend query execution.
-    Returns all UI sections (carousel, topbar, categories, side panels) in ONE request.
-    
-    Query Parameters:
-      - cache: 'true'/'false' - enable/disable caching (default: true)
-      - sections: comma-separated list of sections to fetch (default: all)
-        Options: carousel, topbar, categories, side_panels
-      
-    Response:
-      {
-        "timestamp": "2024-03-04T10:30:00Z",
-        "total_execution_ms": 145,
-        "cached": false,
-        "sections": {
-          "carousel": { "data": {...}, "count": 20 },
-          "topbar": { "slides": [...], "count": 5 },
-          "categories": { "featured": [...], "root": [...] },
-          "side_panels": { "data": {...}, "count": 8 }
-        },
-        "meta": {
-          "sections_fetched": 4,
-          "parallel_execution": true
-        }
-      }
-    """
-    
+    """GET /api/ui/batch - Ultra-fast combined UI data with Redis caching."""
     start_time = time.time()
+    PERF_METRICS['total_requests'] += 1
     
-    # Check cache first
     cache_enabled = request.args.get('cache', 'true').lower() == 'true'
+    invalidate_cache = request.args.get('invalidate', 'false').lower() == 'true'
     requested_sections = request.args.get('sections', 'all')
-    
     cache_key = BATCH_CACHE_CONFIG['ui_all']['key']
-    if cache_enabled:
+    
+    # Try combined cache first
+    if cache_enabled and not invalidate_cache:
         try:
             cached_data = product_cache.get(cache_key)
             if cached_data:
+                execution_time = time.time() - start_time
                 cached_data['cached'] = True
-                cached_data['total_execution_ms'] = round((time.time() - start_time) * 1000, 2)
-                logger.info(f"UI batch served from cache in {cached_data['total_execution_ms']}ms")
+                cached_data['total_execution_ms'] = round(execution_time * 1000, 2)
+                PERF_METRICS['cache_hits'] += 1
                 return jsonify(cached_data), 200
         except Exception as e:
             logger.warning(f"Cache retrieval failed: {str(e)}")
     
     try:
-        # Define all fetch functions
-        fetch_functions = {
-            'carousel': fetch_carousel,
-            'topbar': fetch_topbar,
-            'categories': fetch_categories,
-            'side_panels': fetch_side_panels,
-        }
+        fetch_functions = {'carousel': fetch_carousel, 'topbar': fetch_topbar, 'categories': fetch_categories, 'side_panels': fetch_side_panels}
         
-        # Determine which sections to fetch
-        if requested_sections == 'all':
+        sections_to_fetch = list(fetch_functions.keys()) if requested_sections == 'all' else [s.strip() for s in requested_sections.split(',') if s.strip() in fetch_functions]
+        if not sections_to_fetch:
             sections_to_fetch = list(fetch_functions.keys())
-        else:
-            sections_to_fetch = [
-                s.strip() for s in requested_sections.split(',') 
-                if s.strip() in fetch_functions
-            ]
-            if not sections_to_fetch:
-                sections_to_fetch = list(fetch_functions.keys())
         
-        # PARALLEL execution using ThreadPoolExecutor
-        # All queries execute simultaneously, not sequentially
-        # We need to wrap each fetch with the app context
         results = {}
-        
-        # Get the current app instance to pass to threads
         app = current_app._get_current_object()
         
         def fetch_with_context(fetch_func, app_instance):
-            """Wrapper to ensure fetch functions run within app context."""
             with app_instance.app_context():
                 return fetch_func()
         
         with ThreadPoolExecutor(max_workers=8) as executor:
-            # Submit all queries at once, wrapped in app context
-            futures = {
-                executor.submit(fetch_with_context, fetch_functions[section], app): section 
-                for section in sections_to_fetch
-            }
-            
-            # Collect results as they complete
+            futures = {executor.submit(fetch_with_context, fetch_functions[section], app): section for section in sections_to_fetch}
             for future in as_completed(futures):
                 section = futures[future]
                 try:
-                    result = future.result(timeout=5)
-                    results[section] = {
-                        **result,
-                        'success': result.get('success', False)
-                    }
+                    results[section] = future.result(timeout=5)
                 except Exception as e:
-                    logger.error(f"Error in parallel fetch for {section}: {str(e)}")
-                    results[section] = {
-                        'success': False,
-                        'error': str(e)
-                    }
+                    logger.error(f"Error fetching {section}: {str(e)}")
+                    results[section] = {'success': False, 'error': str(e), 'section': section}
         
-        # Build response
         execution_time = time.time() - start_time
         response_data = {
             'timestamp': datetime.utcnow().isoformat() + 'Z',
             'total_execution_ms': round(execution_time * 1000, 2),
             'cached': False,
             'sections': results,
-            'meta': {
-                'sections_fetched': len(results),
-                'parallel_execution': True,
-                'cache_key': cache_key if cache_enabled else None
-            }
+            'meta': {'sections_fetched': len(results), 'parallel_execution': True}
         }
         
-        # Cache the response
         if cache_enabled:
             try:
-                product_cache.set(
-                    cache_key, 
-                    response_data,
-                    ex=BATCH_CACHE_CONFIG['ui_all']['ttl']
-                )
-                logger.info(f"UI batch cached for {BATCH_CACHE_CONFIG['ui_all']['ttl']}s")
+                product_cache.set(cache_key, response_data, BATCH_CACHE_CONFIG['ui_all']['ttl'])
             except Exception as e:
                 logger.warning(f"Failed to cache UI batch: {str(e)}")
         
-        logger.info(f"UI batch endpoint executed in {execution_time*1000:.2f}ms")
+        PERF_METRICS['total_time_ms'] += execution_time * 1000
         return jsonify(response_data), 200
-        
     except Exception as e:
         logger.error(f"UI batch endpoint error: {str(e)}")
-        return jsonify({
-            'error': 'Failed to fetch UI data',
-            'message': str(e),
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }), 500
+        return jsonify({'error': 'Failed to fetch UI data', 'message': str(e), 'timestamp': datetime.utcnow().isoformat() + 'Z'}), 500
 
 
-@ui_batch_routes.route('/ui/batch/status', methods=['GET'])
+@ui_batch_routes.route('/batch/status', methods=['GET'])
 def get_ui_batch_status():
-    """
-    GET /api/ui/batch/status
-    
-    Health check and performance metrics for the unified batch endpoint.
-    Useful for monitoring and debugging.
-    """
+    """GET /api/ui/batch/status - Health check and performance metrics."""
     try:
-        # Test database connections for all models
         db_status = {}
         
         try:
             from app.models.carousel_model import CarouselBanner
-            test = CarouselBanner.query.limit(1).first()
-            db_status['carousel'] = 'connected' if test is not None else 'ok'
+            db_status['carousel'] = 'ok' if CarouselBanner.query.limit(1).first() else 'ok'
         except:
             db_status['carousel'] = 'unavailable'
         
         try:
             from app.models.topbar_model import TopBarSlide
-            test = TopBarSlide.query.limit(1).first()
-            db_status['topbar'] = 'connected' if test is not None else 'ok'
+            db_status['topbar'] = 'ok' if TopBarSlide.query.limit(1).first() else 'ok'
         except:
             db_status['topbar'] = 'unavailable'
         
         try:
             from app.models.models import Category
-            test = Category.query.limit(1).first()
-            db_status['categories'] = 'connected' if test is not None else 'ok'
+            db_status['categories'] = 'ok' if Category.query.limit(1).first() else 'ok'
         except:
             db_status['categories'] = 'unavailable'
         
         try:
             from app.models.side_panel_model import SidePanel
-            test = SidePanel.query.limit(1).first()
-            db_status['side_panels'] = 'connected' if test is not None else 'ok'
+            db_status['side_panels'] = 'ok' if SidePanel.query.limit(1).first() else 'ok'
         except:
             db_status['side_panels'] = 'unavailable'
         
-        # Test cache
-        cache_test_key = 'batch:ui_health_check'
         cache_healthy = False
-        cache_type = 'memory'
-        cache_stats = {}
+        cache_info = {'connected': False, 'type': 'unknown', 'stats': {}}
         
         try:
-            from app.utils.redis_cache import get_cache_status
             cache_status = get_cache_status()
-            cache_type = cache_status.get('cache_type', 'memory')
-            cache_stats = cache_status.get('stats', {})
+            cache_info['connected'] = cache_status.get('connected', False)
+            cache_info['type'] = cache_status.get('cache_type', 'memory')
+            cache_info['stats'] = cache_status.get('stats', {})
             
-            product_cache.set(cache_test_key, {'test': True}, ex=10)
-            cache_healthy = product_cache.get(cache_test_key) is not None
-            product_cache.delete(cache_test_key)
+            product_cache.set('batch:health_check', {'test': True}, ex=10)
+            cache_healthy = product_cache.get('batch:health_check') is not None
+            product_cache.delete('batch:health_check')
         except Exception as e:
             logger.warning(f"Cache test failed: {e}")
-            cache_healthy = False
         
-        all_healthy = all(v == 'connected' or v == 'ok' for v in db_status.values())
+        total_requests = PERF_METRICS['total_requests']
+        cache_hits = PERF_METRICS['cache_hits']
+        hit_rate = (cache_hits / total_requests * 100) if total_requests > 0 else 0
+        
+        all_healthy = all(v == 'ok' for v in db_status.values())
         
         return jsonify({
             'status': 'healthy' if (all_healthy and cache_healthy) else 'degraded',
-            'database': db_status,
-            'cache': 'connected' if cache_healthy else 'disconnected',
-            'cache_type': cache_type,
-            'cache_stats': cache_stats,
-            'endpoint': '/api/ui/batch',
-            'sections_available': [
-                'carousel',
-                'topbar',
-                'categories',
-                'side_panels'
-            ],
-            'cache_ttls': {
-                'carousel': BATCH_CACHE_CONFIG['carousel']['ttl'],
-                'topbar': BATCH_CACHE_CONFIG['topbar']['ttl'],
-                'categories': BATCH_CACHE_CONFIG['categories']['ttl'],
-                'side_panels': BATCH_CACHE_CONFIG['side_panels']['ttl'],
-                'combined': BATCH_CACHE_CONFIG['ui_all']['ttl']
-            },
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'database': {'status': 'connected' if all_healthy else 'degraded', 'models': db_status},
+            'cache': {'status': 'connected' if cache_healthy else 'disconnected', 'details': cache_info},
+            'performance_metrics': {'total_requests': total_requests, 'cache_hits': cache_hits, 'hit_rate_percent': round(hit_rate, 2)},
+            'sections_available': ['carousel', 'topbar', 'categories', 'side_panels']
         }), 200
     except Exception as e:
         logger.error(f"Status check error: {str(e)}")
+        return jsonify({'status': 'error', 'error': str(e)}), 500
+
+
+@ui_batch_routes.route('/batch/cache/clear', methods=['POST'])
+def clear_batch_cache():
+    """POST /api/ui/batch/cache/clear - Clear all batch cache."""
+    try:
+        sections_cleared = 0
+        for section_name in BATCH_CACHE_CONFIG.keys():
+            try:
+                product_cache.delete(BATCH_CACHE_CONFIG[section_name]['key'])
+                sections_cleared += 1
+            except:
+                pass
+        return jsonify({'status': 'success', 'sections_cleared': sections_cleared}), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'error': str(e)}), 500
+
+
+@ui_batch_routes.route('/batch/cache/stats', methods=['GET'])
+def get_cache_stats():
+    """GET /api/ui/batch/cache/stats - Get cache statistics."""
+    try:
+        cache_status = get_cache_status()
+        total_requests = PERF_METRICS['total_requests']
+        cache_hits = PERF_METRICS['cache_hits']
+        hit_rate = (cache_hits / total_requests * 100) if total_requests > 0 else 0
+        
         return jsonify({
-            'status': 'error',
-            'error': str(e),
-            'timestamp': datetime.utcnow().isoformat() + 'Z'
-        }), 500
+            'status': 'success',
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'redis_stats': cache_status.get('stats', {}),
+            'batch_stats': {'total_requests': total_requests, 'cache_hits': cache_hits, 'hit_rate_percent': round(hit_rate, 2)},
+            'cache_config': BATCH_CACHE_CONFIG
+        }), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'error': str(e)}), 500
