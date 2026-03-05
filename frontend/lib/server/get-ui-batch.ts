@@ -73,8 +73,10 @@ export interface UIBatchData {
     premium?: PanelItem[]
     showcase?: PanelItem[]
   } | null
-  timestamp: number
+  timestamp?: number
   duration: number
+  cached?: boolean
+  total_execution_ms?: number
   error?: string
 }
 
@@ -94,6 +96,7 @@ const DEFAULT_UI_BATCH: UIBatchData = {
   sidePanels: null,
   timestamp: Date.now(),
   duration: 0,
+  cached: false,
 }
 
 /**
@@ -146,7 +149,8 @@ export const getUIBatch = cache(
 
       const data = await response.json() as UIBatchData
 
-      console.log('[v0] getUIBatch: Successfully fetched batch data in', data.duration.toFixed(2), 'ms')
+      const executionTime = data.total_execution_ms || data.duration || 0
+      console.log('[v0] getUIBatch: Successfully fetched batch data in', (executionTime as number).toFixed(2), 'ms (Cached:', data.cached, ')')
 
       // Normalize and validate response data
       return {
@@ -155,7 +159,7 @@ export const getUIBatch = cache(
         categories: Array.isArray(data.categories) ? data.categories : [],
         sidePanels: data.sidePanels || null,
         timestamp: data.timestamp || Date.now(),
-        duration: data.duration || 0,
+        duration: executionTime,
       }
     } catch (error) {
       console.error('[v0] getUIBatch: Error fetching batch data:', error)
