@@ -1,17 +1,26 @@
 """
-Homepage Batch Endpoint - HIGH PERFORMANCE
+Homepage Batch Endpoint - HIGH PERFORMANCE with Intelligent Cache Invalidation
 Combines all homepage sections (Flash Sales, Trending, Top Picks, etc.)
 in a SINGLE request with PARALLEL backend execution using ThreadPoolExecutor.
+
+Caching Strategy (Like Jumia, Amazon):
+  - Individual section caching with granular TTLs
+  - Combined batch response caching for whole homepage
+  - Automatic cache invalidation when products are updated
+  - Smart fallback caching when sections are empty
+  - Real-time performance metrics and cache statistics
 
 Architecture:
   Client: 1 HTTP request to /api/homepage/batch
   Backend: Parallel execution of 5-8 product queries simultaneously
+  Cache: Upstash Redis with automatic invalidation on admin updates
   Response: All sections returned at once
 
 Expected Performance:
-  - Network overhead: 100ms (1 request instead of 8)
-  - Backend time: ~130-150ms (parallel queries, not sequential)
-  - Total: ~250ms vs 1000ms+ for 8 separate sequential requests
+  - Cache hit: 5-10ms (served from Redis)
+  - Cache miss: 130-150ms (parallel queries, not sequential)
+  - Total network: 100ms (1 request instead of 8)
+  - Admin update impact: Automatic cache refresh within 60s
 """
 from flask import Blueprint, jsonify, request, current_app, Response
 from sqlalchemy.orm import load_only
@@ -19,6 +28,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
 import json
 from datetime import datetime
+import logging
 
 from app.models.models import Product
 from app.configuration.extensions import db
@@ -27,6 +37,8 @@ from app.utils.redis_cache import (
     fast_cached_response, 
     fast_json_dumps
 )
+
+logger = logging.getLogger(__name__)
 
 homepage_batch_routes = Blueprint('homepage_batch_routes', __name__, url_prefix='/api')
 
@@ -39,6 +51,14 @@ BATCH_CACHE_CONFIG = {
     'daily_finds': {'ttl': 300, 'key': 'batch:daily_finds'},     # 5 min
     'luxury_deals': {'ttl': 600, 'key': 'batch:luxury_deals'},   # 10 min
     'batch_all': {'ttl': 60, 'key': 'batch:all_combined'},       # 1 min - freshest combined data
+}
+
+# Performance metrics for monitoring
+PERF_METRICS = {
+    'cache_hits': 0,
+    'cache_misses': 0,
+    'total_requests': 0,
+    'invalidations': 0,
 }
 
 
@@ -248,13 +268,18 @@ def get_homepage_batch():
     cache_enabled = request.args.get('cache', 'true').lower() == 'true'
     requested_sections = request.args.get('sections', 'all')
     
+    PERF_METRICS['total_requests'] += 1
+    
     cache_key = BATCH_CACHE_CONFIG['batch_all']['key']
     if cache_enabled:
         cached_data = product_cache.get(cache_key)
         if cached_data:
             cached_data['cached'] = True
             cached_data['total_execution_ms'] = round((time.time() - start_time) * 1000, 2)
+            PERF_METRICS['cache_hits'] += 1
             return jsonify(cached_data), 200
+        else:
+            PERF_METRICS['cache_misses'] += 1
     
     try:
         # Define all fetch functions
@@ -378,6 +403,177 @@ def get_batch_endpoint_status():
         }), 200
     except Exception as e:
         current_app.logger.error(f"Status check error: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        }), 500
+
+
+# ============================================================================
+# CACHE INVALIDATION & MANAGEMENT - For Admin Product Updates
+# ============================================================================
+
+def invalidate_section_cache(section_name):
+    """Invalidate cache for a specific section when products are updated."""
+    try:
+        cache_key = BATCH_CACHE_CONFIG[section_name]['key']
+        product_cache.delete(cache_key)
+        logger.info(f"Cache invalidated for {section_name}: {cache_key}")
+        PERF_METRICS['invalidations'] += 1
+        return True
+    except Exception as e:
+        logger.warning(f"Failed to invalidate cache for {section_name}: {e}")
+        return False
+
+
+def invalidate_all_homepage_cache():
+    """Invalidate all homepage-related cache (called when any product is updated)."""
+    invalidated = 0
+    for section_name in BATCH_CACHE_CONFIG.keys():
+        if invalidate_section_cache(section_name):
+            invalidated += 1
+    logger.info(f"Invalidated {invalidated} homepage cache sections")
+    return invalidated
+
+
+def invalidate_related_section_caches(product_id):
+    """Smart invalidation: only invalidate sections affected by this product."""
+    try:
+        product = Product.query.get(product_id)
+        if not product:
+            return
+        
+        sections_to_invalidate = []
+        
+        # Determine which sections this product affects
+        if product.is_flash_sale:
+            sections_to_invalidate.append('flash_sales')
+        if product.is_trending:
+            sections_to_invalidate.append('trending')
+        if product.is_top_pick:
+            sections_to_invalidate.append('top_picks')
+        if product.is_new_arrival:
+            sections_to_invalidate.append('new_arrivals')
+        if product.is_daily_find:
+            sections_to_invalidate.append('daily_finds')
+        if product.is_luxury_deal:
+            sections_to_invalidate.append('luxury_deals')
+        
+        # Always invalidate combined cache since it contains all products
+        if sections_to_invalidate or product.is_active:
+            sections_to_invalidate.append('batch_all')
+        
+        # Invalidate affected sections
+        invalidated = 0
+        for section in set(sections_to_invalidate):
+            if invalidate_section_cache(section):
+                invalidated += 1
+        
+        logger.info(f"Smart cache invalidation for product {product_id}: {invalidated} sections")
+        return invalidated
+        
+    except Exception as e:
+        logger.error(f"Error in smart cache invalidation: {e}")
+        # Fallback: invalidate everything
+        invalidate_all_homepage_cache()
+        return len(BATCH_CACHE_CONFIG)
+
+
+@homepage_batch_routes.route('/homepage/batch/cache/invalidate', methods=['POST'])
+def invalidate_homepage_cache():
+    """
+    POST /api/homepage/batch/cache/invalidate
+    
+    Manually invalidate all homepage cache.
+    Called from admin routes when products are updated.
+    """
+    try:
+        product_id = request.args.get('product_id', type=int)
+        
+        if product_id:
+            # Smart invalidation for specific product
+            invalidated = invalidate_related_section_caches(product_id)
+        else:
+            # Full invalidation
+            invalidated = invalidate_all_homepage_cache()
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Invalidated {invalidated} cache sections',
+            'sections_invalidated': invalidated,
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Cache invalidation error: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        }), 500
+
+
+@homepage_batch_routes.route('/homepage/batch/cache/clear', methods=['POST'])
+def clear_homepage_cache():
+    """
+    POST /api/homepage/batch/cache/clear
+    
+    Force clear all homepage cache (for emergency situations).
+    """
+    try:
+        invalidated = invalidate_all_homepage_cache()
+        
+        return jsonify({
+            'status': 'success',
+            'message': f'Cleared {invalidated} cache entries',
+            'sections_cleared': invalidated,
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Cache clear error: {str(e)}")
+        return jsonify({
+            'status': 'error',
+            'error': str(e),
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        }), 500
+
+
+@homepage_batch_routes.route('/homepage/batch/cache/stats', methods=['GET'])
+def get_homepage_cache_stats():
+    """
+    GET /api/homepage/batch/cache/stats
+    
+    Get detailed cache statistics and performance metrics.
+    """
+    try:
+        total_requests = PERF_METRICS['total_requests']
+        cache_hits = PERF_METRICS['cache_hits']
+        cache_misses = PERF_METRICS['cache_misses']
+        hit_rate = (cache_hits / total_requests * 100) if total_requests > 0 else 0
+        
+        return jsonify({
+            'status': 'success',
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'performance': {
+                'total_requests': total_requests,
+                'cache_hits': cache_hits,
+                'cache_misses': cache_misses,
+                'hit_rate_percent': round(hit_rate, 2),
+                'total_invalidations': PERF_METRICS['invalidations']
+            },
+            'cache_config': {section: config['ttl'] for section, config in BATCH_CACHE_CONFIG.items()},
+            'estimated_performance': {
+                'cache_hit_response_time_ms': '5-10',
+                'cache_miss_response_time_ms': '130-150',
+                'total_time_saved_ms': round(cache_hits * 125, 2),  # Average time saved per hit
+                'database_queries_avoided': cache_hits
+            }
+        }), 200
+        
+    except Exception as e:
+        logger.error(f"Cache stats error: {str(e)}")
         return jsonify({
             'status': 'error',
             'error': str(e),
