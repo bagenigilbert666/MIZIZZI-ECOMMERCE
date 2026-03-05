@@ -25,6 +25,27 @@ from datetime import datetime
 backend_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, backend_dir)
 
+# Load environment variables from .env file
+def load_env_file():
+    """Load environment variables from .env file in the backend directory."""
+    env_file = os.path.join(backend_dir, '.env')
+    if os.path.exists(env_file):
+        with open(env_file, 'r') as f:
+            for line in f:
+                line = line.strip()
+                # Skip comments and empty lines
+                if line and not line.startswith('#'):
+                    # Split on first '=' only
+                    if '=' in line:
+                        key, value = line.split('=', 1)
+                        # Set environment variable if not already set
+                        if key not in os.environ:
+                            os.environ[key] = value
+                            print(f"[ENV] Loaded {key} from .env")
+
+# Load .env file before checking environment
+load_env_file()
+
 
 def print_section(title):
     """Print a formatted section header."""
