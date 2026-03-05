@@ -233,7 +233,7 @@ def get_ui_batch():
         
         if cache_enabled:
             try:
-                product_cache.set(cache_key, response_data, ex=BATCH_CACHE_CONFIG['ui_all']['ttl'])
+                product_cache.set(cache_key, response_data, BATCH_CACHE_CONFIG['ui_all']['ttl'])
             except Exception as e:
                 logger.warning(f"Failed to cache UI batch: {str(e)}")
         

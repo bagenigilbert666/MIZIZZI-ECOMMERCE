@@ -326,7 +326,7 @@ def get_homepage_batch():
                 product_cache.set(
                     cache_key, 
                     response_data,
-                    ex=BATCH_CACHE_CONFIG['batch_all']['ttl']
+                    BATCH_CACHE_CONFIG['batch_all']['ttl']
                 )
             except Exception as e:
                 current_app.logger.warning(f"Failed to cache homepage batch: {str(e)}")
