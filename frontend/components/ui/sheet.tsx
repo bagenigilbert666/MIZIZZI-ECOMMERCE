@@ -58,13 +58,9 @@ const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Con
   ({ side = "right", className, children, ...props }, ref) => (
     <SheetPortal>
       <SheetOverlay />
-      <VisuallyHidden.Root asChild>
-        <SheetPrimitive.Title>Sheet</SheetPrimitive.Title>
-      </VisuallyHidden.Root>
-      <VisuallyHidden.Root asChild>
-        <SheetPrimitive.Description>Sheet content</SheetPrimitive.Description>
-      </VisuallyHidden.Root>
       <SheetPrimitive.Content ref={ref} className={cn(sheetVariants({ side }), className)} {...props}>
+        <SheetPrimitive.Title className="sr-only">Sheet</SheetPrimitive.Title>
+        <SheetPrimitive.Description className="sr-only">Sheet content</SheetPrimitive.Description>
         {children}
         <SheetPrimitive.Close asChild>
           <motion.button
