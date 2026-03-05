@@ -1573,6 +1573,36 @@ def create_app(config_name=None, enable_socketio=True):
                 }), 503
         return None
 
+    # Initialize Redis cache on startup
+    @app.before_first_request
+    def initialize_redis_cache():
+        """Initialize Redis cache connection on first request."""
+        try:
+            from app.cache.redis_client import get_redis_client, is_redis_connected
+            client = get_redis_client()
+            if is_redis_connected():
+                app.logger.info("✅ Redis Cache: CONNECTED - Upstash Redis is ready")
+            else:
+                app.logger.warning("⚠️ Redis Cache: FALLBACK - Using in-memory cache")
+        except Exception as e:
+            app.logger.warning(f"⚠️ Redis Cache initialization: {e} - Using in-memory cache")
+    
+    # Add cache status endpoint
+    @app.route('/api/cache/status', methods=['GET'])
+    def cache_status():
+        """Get cache system status and statistics."""
+        try:
+            from app.utils.redis_cache import get_cache_status
+            status = get_cache_status()
+            return jsonify(status), 200
+        except Exception as e:
+            app.logger.error(f"Cache status endpoint error: {e}")
+            return jsonify({
+                "error": "cache_status_error",
+                "message": str(e),
+                "connected": False
+            }), 500
+    
     app.logger.info(f"Application created successfully with config: {config_name}")
     return app
 
