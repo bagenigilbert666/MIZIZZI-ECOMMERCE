@@ -103,6 +103,27 @@ try:
     # Global instance
     product_cache = RedisCache()
     
+    # Convenience functions for backwards compatibility
+    def invalidate_products() -> int:
+        """Invalidate all product cache entries."""
+        return product_cache.invalidate_products()
+    
+    def invalidate_featured() -> int:
+        """Invalidate featured products cache."""
+        return product_cache.invalidate_featured()
+    
+    def invalidate_search() -> int:
+        """Invalidate search cache entries."""
+        return product_cache.invalidate_search()
+    
+    def invalidate_all_products() -> int:
+        """Invalidate all product-related cache."""
+        return product_cache.invalidate_all_products()
+    
+    def flush_all() -> bool:
+        """Flush entire cache."""
+        return product_cache.flush_all()
+    
     logger.info("Using new modular cache system from app/cache/")
 
 except ImportError as e:
