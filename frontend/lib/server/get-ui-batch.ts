@@ -108,8 +108,9 @@ const DEFAULT_UI_BATCH: UIBatchData = {
 export const getUIBatch = cache(
   async (sections?: string, useCache: boolean = true): Promise<UIBatchData> => {
     try {
-      // Build request URL
-      const url = new URL('/api/ui/batch', process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:3000')
+      // Build request URL - use NEXT_PUBLIC_API_URL for backend
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000'
+      const url = new URL('/api/ui/batch', apiUrl)
       
       if (sections) {
         url.searchParams.set('sections', sections)
@@ -119,7 +120,7 @@ export const getUIBatch = cache(
         url.searchParams.set('cache', 'false')
       }
 
-      console.log('[v0] getUIBatch: Fetching from frontend API:', url.toString())
+      console.log('[v0] getUIBatch: Fetching from backend API:', url.toString())
 
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 8000) // 8 second timeout
