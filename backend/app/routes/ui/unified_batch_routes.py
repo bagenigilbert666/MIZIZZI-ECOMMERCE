@@ -517,6 +517,351 @@ def get_ui_batch():
         }), 500
 
 
+# ============================================================================
+# FETCH FUNCTIONS - Parallel execution
+# ============================================================================
+
+def fetch_carousel():
+    """Fetch carousel banners from all positions."""
+    try:
+        from app.models.carousel_model import CarouselBanner
+        
+        # Ensure we're in the application context for database queries
+        def _fetch():
+            carousel_data = {}
+            positions = ['homepage', 'category_page', 'flash_sales', 'luxury_deals']
+            
+            for position in positions:
+                items = CarouselBanner.query.filter_by(
+                    position=position,
+                    is_active=True
+                ).order_by(CarouselBanner.sort_order).limit(5).all()
+                
+                carousel_data[position] = [
+                    {
+                        'id': item.id,
+                        'name': item.name,
+                        'title': item.title,
+                        'description': item.description,
+                        'badge_text': item.badge_text,
+                        'discount': item.discount,
+                        'button_text': item.button_text,
+                        'link_url': item.link_url,
+                        'image_url': item.image_url,
+                        'sort_order': item.sort_order
+                    } for item in items
+                ]
+            
+            return carousel_data
+        
+        # Execute within the current app context
+        carousel_data = _fetch()
+        
+        return {
+            'section': 'carousel',
+            'data': carousel_data,
+            'count': sum(len(items) for items in carousel_data.values()),
+            'success': True
+        }
+    except Exception as e:
+        logger.error(f"Error fetching carousel: {str(e)}")
+        return {
+            'section': 'carousel',
+            'data': {},
+            'error': str(e),
+            'success': False
+        }
+
+
+def fetch_topbar():
+    """Fetch active topbar slides."""
+    try:
+        from app.models.topbar_model import TopBarSlide
+        
+        # Ensure we're in the application context for database queries
+        def _fetch():
+            slides = TopBarSlide.query.filter_by(is_active=True).order_by(
+                TopBarSlide.sort_order
+            ).limit(10).all()
+            
+            return [slide.to_dict() for slide in slides]
+        
+        topbar_data = _fetch()
+        
+        return {
+            'section': 'topbar',
+            'slides': topbar_data,
+            'count': len(topbar_data),
+            'success': True
+        }
+    except Exception as e:
+        logger.error(f"Error fetching topbar: {str(e)}")
+        return {
+            'section': 'topbar',
+            'slides': [],
+            'error': str(e),
+            'success': False
+        }
+
+
+def fetch_categories():
+    """Fetch featured and root categories."""
+    try:
+        from app.models.models import Category, Product
+        
+        # Ensure we're in the application context for database queries
+        def _fetch():
+            # Get featured categories
+            featured = Category.query.filter_by(is_featured=True).order_by(
+                Category.name
+            ).limit(10).all()
+            
+            featured_data = []
+            for cat in featured:
+                product_count = Product.query.filter_by(category_id=cat.id).count()
+                featured_data.append({
+                    'id': cat.id,
+                    'name': cat.name,
+                    'slug': cat.slug,
+                    'description': cat.description,
+                    'image_url': cat.image_url,
+                    'is_featured': cat.is_featured,
+                    'products_count': product_count
+                })
+            
+            # Get root categories with their subcategories count
+            root_categories = Category.query.filter_by(parent_id=None).order_by(
+                Category.name
+            ).limit(20).all()
+            
+            root_data = []
+            for cat in root_categories:
+                product_count = Product.query.filter_by(category_id=cat.id).count()
+                subcategories_count = Category.query.filter_by(parent_id=cat.id).count()
+                
+                root_data.append({
+                    'id': cat.id,
+                    'name': cat.name,
+                    'slug': cat.slug,
+                    'description': cat.description,
+                    'image_url': cat.image_url,
+                    'products_count': product_count,
+                    'subcategories_count': subcategories_count
+                })
+            
+            return featured_data, root_data
+        
+        featured_data, root_data = _fetch()
+        
+        return {
+            'section': 'categories',
+            'featured': featured_data,
+            'root': root_data,
+            'featured_count': len(featured_data),
+            'root_count': len(root_data),
+            'success': True
+        }
+    except Exception as e:
+        logger.error(f"Error fetching categories: {str(e)}")
+        return {
+            'section': 'categories',
+            'featured': [],
+            'root': [],
+            'error': str(e),
+            'success': False
+        }
+
+
+def fetch_side_panels():
+    """Fetch side panel items for all types and positions."""
+    try:
+        from app.models.side_panel_model import SidePanel
+        
+        # Ensure we're in the application context for database queries
+        def _fetch():
+            panels_data = {}
+            panel_types = ['product_showcase', 'premium_experience']
+            positions = ['left', 'right']
+            
+            for panel_type in panel_types:
+                for position in positions:
+                    key = f"{panel_type}_{position}"
+                    items = SidePanel.query.filter_by(
+                        panel_type=panel_type,
+                        position=position,
+                        is_active=True
+                    ).order_by(SidePanel.sort_order).limit(3).all()
+                    
+                    panels_data[key] = [item.to_dict() for item in items]
+            
+            return panels_data
+        
+        panels_data = _fetch()
+        
+        return {
+            'section': 'side_panels',
+            'data': panels_data,
+            'count': sum(len(items) for items in panels_data.values()),
+            'success': True
+        }
+    except Exception as e:
+        logger.error(f"Error fetching side panels: {str(e)}")
+        return {
+            'section': 'side_panels',
+            'data': {},
+            'error': str(e),
+            'success': False
+        }
+
+
+# ============================================================================
+# MAIN BATCH ENDPOINT
+# ============================================================================
+
+@ui_batch_routes.route('/batch', methods=['GET'])
+def get_ui_batch():
+    """
+    GET /api/ui/batch
+    
+    Combined UI data endpoint with parallel backend query execution.
+    Returns all UI sections (carousel, topbar, categories, side panels) in ONE request.
+    
+    Query Parameters:
+      - cache: 'true'/'false' - enable/disable caching (default: true)
+      - sections: comma-separated list of sections to fetch (default: all)
+        Options: carousel, topbar, categories, side_panels
+      
+    Response:
+      {
+        "timestamp": "2024-03-04T10:30:00Z",
+        "total_execution_ms": 145,
+        "cached": false,
+        "sections": {
+          "carousel": { "data": {...}, "count": 20 },
+          "topbar": { "slides": [...], "count": 5 },
+          "categories": { "featured": [...], "root": [...] },
+          "side_panels": { "data": {...}, "count": 8 }
+        },
+        "meta": {
+          "sections_fetched": 4,
+          "parallel_execution": true
+        }
+      }
+    """
+    
+    start_time = time.time()
+    
+    # Check cache first
+    cache_enabled = request.args.get('cache', 'true').lower() == 'true'
+    requested_sections = request.args.get('sections', 'all')
+    
+    cache_key = BATCH_CACHE_CONFIG['ui_all']['key']
+    if cache_enabled:
+        try:
+            cached_data = product_cache.get(cache_key)
+            if cached_data:
+                cached_data['cached'] = True
+                cached_data['total_execution_ms'] = round((time.time() - start_time) * 1000, 2)
+                logger.info(f"UI batch served from cache in {cached_data['total_execution_ms']}ms")
+                return jsonify(cached_data), 200
+        except Exception as e:
+            logger.warning(f"Cache retrieval failed: {str(e)}")
+    
+    try:
+        # Define all fetch functions
+        fetch_functions = {
+            'carousel': fetch_carousel,
+            'topbar': fetch_topbar,
+            'categories': fetch_categories,
+            'side_panels': fetch_side_panels,
+        }
+        
+        # Determine which sections to fetch
+        if requested_sections == 'all':
+            sections_to_fetch = list(fetch_functions.keys())
+        else:
+            sections_to_fetch = [
+                s.strip() for s in requested_sections.split(',') 
+                if s.strip() in fetch_functions
+            ]
+            if not sections_to_fetch:
+                sections_to_fetch = list(fetch_functions.keys())
+        
+        # PARALLEL execution using ThreadPoolExecutor
+        # All queries execute simultaneously, not sequentially
+        # We need to wrap each fetch with the app context
+        results = {}
+        
+        # Get the current app instance to pass to threads
+        app = current_app._get_current_object()
+        
+        def fetch_with_context(fetch_func, app_instance):
+            """Wrapper to ensure fetch functions run within app context."""
+            with app_instance.app_context():
+                return fetch_func()
+        
+        with ThreadPoolExecutor(max_workers=8) as executor:
+            # Submit all queries at once, wrapped in app context
+            futures = {
+                executor.submit(fetch_with_context, fetch_functions[section], app): section 
+                for section in sections_to_fetch
+            }
+            
+            # Collect results as they complete
+            for future in as_completed(futures):
+                section = futures[future]
+                try:
+                    result = future.result(timeout=5)
+                    results[section] = {
+                        **result,
+                        'success': result.get('success', False)
+                    }
+                except Exception as e:
+                    logger.error(f"Error in parallel fetch for {section}: {str(e)}")
+                    results[section] = {
+                        'success': False,
+                        'error': str(e)
+                    }
+        
+        # Build response
+        execution_time = time.time() - start_time
+        response_data = {
+            'timestamp': datetime.utcnow().isoformat() + 'Z',
+            'total_execution_ms': round(execution_time * 1000, 2),
+            'cached': False,
+            'sections': results,
+            'meta': {
+                'sections_fetched': len(results),
+                'parallel_execution': True,
+                'cache_key': cache_key if cache_enabled else None
+            }
+        }
+        
+        # Cache the response
+        if cache_enabled:
+            try:
+                product_cache.set(
+                    cache_key, 
+                    response_data,
+                    ex=BATCH_CACHE_CONFIG['ui_all']['ttl']
+                )
+                logger.info(f"UI batch cached for {BATCH_CACHE_CONFIG['ui_all']['ttl']}s")
+            except Exception as e:
+                logger.warning(f"Failed to cache UI batch: {str(e)}")
+        
+        logger.info(f"UI batch endpoint executed in {execution_time*1000:.2f}ms")
+        return jsonify(response_data), 200
+        
+    except Exception as e:
+        logger.error(f"UI batch endpoint error: {str(e)}")
+        return jsonify({
+            'error': 'Failed to fetch UI data',
+            'message': str(e),
+            'timestamp': datetime.utcnow().isoformat() + 'Z'
+        }), 500
+
+
+
 @ui_batch_routes.route('/batch/status', methods=['GET'])
 def get_ui_batch_status():
     """
