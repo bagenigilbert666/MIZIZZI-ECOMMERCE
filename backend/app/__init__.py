@@ -243,26 +243,48 @@ def create_app(config_name=None, enable_socketio=True):
     )
 
     @app.before_request
-    def _handle_options_preflight():
-        if request.method != 'OPTIONS':
+    def handle_preflight_and_logging():
+        """Consolidated request handler for OPTIONS preflight and logging."""
+        # Handle OPTIONS preflight
+        if request.method == 'OPTIONS':
+            from flask import make_response
+            response = make_response(jsonify({'status': 'ok'}), 200)
+            origin = request.headers.get('Origin')
+            allowed_origins = app.config.get('CORS_ORIGINS', ['http://localhost:3000', 'http://127.0.0.1:3000','https://mizizzi-shop.vercel.app'])
+            
+            if origin and ("*" in allowed_origins or origin in allowed_origins):
+                response.headers['Access-Control-Allow-Origin'] = origin     
+            else:
+                response.headers['Access-Control-Allow-Origin'] = ','.join(allowed_origins)
+            
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, X-MFA-Token, Accept, Origin, Cache-Control, cache-control, Pragma, Expires'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH'
+            response.headers['Access-Control-Allow-Credentials'] = 'true'
+            response.headers['Vary'] = 'Origin'
+            return response
+        
+        # Log request (except health checks and root)
+        path = (request.path or "").lower()
+        if path not in ("/", "/api/health-check", "/api/health", "/api/admin/dashboard/health"):
+            app.logger.debug(f"Processing request: {request.method} {request.path}")
+    
+    @app.before_request
+    def short_circuit_when_db_unavailable():
+        """Short-circuit requests when database is unavailable."""
+        path = (request.path or "").lower()
+        # Allow non-API requests, health checks and static files to proceed
+        if path in ("/", "/api/health-check", "/api/health", "/api/admin/dashboard/health"):
             return None
-
-        from flask import make_response
-        response = make_response(jsonify({'status': 'ok'}), 200)
-
-        origin = request.headers.get('Origin')
-        allowed_origins = app.config.get('CORS_ORIGINS', ['http://localhost:3000', 'http://127.0.0.1:3000','https://mizizzi-shop.vercel.app'])
-        if origin and ("*" in allowed_origins or origin in allowed_origins):
-            response.headers['Access-Control-Allow-Origin'] = origin     
-        else:
-            response.headers['Access-Control-Allow-Origin'] = ','.join(allowed_origins)
-
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, X-MFA-Token, Accept, Origin, Cache-Control, cache-control, Pragma, Expires'
-        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH'
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
-        response.headers['Vary'] = 'Origin'
-
-        return response
+        
+        # Only short-circuit API routes; leave non-API endpoints alone
+        if path.startswith("/api"):
+            if not is_db_available():
+                return jsonify({
+                    "error": "database_unavailable",
+                    "message": "Database is currently unavailable. Please try again later.",
+                    "retry_after_seconds": DB_CHECK_TTL
+                }), 503
+        return None
     
     # Initialize JWT
     jwt = JWTManager(app)
