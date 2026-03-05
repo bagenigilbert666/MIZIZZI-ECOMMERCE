@@ -935,7 +935,7 @@ def create_app(config_name=None, enable_socketio=True):
         app.register_blueprint(final_blueprints['theme_routes'], url_prefix='/api/theme')
         app.register_blueprint(final_blueprints['footer_routes'], url_prefix='/api/footer')
         app.register_blueprint(final_blueprints['homepage_batch_routes'], url_prefix='/api')
-        app.register_blueprint(final_blueprints['ui_batch_routes'], url_prefix='/api')
+        app.register_blueprint(final_blueprints['ui_batch_routes'])  # Blueprint already has url_prefix='/api/ui'
 
         app.register_blueprint(final_blueprints['meilisearch_routes'], url_prefix='/api/meilisearch')
         app.register_blueprint(final_blueprints['admin_meilisearch_routes'], url_prefix='/api/admin/meilisearch')
