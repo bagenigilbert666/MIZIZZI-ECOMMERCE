@@ -106,6 +106,16 @@ def get_minimal_product_query():
     )
 
 
+# ============================================================================
+# FETCH FUNCTIONS - Parallel execution with proper app context
+# ============================================================================
+
+def fetch_with_context(fetch_func, app_instance):
+    """Wrapper to ensure fetch functions run within Flask app context."""
+    with app_instance.app_context():
+        return fetch_func()
+
+
 def fetch_flash_sales():
     """Fetch flash sale products - highest priority, shown most prominently."""
     try:
@@ -305,10 +315,12 @@ def get_homepage_batch():
         # Total time = longest query time + overhead (typically 130-150ms)
         # vs sequential time of sum of all queries (500-800ms)
         results = {}
+        app = current_app._get_current_object()
+        
         with ThreadPoolExecutor(max_workers=8) as executor:
-            # Submit all queries at once
+            # Submit all queries at once, wrapped with app context
             futures = {
-                executor.submit(fetch_functions[section]): section 
+                executor.submit(fetch_with_context, fetch_functions[section], app): section 
                 for section in sections_to_fetch
             }
             
