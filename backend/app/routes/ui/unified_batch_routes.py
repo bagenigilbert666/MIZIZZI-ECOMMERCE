@@ -427,11 +427,20 @@ def get_ui_batch_status():
         # Test cache
         cache_test_key = 'batch:ui_health_check'
         cache_healthy = False
+        cache_type = 'memory'
+        cache_stats = {}
+        
         try:
+            from app.utils.redis_cache import get_cache_status
+            cache_status = get_cache_status()
+            cache_type = cache_status.get('cache_type', 'memory')
+            cache_stats = cache_status.get('stats', {})
+            
             product_cache.set(cache_test_key, {'test': True}, ex=10)
             cache_healthy = product_cache.get(cache_test_key) is not None
             product_cache.delete(cache_test_key)
-        except:
+        except Exception as e:
+            logger.warning(f"Cache test failed: {e}")
             cache_healthy = False
         
         all_healthy = all(v == 'connected' or v == 'ok' for v in db_status.values())
@@ -440,6 +449,8 @@ def get_ui_batch_status():
             'status': 'healthy' if (all_healthy and cache_healthy) else 'degraded',
             'database': db_status,
             'cache': 'connected' if cache_healthy else 'disconnected',
+            'cache_type': cache_type,
+            'cache_stats': cache_stats,
             'endpoint': '/api/ui/batch',
             'sections_available': [
                 'carousel',
