@@ -49,29 +49,36 @@ def fetch_carousel():
     try:
         from app.models.carousel_model import CarouselBanner
         
-        carousel_data = {}
-        positions = ['homepage', 'category_page', 'flash_sales', 'luxury_deals']
-        
-        for position in positions:
-            items = CarouselBanner.query.filter_by(
-                position=position,
-                is_active=True
-            ).order_by(CarouselBanner.sort_order).limit(5).all()
+        # Ensure we're in the application context for database queries
+        def _fetch():
+            carousel_data = {}
+            positions = ['homepage', 'category_page', 'flash_sales', 'luxury_deals']
             
-            carousel_data[position] = [
-                {
-                    'id': item.id,
-                    'name': item.name,
-                    'title': item.title,
-                    'description': item.description,
-                    'badge_text': item.badge_text,
-                    'discount': item.discount,
-                    'button_text': item.button_text,
-                    'link_url': item.link_url,
-                    'image_url': item.image_url,
-                    'sort_order': item.sort_order
-                } for item in items
-            ]
+            for position in positions:
+                items = CarouselBanner.query.filter_by(
+                    position=position,
+                    is_active=True
+                ).order_by(CarouselBanner.sort_order).limit(5).all()
+                
+                carousel_data[position] = [
+                    {
+                        'id': item.id,
+                        'name': item.name,
+                        'title': item.title,
+                        'description': item.description,
+                        'badge_text': item.badge_text,
+                        'discount': item.discount,
+                        'button_text': item.button_text,
+                        'link_url': item.link_url,
+                        'image_url': item.image_url,
+                        'sort_order': item.sort_order
+                    } for item in items
+                ]
+            
+            return carousel_data
+        
+        # Execute within the current app context
+        carousel_data = _fetch()
         
         return {
             'section': 'carousel',
@@ -94,11 +101,15 @@ def fetch_topbar():
     try:
         from app.models.topbar_model import TopBarSlide
         
-        slides = TopBarSlide.query.filter_by(is_active=True).order_by(
-            TopBarSlide.sort_order
-        ).limit(10).all()
+        # Ensure we're in the application context for database queries
+        def _fetch():
+            slides = TopBarSlide.query.filter_by(is_active=True).order_by(
+                TopBarSlide.sort_order
+            ).limit(10).all()
+            
+            return [slide.to_dict() for slide in slides]
         
-        topbar_data = [slide.to_dict() for slide in slides]
+        topbar_data = _fetch()
         
         return {
             'section': 'topbar',
@@ -121,43 +132,49 @@ def fetch_categories():
     try:
         from app.models.models import Category, Product
         
-        # Get featured categories
-        featured = Category.query.filter_by(is_featured=True).order_by(
-            Category.name
-        ).limit(10).all()
-        
-        featured_data = []
-        for cat in featured:
-            product_count = Product.query.filter_by(category_id=cat.id).count()
-            featured_data.append({
-                'id': cat.id,
-                'name': cat.name,
-                'slug': cat.slug,
-                'description': cat.description,
-                'image_url': cat.image_url,
-                'is_featured': cat.is_featured,
-                'products_count': product_count
-            })
-        
-        # Get root categories with their subcategories count
-        root_categories = Category.query.filter_by(parent_id=None).order_by(
-            Category.name
-        ).limit(20).all()
-        
-        root_data = []
-        for cat in root_categories:
-            product_count = Product.query.filter_by(category_id=cat.id).count()
-            subcategories_count = Category.query.filter_by(parent_id=cat.id).count()
+        # Ensure we're in the application context for database queries
+        def _fetch():
+            # Get featured categories
+            featured = Category.query.filter_by(is_featured=True).order_by(
+                Category.name
+            ).limit(10).all()
             
-            root_data.append({
-                'id': cat.id,
-                'name': cat.name,
-                'slug': cat.slug,
-                'description': cat.description,
-                'image_url': cat.image_url,
-                'products_count': product_count,
-                'subcategories_count': subcategories_count
-            })
+            featured_data = []
+            for cat in featured:
+                product_count = Product.query.filter_by(category_id=cat.id).count()
+                featured_data.append({
+                    'id': cat.id,
+                    'name': cat.name,
+                    'slug': cat.slug,
+                    'description': cat.description,
+                    'image_url': cat.image_url,
+                    'is_featured': cat.is_featured,
+                    'products_count': product_count
+                })
+            
+            # Get root categories with their subcategories count
+            root_categories = Category.query.filter_by(parent_id=None).order_by(
+                Category.name
+            ).limit(20).all()
+            
+            root_data = []
+            for cat in root_categories:
+                product_count = Product.query.filter_by(category_id=cat.id).count()
+                subcategories_count = Category.query.filter_by(parent_id=cat.id).count()
+                
+                root_data.append({
+                    'id': cat.id,
+                    'name': cat.name,
+                    'slug': cat.slug,
+                    'description': cat.description,
+                    'image_url': cat.image_url,
+                    'products_count': product_count,
+                    'subcategories_count': subcategories_count
+                })
+            
+            return featured_data, root_data
+        
+        featured_data, root_data = _fetch()
         
         return {
             'section': 'categories',
@@ -183,20 +200,26 @@ def fetch_side_panels():
     try:
         from app.models.side_panel_model import SidePanel
         
-        panels_data = {}
-        panel_types = ['product_showcase', 'premium_experience']
-        positions = ['left', 'right']
+        # Ensure we're in the application context for database queries
+        def _fetch():
+            panels_data = {}
+            panel_types = ['product_showcase', 'premium_experience']
+            positions = ['left', 'right']
+            
+            for panel_type in panel_types:
+                for position in positions:
+                    key = f"{panel_type}_{position}"
+                    items = SidePanel.query.filter_by(
+                        panel_type=panel_type,
+                        position=position,
+                        is_active=True
+                    ).order_by(SidePanel.sort_order).limit(3).all()
+                    
+                    panels_data[key] = [item.to_dict() for item in items]
+            
+            return panels_data
         
-        for panel_type in panel_types:
-            for position in positions:
-                key = f"{panel_type}_{position}"
-                items = SidePanel.query.filter_by(
-                    panel_type=panel_type,
-                    position=position,
-                    is_active=True
-                ).order_by(SidePanel.sort_order).limit(3).all()
-                
-                panels_data[key] = [item.to_dict() for item in items]
+        panels_data = _fetch()
         
         return {
             'section': 'side_panels',
@@ -289,11 +312,21 @@ def get_ui_batch():
         
         # PARALLEL execution using ThreadPoolExecutor
         # All queries execute simultaneously, not sequentially
+        # We need to wrap each fetch with the app context
         results = {}
+        
+        # Get the current app instance to pass to threads
+        app = current_app._get_current_object()
+        
+        def fetch_with_context(fetch_func, app_instance):
+            """Wrapper to ensure fetch functions run within app context."""
+            with app_instance.app_context():
+                return fetch_func()
+        
         with ThreadPoolExecutor(max_workers=8) as executor:
-            # Submit all queries at once
+            # Submit all queries at once, wrapped in app context
             futures = {
-                executor.submit(fetch_functions[section]): section 
+                executor.submit(fetch_with_context, fetch_functions[section], app): section 
                 for section in sections_to_fetch
             }
             
