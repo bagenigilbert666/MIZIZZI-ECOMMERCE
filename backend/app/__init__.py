@@ -1595,14 +1595,25 @@ def create_app(config_name=None, enable_socketio=True):
     except Exception as e:
         app.logger.warning(f"Deferred Redis initialization (will retry on first request): {e}")
     
-    # Also set up deferred initialization for first request
-    @app.before_first_request
-    def initialize_redis_cache_deferred():
-        """Deferred Redis cache connection initialization."""
-        try:
-            init_redis_cache()
-        except Exception as e:
-            app.logger.warning(f"Deferred Redis initialization failed: {e}")
+    # Also set up deferred initialization for first request (Flask 2.0+ compatible)
+    try:
+        # Try Flask 2.0+ approach
+        @app.before_serving
+        def initialize_redis_cache_deferred():
+            """Deferred Redis cache connection initialization."""
+            try:
+                init_redis_cache()
+            except Exception as e:
+                app.logger.warning(f"Deferred Redis initialization failed: {e}")
+    except AttributeError:
+        # Fallback for older Flask versions
+        @app.before_first_request
+        def initialize_redis_cache_deferred():
+            """Deferred Redis cache connection initialization."""
+            try:
+                init_redis_cache()
+            except Exception as e:
+                app.logger.warning(f"Deferred Redis initialization failed: {e}")
     
     # Add cache status endpoint
     @app.route('/api/cache/status', methods=['GET'])
@@ -1622,21 +1633,6 @@ def create_app(config_name=None, enable_socketio=True):
     
     app.logger.info(f"Application created successfully with config: {config_name}")
     return app
-
-# Initialize Flask app factory
-def create_app_with_search():
-    """Create Flask app (Meilisearch handles search)."""
-    try:
-        # Use the directly imported create_app function
-        app = create_app()
-        
-        with app.app_context():
-            app.logger.info("✅ App initialized - Meilisearch handles search.")
-        
-        return app
-        
-    except Exception as e:
-        logger.error(f"Error creating app: {str(e)}")
         
         try:
             # Fallback to calling create_app directly again
