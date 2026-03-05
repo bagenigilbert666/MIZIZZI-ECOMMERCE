@@ -100,6 +100,10 @@ except ImportError:
         mail = Mail()
         cache = Cache()
         limiter = Limiter(key_func=get_remote_address)
+        # Removed duplicate SQLAlchemy instance - import from extensions instead
+        from .configuration.extensions import db, ma, mail, cache, limiter
+        from flask_socketio import SocketIO
+
         socketio = SocketIO()
         
         def get_database_url():
@@ -109,6 +113,7 @@ except ImportError:
                 if database_url.startswith('postgres://'):
                     database_url = database_url.replace('postgres://', 'postgresql://', 1)
                 return database_url
+            # Return only the URL string (not a tuple) so SQLAlchemy receives a valid URL
             return 'postgresql://neondb_owner:npg_0gMwASZYo9pJ@ep-shiny-term-adlossxs-pooler.c-2.us-east-1.aws.neon.tech/mizizzi_project?sslmode=require&channel_binding=require'
         
         # Minimal config classes
@@ -131,6 +136,7 @@ except ImportError:
         
         class ProductionConfig(Config):
             DEBUG = False
+            # Use SimpleCache as fallback if Redis not available
             CACHE_TYPE = 'SimpleCache'
             RATELIMIT_STORAGE_URI = os.environ.get('REDIS_URL') or 'memory://'
         
@@ -243,48 +249,26 @@ def create_app(config_name=None, enable_socketio=True):
     )
 
     @app.before_request
-    def handle_preflight_and_logging():
-        """Consolidated request handler for OPTIONS preflight and logging."""
-        # Handle OPTIONS preflight
-        if request.method == 'OPTIONS':
-            from flask import make_response
-            response = make_response(jsonify({'status': 'ok'}), 200)
-            origin = request.headers.get('Origin')
-            allowed_origins = app.config.get('CORS_ORIGINS', ['http://localhost:3000', 'http://127.0.0.1:3000','https://mizizzi-shop.vercel.app'])
-            
-            if origin and ("*" in allowed_origins or origin in allowed_origins):
-                response.headers['Access-Control-Allow-Origin'] = origin     
-            else:
-                response.headers['Access-Control-Allow-Origin'] = ','.join(allowed_origins)
-            
-            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, X-MFA-Token, Accept, Origin, Cache-Control, cache-control, Pragma, Expires'
-            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH'
-            response.headers['Access-Control-Allow-Credentials'] = 'true'
-            response.headers['Vary'] = 'Origin'
-            return response
-        
-        # Log request (except health checks and root)
-        path = (request.path or "").lower()
-        if path not in ("/", "/api/health-check", "/api/health", "/api/admin/dashboard/health"):
-            app.logger.debug(f"Processing request: {request.method} {request.path}")
-    
-    @app.before_request
-    def short_circuit_when_db_unavailable():
-        """Short-circuit requests when database is unavailable."""
-        path = (request.path or "").lower()
-        # Allow non-API requests, health checks and static files to proceed
-        if path in ("/", "/api/health-check", "/api/health", "/api/admin/dashboard/health"):
+    def _handle_options_preflight():
+        if request.method != 'OPTIONS':
             return None
-        
-        # Only short-circuit API routes; leave non-API endpoints alone
-        if path.startswith("/api"):
-            if not is_db_available():
-                return jsonify({
-                    "error": "database_unavailable",
-                    "message": "Database is currently unavailable. Please try again later.",
-                    "retry_after_seconds": DB_CHECK_TTL
-                }), 503
-        return None
+
+        from flask import make_response
+        response = make_response(jsonify({'status': 'ok'}), 200)
+
+        origin = request.headers.get('Origin')
+        allowed_origins = app.config.get('CORS_ORIGINS', ['http://localhost:3000', 'http://127.0.0.1:3000','https://mizizzi-shop.vercel.app'])
+        if origin and ("*" in allowed_origins or origin in allowed_origins):
+            response.headers['Access-Control-Allow-Origin'] = origin     
+        else:
+            response.headers['Access-Control-Allow-Origin'] = ','.join(allowed_origins)
+
+        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, X-MFA-Token, Accept, Origin, Cache-Control, cache-control, Pragma, Expires'
+        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH'
+        response.headers['Access-Control-Allow-Credentials'] = 'true'
+        response.headers['Vary'] = 'Origin'
+
+        return response
     
     # Initialize JWT
     jwt = JWTManager(app)
@@ -951,7 +935,7 @@ def create_app(config_name=None, enable_socketio=True):
         app.register_blueprint(final_blueprints['theme_routes'], url_prefix='/api/theme')
         app.register_blueprint(final_blueprints['footer_routes'], url_prefix='/api/footer')
         app.register_blueprint(final_blueprints['homepage_batch_routes'], url_prefix='/api')
-        app.register_blueprint(final_blueprints['ui_batch_routes'])  # Blueprint already has url_prefix='/api/ui'
+        app.register_blueprint(final_blueprints['ui_batch_routes'], url_prefix='/api')
 
         app.register_blueprint(final_blueprints['meilisearch_routes'], url_prefix='/api/meilisearch')
         app.register_blueprint(final_blueprints['admin_meilisearch_routes'], url_prefix='/api/admin/meilisearch')
@@ -1611,25 +1595,14 @@ def create_app(config_name=None, enable_socketio=True):
     except Exception as e:
         app.logger.warning(f"Deferred Redis initialization (will retry on first request): {e}")
     
-    # Set up deferred initialization for first request (Flask 2.0+ compatible)
-    try:
-        # Try Flask 2.0+ approach
-        @app.before_serving
-        def initialize_redis_cache_deferred():
-            """Deferred Redis cache connection initialization."""
-            try:
-                init_redis_cache()
-            except Exception as e:
-                app.logger.warning(f"Deferred Redis initialization failed: {e}")
-    except AttributeError:
-        # Fallback for older Flask versions
-        @app.before_first_request
-        def initialize_redis_cache_deferred():
-            """Deferred Redis cache connection initialization."""
-            try:
-                init_redis_cache()
-            except Exception as e:
-                app.logger.warning(f"Deferred Redis initialization failed: {e}")
+    # Also set up deferred initialization for first request
+    @app.before_first_request
+    def initialize_redis_cache_deferred():
+        """Deferred Redis cache connection initialization."""
+        try:
+            init_redis_cache()
+        except Exception as e:
+            app.logger.warning(f"Deferred Redis initialization failed: {e}")
     
     # Add cache status endpoint
     @app.route('/api/cache/status', methods=['GET'])
