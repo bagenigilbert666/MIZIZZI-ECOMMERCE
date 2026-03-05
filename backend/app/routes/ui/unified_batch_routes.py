@@ -32,7 +32,7 @@ from app.utils.redis_cache import (
 
 logger = logging.getLogger(__name__)
 
-ui_batch_routes = Blueprint('ui_batch_routes', __name__, url_prefix='/api')
+ui_batch_routes = Blueprint('ui_batch_routes', __name__, url_prefix='/api/ui')
 
 # Cache configuration with different TTLs for each section
 BATCH_CACHE_CONFIG = {
@@ -361,7 +361,7 @@ def fetch_side_panels():
 # MAIN BATCH ENDPOINT - ULTRA FAST WITH REDIS
 # ============================================================================
 
-@ui_batch_routes.route('/ui/batch', methods=['GET'])
+@ui_batch_routes.route('/batch', methods=['GET'])
 def get_ui_batch():
     """
     GET /api/ui/batch
@@ -718,7 +718,7 @@ def fetch_side_panels():
 # MAIN BATCH ENDPOINT
 # ============================================================================
 
-@ui_batch_routes.route('/ui/batch', methods=['GET'])
+@ui_batch_routes.route('/batch', methods=['GET'])
 def get_ui_batch():
     """
     GET /api/ui/batch
@@ -862,7 +862,7 @@ def get_ui_batch():
 
 
 
-@ui_batch_routes.route('/ui/batch/status', methods=['GET'])
+@ui_batch_routes.route('/batch/status', methods=['GET'])
 def get_ui_batch_status():
     """
     GET /api/ui/batch/status
@@ -1006,7 +1006,7 @@ def get_ui_batch_status():
 # CACHE MANAGEMENT ENDPOINTS
 # ============================================================================
 
-@ui_batch_routes.route('/ui/batch/cache/clear', methods=['POST'])
+@ui_batch_routes.route('/batch/cache/clear', methods=['POST'])
 def clear_batch_cache():
     """
     POST /api/ui/batch/cache/clear
@@ -1043,7 +1043,7 @@ def clear_batch_cache():
         }), 500
 
 
-@ui_batch_routes.route('/ui/batch/cache/stats', methods=['GET'])
+@ui_batch_routes.route('/batch/cache/stats', methods=['GET'])
 def get_cache_stats():
     """
     GET /api/ui/batch/cache/stats
