@@ -194,7 +194,8 @@ def create_app(config_name=None, enable_socketio=True):
     db.init_app(app)
     ma.init_app(app)
     mail.init_app(app)
-    cache.init_app(app)
+    # Skip Flask-Caching init - using custom Upstash Redis instead
+    # cache.init_app(app)  # Disabled: using app.cache.cache_manager directly
     limiter.init_app(app)
 
     # Disable strict slashes to avoid Flask redirecting requests which breaks CORS preflight
@@ -1573,12 +1574,13 @@ def create_app(config_name=None, enable_socketio=True):
                 }), 503
         return None
 
-    # Initialize Redis cache on startup
-    @app.before_first_request
-    def initialize_redis_cache():
-        """Initialize Redis cache connection on first request."""
+    # Initialize Redis cache immediately and on first request
+    def init_redis_cache():
+        """Initialize Redis cache connection."""
         try:
             from app.cache.redis_client import get_redis_client, is_redis_connected
+            from app.cache.cache import cache_manager
+            
             client = get_redis_client()
             if is_redis_connected():
                 app.logger.info("✅ Redis Cache: CONNECTED - Upstash Redis is ready")
@@ -1586,6 +1588,21 @@ def create_app(config_name=None, enable_socketio=True):
                 app.logger.warning("⚠️ Redis Cache: FALLBACK - Using in-memory cache")
         except Exception as e:
             app.logger.warning(f"⚠️ Redis Cache initialization: {e} - Using in-memory cache")
+    
+    # Initialize on startup
+    try:
+        init_redis_cache()
+    except Exception as e:
+        app.logger.warning(f"Deferred Redis initialization (will retry on first request): {e}")
+    
+    # Also set up deferred initialization for first request
+    @app.before_first_request
+    def initialize_redis_cache_deferred():
+        """Deferred Redis cache connection initialization."""
+        try:
+            init_redis_cache()
+        except Exception as e:
+            app.logger.warning(f"Deferred Redis initialization failed: {e}")
     
     # Add cache status endpoint
     @app.route('/api/cache/status', methods=['GET'])
