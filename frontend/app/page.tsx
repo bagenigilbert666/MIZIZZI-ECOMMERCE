@@ -23,40 +23,42 @@ export const revalidate = 60
  */
 
 async function LoadAllContent() {
-  const timeout = <T extends any[] = any>(promise: Promise<T>, ms: number = 3000): Promise<T | []> => {
+  const timeout = <T,>(promise: Promise<T>, ms: number = 3000, fallback: T): Promise<T> => {
     return Promise.race([
-      promise as Promise<T | []>,
-      new Promise<[]>(resolve => setTimeout(() => resolve([]), ms))
-    ]).catch(() => [] as unknown as T)
+      promise,
+      new Promise<T>(resolve => setTimeout(() => resolve(fallback), ms))
+    ]).catch(() => fallback)
   }
 
   try {
     // Fetch both batch endpoints in parallel
-    const uiBatchPromise = getUIBatch().catch(() => ({
+    const uiBatchPromise = getUIBatch()
+    const homepageBatchPromise = getHomepageBatch()
+    
+    const defaultUIBatch = {
       carousel: [],
       topbar: null,
       categories: [],
       sidePanels: null,
       timestamp: Date.now(),
       duration: 0,
-    }))
-
-    const homepageBatchPromise = getHomepageBatch().catch(() => ({
+    }
+    
+    const defaultHomepageBatch = {
       timestamp: new Date().toISOString(),
       total_execution_ms: 0,
       cached: false,
       sections: {},
-    }))
+    }
 
-    // Fetch additional data in parallel
     const [
       uiBatchData,
       homepageBatchData,
       featureCards,
       contactCTASlides,
     ] = await Promise.all([
-      timeout(uiBatchPromise, 3000),
-      timeout(homepageBatchPromise, 3000),
+      timeout(uiBatchPromise, 3000, defaultUIBatch),
+      timeout(homepageBatchPromise, 3000, defaultHomepageBatch),
       getFeatureCards().catch(() => []),
       getContactCTASlides().catch(() => []),
     ])
