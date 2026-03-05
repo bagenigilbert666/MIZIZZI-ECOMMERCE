@@ -14,6 +14,7 @@ import { NewArrivals } from "@/components/features/new-arrivals"
 import { TrendingNow } from "@/components/features/trending-now"
 import { DailyFinds } from "@/components/features/daily-finds"
 import { BrandShowcase } from "@/components/features/brand-showcase"
+import { useCategoriesCache } from "@/hooks/use-categories-cache"
 import type { Product } from "@/types"
 import type { Category } from "@/lib/server/get-categories"
 import type {
@@ -23,8 +24,6 @@ import type {
   FeatureCard,
   ProductShowcaseCategory,
 } from "@/lib/server/get-carousel-data"
-import { useCategoriesCache } from "@/hooks/use-categories-cache"
-
 interface HomeContentProps {
   flashSaleProducts: Product[]
   luxuryProducts: Product[]
@@ -58,7 +57,7 @@ export function HomeContent({
   featureCards = [],
   productShowcase = [],
 }: HomeContentProps) {
-  // Apply 3-layer cache strategy: sessionStorage > localStorage > server data
+  // Use 3-layer caching: sessionStorage → localStorage → server data
   const { categories: cachedCategories } = useCategoriesCache(categories)
   return (
     <>

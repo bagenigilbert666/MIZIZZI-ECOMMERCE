@@ -1,4 +1,5 @@
 import { Suspense } from "react"
+import { getUIBatch } from "@/lib/server/get-ui-batch"
 import { getCarouselItems, getPremiumExperiences, getProductShowcase, getContactCTASlides, getFeatureCards } from "@/lib/server/get-carousel-data"
 import { getCategories } from "@/lib/server/get-categories"
 import { getFlashSaleProducts } from "@/lib/server/get-flash-sale-products"
@@ -13,10 +14,9 @@ import { HomeContent } from "@/components/home/home-content"
 export const revalidate = 60
 
 /**
- * JUMIA-STYLE HOMEPAGE: Render once with all data, no duplicate components
- * Critical data has 3-second timeout for instant LCP with defaults
- * Deferred data loads in parallel with no waterfall delays
- * Single component render eliminates duplicate page layout issues
+ * OPTIMIZED HOMEPAGE: Uses unified batch API for carousel, categories, and side panels
+ * Product data loads in parallel with efficient timeout handling
+ * Single page render with gradual enhancement of UI components
  */
 
 async function LoadAllContent() {
@@ -28,12 +28,19 @@ async function LoadAllContent() {
   }
 
   try {
+    // Fetch UI batch data (carousel, categories, side panels) in a single request
+    const uiBatchPromise = getUIBatch().catch(() => ({
+      carousel: [],
+      topbar: null,
+      categories: [],
+      sidePanels: null,
+      timestamp: Date.now(),
+      duration: 0,
+    }))
+
+    // Fetch product data in parallel with UI batch
     const [
-      categories,
-      carouselItems,
-      premiumExperiences,
-      productShowcase,
-      contactCTASlides,
+      uiBatchData,
       featureCards,
       flashSaleProducts,
       luxuryProducts,
@@ -43,14 +50,11 @@ async function LoadAllContent() {
       dailyFinds,
       allProductsData,
     ] = await Promise.all([
-      // Critical - with timeout for instant page load
-      timeout(getCategories(20), 3000),
-      timeout(getCarouselItems(), 3000),
-      timeout(getPremiumExperiences(), 3000),
-      timeout(getProductShowcase(), 3000),
-      timeout(getContactCTASlides(), 3000),
-      // Deferred - no timeout, load with critical
+      // UI batch data - single request for carousel, categories, side panels
+      timeout(uiBatchPromise, 3000),
+      // Feature cards - from existing source (can be migrated to batch later)
       getFeatureCards().catch(() => []),
+      // All product data fetches in parallel
       getFlashSaleProducts(50).catch(() => []),
       getLuxuryProducts(12).catch(() => []),
       getNewArrivals(20).catch(() => []),
@@ -59,6 +63,25 @@ async function LoadAllContent() {
       getDailyFinds(20).catch(() => []),
       getAllProductsForHome(12).catch(() => ({ products: [], hasMore: false })),
     ])
+
+    // Normalize carousel items from batch response
+    const carouselItems = Array.isArray(uiBatchData?.carousel) 
+      ? uiBatchData.carousel 
+      : []
+
+    // Normalize categories from batch response  
+    const categories = Array.isArray(uiBatchData?.categories) 
+      ? uiBatchData.categories 
+      : []
+
+    // Extract premium experiences and product showcase from side panels
+    const sidePanels = uiBatchData?.sidePanels || {}
+    const premiumExperiences = Array.isArray(sidePanels?.premium) ? sidePanels.premium : []
+    const productShowcase = Array.isArray(sidePanels?.showcase) ? sidePanels.showcase : []
+
+    // Fetch additional carousel data (contact CTA slides) from original source
+    // This can also be migrated to the unified batch API in future
+    const contactCTASlides = await getContactCTASlides().catch(() => [])
 
     return {
       categories: Array.isArray(categories) ? categories : [],

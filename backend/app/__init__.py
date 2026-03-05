@@ -189,19 +189,6 @@ def create_app(config_name=None, enable_socketio=True):
             # leave as-is; init_app will raise a clear error if still absent
             pass
     app.config.setdefault('SQLALCHEMY_TRACK_MODIFICATIONS', False)
-    
-    # Enhanced database connection pool configuration for reliability
-    app.config.setdefault('SQLALCHEMY_ENGINE_OPTIONS', {
-        'pool_size': 10,
-        'pool_recycle': 300,  # Recycle connections after 5 minutes to prevent "server closed the connection" errors
-        'pool_pre_ping': True,  # Test connections before using them
-        'pool_timeout': 10,  # 10 second timeout for acquiring a connection
-        'max_overflow': 20,  # Allow up to 20 overflow connections
-        'connect_args': {
-            'connect_timeout': 10,
-            'application_name': 'mizizzi-ecommerce'
-        }
-    })
 
     # Initialize extensions
     db.init_app(app)
@@ -494,17 +481,12 @@ def create_app(config_name=None, enable_socketio=True):
         'user_brand_routes': Blueprint('user_brand_routes', __name__),
         'admin_brand_routes': Blueprint('admin_brand_routes', __name__),
         'notification_routes': Blueprint('notification_routes', __name__),
-        'carousel_routes': Blueprint('carousel_routes', __name__),
         'theme_routes': Blueprint('theme_routes', __name__),
         'footer_routes': Blueprint('footer_routes', __name__),
-        'side_panel_routes': Blueprint('side_panel_routes', __name__),
-        'topbar_routes': Blueprint('topbar_routes', __name__),
-        'contact_cta_routes': Blueprint('contact_cta_routes', __name__),
-        'featured_routes': Blueprint('featured_routes', __name__),
-        'homepage_batch_routes': Blueprint('homepage_batch_bp', __name__),
+        'homepage_batch_routes': Blueprint('homepage_batch_routes', __name__),
+        'ui_batch_routes': Blueprint('ui_batch_routes', __name__),
         'meilisearch_routes': Blueprint('meilisearch_routes', __name__),
         'admin_meilisearch_routes': Blueprint('admin_meilisearch_routes', __name__),
-        'flash_sale_routes': Blueprint('flash_sale_routes', __name__),
         'admin_settings_routes': Blueprint('admin_settings_routes', __name__),
     }
     
@@ -606,9 +588,9 @@ def create_app(config_name=None, enable_socketio=True):
     def fallback_notification_health():
         return jsonify({"status": "ok", "message": "Fallback notification routes active"}), 200
     
-    @fallback_blueprints['carousel_routes'].route('/health', methods=['GET'])
-    def fallback_carousel_health():
-        return jsonify({"status": "ok", "message": "Fallback carousel routes active"}), 200
+    @fallback_blueprints['homepage_batch_routes'].route('/health', methods=['GET'])
+    def fallback_homepage_batch_health():
+        return jsonify({"status": "ok", "message": "Fallback homepage batch routes active"}), 200
     
     @fallback_blueprints['theme_routes'].route('/health', methods=['GET'])
     def fallback_theme_health():
@@ -618,22 +600,6 @@ def create_app(config_name=None, enable_socketio=True):
     def fallback_footer_health():
         return jsonify({"status": "ok", "message": "Fallback footer routes active"}), 200
     
-    @fallback_blueprints['side_panel_routes'].route('/health', methods=['GET'])
-    def fallback_side_panel_health():
-        return jsonify({"status": "ok", "message": "Fallback side panel routes active"}), 200
-
-    @fallback_blueprints['topbar_routes'].route('/health', methods=['GET'])
-    def fallback_topbar_health():
-        return jsonify({"status": "ok", "message": "Fallback topbar routes active"}), 200
-
-    @fallback_blueprints['contact_cta_routes'].route('/health', methods=['GET'])
-    def fallback_contact_cta_health():
-        return jsonify({"status": "ok", "message": "Fallback contact CTA routes active"}), 200
-
-    @fallback_blueprints['featured_routes'].route('/health', methods=['GET'])
-    def fallback_featured_health():
-        return jsonify({"status": "ok", "message": "Fallback featured routes active"}), 200
-    
     @fallback_blueprints['meilisearch_routes'].route('/health', methods=['GET'])
     def fallback_meilisearch_health():
         return jsonify({"status": "ok", "message": "Fallback Meilisearch routes active"}), 200
@@ -641,14 +607,6 @@ def create_app(config_name=None, enable_socketio=True):
     @fallback_blueprints['admin_meilisearch_routes'].route('/health', methods=['GET'])
     def fallback_admin_meilisearch_health():
         return jsonify({"status": "ok", "message": "Fallback admin Meilisearch routes active"}), 200
-    
-    @fallback_blueprints['flash_sale_routes'].route('/health', methods=['GET'])
-    def fallback_flash_sale_health():
-        return jsonify({"status": "ok", "message": "Fallback flash sale routes active"}), 200
-    
-    @fallback_blueprints['homepage_batch_routes'].route('/homepage/batch', methods=['GET'])
-    def fallback_homepage_batch():
-        return jsonify({"status": "ok", "message": "Fallback homepage batch routes active"}), 200
     
     # Blueprint import paths dictionary
     blueprint_imports = {
@@ -782,11 +740,25 @@ def create_app(config_name=None, enable_socketio=True):
             ('backend.app.routes.notifications.notification_routes', 'notification_routes'),
             ('backend.routes.notifications.notification_routes', 'notification_routes')
         ],
-        'carousel_routes': [
-            ('app.routes.carousel.carousel_routes', 'carousel_routes'),
-            ('routes.carousel.carousel_routes', 'carousel_routes'),
-            ('backend.app.routes.carousel.carousel_routes', 'carousel_routes'),
-            ('backend.routes.carousel.carousel_routes', 'carousel_routes')
+        'homepage_batch_routes': [
+            ('app.routes.products.homepage_batch_routes', 'homepage_batch_routes'),
+            ('routes.products.homepage_batch_routes', 'homepage_batch_routes'),
+            ('app.routes.products.homepage_batch_routes', 'homepage_batch_bp'),
+            ('routes.products.homepage_batch_routes', 'homepage_batch_bp'),
+            ('backend.app.routes.products.homepage_batch_routes', 'homepage_batch_routes'),
+            ('backend.routes.products.homepage_batch_routes', 'homepage_batch_routes')
+        ],
+        'ui_batch_routes': [
+            ('app.routes.ui.unified_batch_routes', 'ui_batch_routes'),
+            ('routes.ui.unified_batch_routes', 'ui_batch_routes'),
+            ('backend.app.routes.ui.unified_batch_routes', 'ui_batch_routes'),
+            ('backend.routes.ui.unified_batch_routes', 'ui_batch_routes')
+        ],
+        'admin_settings_routes': [
+            ('app.routes.admin.admin_settings_routes', 'admin_settings_routes'),
+            ('routes.admin.admin_settings_routes', 'admin_settings_routes'),
+            ('backend.app.routes.admin.admin_settings_routes', 'admin_settings_routes'),
+            ('backend.routes.admin.admin_settings_routes', 'admin_settings_routes')
         ],
         'theme_routes': [
             ('app.routes.theme.theme_routes', 'theme_routes'),
@@ -800,77 +772,17 @@ def create_app(config_name=None, enable_socketio=True):
             ('backend.app.routes.footer.footer_routes', 'footer_routes'),
             ('backend.routes.footer.footer_routes', 'footer_routes')
         ],
-        'side_panel_routes': [
-            ('app.routes.panels.side_panel_routes', 'side_panel_routes'),
-            ('routes.panels.side_panel_routes', 'side_panel_routes'),
-            ('backend.app.routes.panels.side_panel_routes', 'side_panel_routes'),
-            ('backend.routes.panels.side_panel_routes', 'side_panel_routes')
-        ],
-        'topbar_routes': [
-            ('app.routes.topbar.topbar_routes', 'topbar_routes'),
-            ('routes.topbar.topbar_routes', 'topbar_routes'),
-            ('backend.app.routes.topbar.topbar_routes', 'topbar_routes'),
-            ('backend.routes.topbar.topbar_routes', 'topbar_routes')
-        ],
-        'contact_cta_routes': [
-            ('app.routes.contact_cta.contact_cta_routes', 'contact_cta_routes'),
-            ('routes.contact_cta.contact_cta_routes', 'contact_cta_routes'),
-            ('app.routes.content.contact_cta_routes', 'contact_cta_routes'),
-            ('routes.content.contact_cta_routes', 'contact_cta_routes'),
-            ('backend.app.routes.contact_cta.contact_cta_routes', 'contact_cta_routes'),
-            ('backend.routes.contact_cta.contact_cta_routes', 'contact_cta_routes')
-        ],
-        'featured_routes': [
-            ('app.routes.products.featured_routes', 'featured_routes'),
-            ('routes.products.featured_routes', 'featured_routes'),
-            ('app.routes.products.featured_routes', 'featured_bp'),
-            ('routes.products.featured_routes', 'featured_bp'),
-            ('app.routes.products.featured_routes', 'featured'),
-            ('routes.products.featured_routes', 'featured'),
-            ('app.routes.products.featured', 'featured_routes'),
-            ('routes.products.featured', 'featured_routes'),
-            ('app.routes.products.featured', 'featured_bp'),
-            ('routes.products.featured', 'featured_bp'),
-            ('backend.app.routes.products.featured_routes', 'featured_routes'),
-            ('backend.routes.products.featured_routes', 'featured_routes'),
-            ('backend.app.routes.products.featured_routes', 'featured_bp'),
-            ('backend.routes.products.featured_routes', 'featured_bp'),
-        ],
-        'homepage_batch_routes': [
-            ('app.routes.products.homepage_batch_routes', 'homepage_batch_bp'),
-            ('routes.products.homepage_batch_routes', 'homepage_batch_bp'),
-            ('backend.app.routes.products.homepage_batch_routes', 'homepage_batch_bp'),
-            ('backend.routes.products.homepage_batch_routes', 'homepage_batch_bp'),
-        ],
         'meilisearch_routes': [
-            ('app.routes.meilisearch', 'meilisearch_routes'),
-            ('routes.meilisearch', 'meilisearch_routes'),
             ('app.routes.meilisearch.meilisearch_routes', 'meilisearch_routes'),
             ('routes.meilisearch.meilisearch_routes', 'meilisearch_routes'),
-            ('backend.app.routes.meilisearch', 'meilisearch_routes'),
-            ('backend.routes.meilisearch', 'meilisearch_routes'),
+            ('backend.app.routes.meilisearch.meilisearch_routes', 'meilisearch_routes'),
+            ('backend.routes.meilisearch.meilisearch_routes', 'meilisearch_routes')
         ],
         'admin_meilisearch_routes': [
-            ('app.routes.meilisearch', 'admin_meilisearch_routes'),
-            ('routes.meilisearch', 'admin_meilisearch_routes'),
             ('app.routes.meilisearch.meilisearch_routes', 'admin_meilisearch_routes'),
             ('routes.meilisearch.meilisearch_routes', 'admin_meilisearch_routes'),
-            ('backend.app.routes.meilisearch', 'admin_meilisearch_routes'),
-            ('backend.routes.meilisearch', 'admin_meilisearch_routes'),
-        ],
-        'flash_sale_routes': [
-            ('app.routes.flash_sale.flash_sale_routes', 'flash_sale_routes'),
-            ('routes.flash_sale.flash_sale_routes', 'flash_sale_routes'),
-            ('app.routes.flash_sale.flash_sale_routes', 'flash_sale_bp'),
-            ('routes.flash_sale.flash_sale_routes', 'flash_sale_bp'),
-            ('backend.app.routes.flash_sale.flash_sale_routes', 'flash_sale_routes'),
-            ('backend.routes.flash_sale.flash_sale_routes', 'flash_sale_routes'),
-        ],
-        'admin_settings_routes': [
-            ('app.routes.admin.admin_settings_routes', 'admin_settings_routes'),
-            ('routes.admin.admin_settings_routes', 'admin_settings_routes'),
-            ('backend.app.routes.admin.admin_settings_routes', 'admin_settings_routes'),
-            ('backend.routes.admin.admin_settings_routes', 'admin_settings_routes')
+            ('backend.app.routes.meilisearch.meilisearch_routes', 'admin_meilisearch_routes'),
+            ('backend.routes.meilisearch.meilisearch_routes', 'admin_meilisearch_routes')
         ],
     }
     
@@ -1019,21 +931,14 @@ def create_app(config_name=None, enable_socketio=True):
         app.register_blueprint(final_blueprints['admin_products_routes'], url_prefix='/api/admin/products')
         
         app.register_blueprint(final_blueprints['notification_routes'], url_prefix='/api/notifications')
-        app.register_blueprint(final_blueprints['carousel_routes'], url_prefix='/api/carousel')
         app.register_blueprint(final_blueprints['theme_routes'], url_prefix='/api/theme')
         app.register_blueprint(final_blueprints['footer_routes'], url_prefix='/api/footer')
-        app.register_blueprint(final_blueprints['side_panel_routes'], url_prefix='/api/panels')
-        app.register_blueprint(final_blueprints['topbar_routes'], url_prefix='/api/topbar')
-        app.register_blueprint(final_blueprints['contact_cta_routes'], url_prefix='/api/contact-cta')
-        app.register_blueprint(final_blueprints['featured_routes'], url_prefix='/api/products/featured')
         app.register_blueprint(final_blueprints['homepage_batch_routes'], url_prefix='/api')
+        app.register_blueprint(final_blueprints['ui_batch_routes'], url_prefix='/api')
 
         app.register_blueprint(final_blueprints['meilisearch_routes'], url_prefix='/api/meilisearch')
         app.register_blueprint(final_blueprints['admin_meilisearch_routes'], url_prefix='/api/admin/meilisearch')
         app.logger.info("✅ Meilisearch routes registered successfully")
-
-        app.register_blueprint(final_blueprints['flash_sale_routes'], url_prefix='/api/flash-sale')
-        app.logger.info("✅ Flash sale routes registered at /api/flash-sale")
 
         try:
             app.logger.debug("Importing Google Auth routes...")
@@ -1098,18 +1003,12 @@ def create_app(config_name=None, enable_socketio=True):
                 'user_brand_routes': '/api/brands',
                 'admin_brand_routes': '/api/admin/brands',
                 'notification_routes': '/api/notifications',
-                'carousel_routes': '/api/carousel',
                 'google_auth_routes': '/api/auth',
                 'theme_routes': '/api/theme',
                 'footer_routes': '/api/footer',
-                'side_panel_routes': '/api/panels',
-                'topbar_routes': '/api/topbar',
-                'contact_cta_routes': '/api/contact-cta',
-                'featured_routes': '/api/products/featured',
                 'meilisearch_routes': '/api/meilisearch',
                 'admin_meilisearch_routes': '/api/admin/meilisearch',
-                'flash_sale_routes': '/api/flash-sale',
-            }
+                }
             
             for blueprint_name in final_blueprints:
                 if blueprint_name in imported_blueprints:
@@ -1169,9 +1068,7 @@ def create_app(config_name=None, enable_socketio=True):
             app.logger.info("-" * 30)
             app.logger.info("Flash Sale Products: /api/flash-sale/products")
             app.logger.info("Flash Sale Event: /api/flash-sale/event")
-            app.logger.info("Flash Sale Stock: /api/flash-sale/stock/<id>")
-            app.logger.info("Flash Sale Debug: /api/flash-sale/debug")
-            app.logger.info(f"Flash Sale System: {'✅' if 'flash_sale_routes' in imported_blueprints else '⚠️'}")
+
             
             # Product System Endpoints
             app.logger.info("🛍️ PRODUCT SYSTEM ENDPOINTS")
@@ -1228,52 +1125,7 @@ def create_app(config_name=None, enable_socketio=True):
             app.logger.info("User Notifications: /api/notifications")
             app.logger.info(f"Notification System: {'✅' if 'notification_routes' in imported_blueprints else '❌'}")
             
-            # Carousel System Endpoints
-            app.logger.info("🎠 CAROUSEL SYSTEM ENDPOINTS")
-            app.logger.info("-" * 30)
-            app.logger.info("Carousel Items: /api/carousel")
-            app.logger.info(f"Carousel System: {'✅' if 'carousel_routes' in imported_blueprints else '❌'}")
 
-            app.logger.info("🎨 THEME SYSTEM ENDPOINTS")
-            app.logger.info("-" * 30)
-            app.logger.info("Get Active Theme: /api/theme/active")
-            app.logger.info("Admin Get Themes: /api/theme/admin/themes")
-            app.logger.info("Admin Update Theme: /api/theme/admin/themes/<id>")
-            app.logger.info("Admin Apply Preset: /api/theme/admin/apply-preset/<preset_name>")
-            app.logger.info(f"Theme System: {'✅' if 'theme_routes' in imported_blueprints else '⚠️'}")
-
-            app.logger.info("🦶 FOOTER SYSTEM ENDPOINTS")
-            app.logger.info("-" * 30)
-            app.logger.info("Get Footer Settings: /api/footer/settings")
-            app.logger.info("Update Footer Settings: /api/footer/settings")
-            app.logger.info(f"Footer System: {'✅' if 'footer_routes' in imported_blueprints else '⚠️'}")
-
-            app.logger.info("🖼️ SIDE PANEL SYSTEM ENDPOINTS")
-            app.logger.info("-" * 30)
-            app.logger.info("Get Panels: /api/panels/items")
-            app.logger.info("Admin Panels: /api/panels/admin/all")
-            app.logger.info(f"Side Panel System: {'✅' if 'side_panel_routes' in imported_blueprints else '⚠️'}")
-
-            app.logger.info("📢 TOPBAR SYSTEM ENDPOINTS")
-            app.logger.info("-" * 30)
-            app.logger.info("Get TopBar Slides: /api/topbar/slides")
-            app.logger.info("Admin Get Slides: /api/topbar/admin/all")
-            app.logger.info("Admin Create Slide: /api/topbar/admin")
-            app.logger.info("Admin Update Slide: /api/topbar/admin/<id>")
-            app.logger.info(f"TopBar System: {'✅' if 'topbar_routes' in imported_blueprints else '⚠️'}")
-
-            app.logger.info("📞 CONTACT CTA SYSTEM ENDPOINTS")
-            app.logger.info("-" * 30)
-            app.logger.info("Get Contact CTA Slides: /api/contact-cta/slides")
-            app.logger.info("Admin Get CTA Slides: /api/contact-cta/admin/all")
-            app.logger.info("Admin Create CTA Slide: /api/contact-cta/admin")
-            app.logger.info("Admin Update CTA Slide: /api/contact-cta/admin/<id>")
-            app.logger.info(f"Contact CTA System: {'✅' if 'contact_cta_routes' in imported_blueprints else '⚠️'}")
-            
-            app.logger.info("⭐ FEATURED SYSTEM ENDPOINTS")
-            app.logger.info("-" * 30)
-            app.logger.info("Admin Featured Products: /api/products/featured")
-            app.logger.info(f"Featured System: {'✅' if 'featured_routes' in imported_blueprints else '⚠️'}")
             
             # System Status
             app.logger.info("⚙️ SYSTEM STATUS")
@@ -1296,13 +1148,8 @@ def create_app(config_name=None, enable_socketio=True):
             app.logger.info(f"Wishlist System: ✅")
             app.logger.info(f"Brand System: {'✅' if 'user_brand_routes' in imported_blueprints and 'admin_brand_routes' in imported_blueprints else '❌'}")
             app.logger.info(f"Notification System: {'✅' if 'notification_routes' in imported_blueprints else '❌'}")
-            app.logger.info(f"Carousel System: {'✅' if 'carousel_routes' in imported_blueprints else '❌'}")
             app.logger.info(f"Theme System: {'✅' if 'theme_routes' in imported_blueprints else '❌'}")
             app.logger.info(f"Footer System: {'✅' if 'footer_routes' in imported_blueprints else '❌'}")
-            app.logger.info(f"Side Panel System: {'✅' if 'side_panel_routes' in imported_blueprints else '❌'}")
-            app.logger.info(f"Topbar System: {'✅' if 'topbar_routes' in imported_blueprints else '❌'}")
-            app.logger.info(f"Contact CTA System: {'✅' if 'contact_cta_routes' in imported_blueprints else '❌'}")
-            app.logger.info(f"Featured System: {'✅' if 'featured_routes' in imported_blueprints else '❌'}")
             
             # Security Features
             app.logger.info("🔒 SECURITY FEATURES")
@@ -1354,10 +1201,6 @@ def create_app(config_name=None, enable_socketio=True):
             app.logger.info(f"🎠 Carousel: {'Integrated' if 'carousel_routes' in imported_blueprints else 'Fallback'}")
             app.logger.info(f"💻 Google Auth: {'Integrated' if 'google_auth_routes' in imported_blueprints else 'Fallback'}")
             app.logger.info(f"🦶 Footer System: {'Integrated' if 'footer_routes' in imported_blueprints else 'Fallback'}")
-            app.logger.info(f"🖼️ Side Panel System: {'Integrated' if 'side_panel_routes' in imported_blueprints else 'Fallback'}")
-            app.logger.info(f"💡 Topbar System: {'Integrated' if 'topbar_routes' in imported_blueprints else 'Fallback'}")
-            app.logger.info(f"📞 Contact CTA System: {'Integrated' if 'contact_cta_routes' in imported_blueprints else 'Fallback'}")
-            app.logger.info(f"⭐ Featured System: {'Integrated' if 'featured_routes' in imported_blueprints else 'Fallback'}")
             app.logger.info(f"🔍 Meilisearch System: {'Integrated' if ('meilisearch_routes' in imported_blueprints and 'admin_meilisearch_routes' in imported_blueprints) else 'Fallback'}")
         
         log_startup_summary()
@@ -1446,24 +1289,7 @@ def create_app(config_name=None, enable_socketio=True):
                         except ImportError:
                             app.logger.warning("Side panel model not found - side panel system will not be available")
 
-                    try:
-                        from .routes.contact_cta.contact_cta_routes import init_contact_cta_tables
-                        init_contact_cta_tables()
-                        app.logger.info("Contact CTA tables initialized successfully")
-                    except ImportError:
-                        try:
-                            from routes.contact_cta.contact_cta_routes import init_contact_cta_tables
-                            init_contact_cta_tables()
-                            app.logger.info("Contact CTA tables initialized successfully")
-                        except ImportError:
-                            app.logger.warning("Contact CTA tables initialization skipped - module not found")
 
-                    try:
-                        from .routes.products.featured_routes import init_featured_routes_tables
-                        init_featured_routes_tables()
-                        app.logger.info("Featured routes tables initialized successfully")
-                    except ImportError:
-                        app.logger.warning("Featured routes tables initialization skipped - module not found")
                         
                     try:
                         from .routes.meilisearch.meilisearch_routes import init_meilisearch_tables
@@ -1472,13 +1298,6 @@ def create_app(config_name=None, enable_socketio=True):
                     except ImportError:
                         app.logger.warning("Meilisearch tables initialization skipped - module not found")
 
-                    # Initialize flash sale tables
-                    try:
-                        from .routes.flash_sale.flash_sale_routes import init_flash_sale_tables
-                        init_flash_sale_tables()
-                        app.logger.info("Flash sale tables initialized successfully")
-                    except ImportError:
-                        app.logger.warning("Flash sale tables initialization skipped - module not found")
 
                     app.logger.info("Database tables created successfully")
                 except Exception as e:
@@ -1581,12 +1400,8 @@ def create_app(config_name=None, enable_socketio=True):
             "product_system": "active",
             "payment_system": {
                 "pesapal": "active" if 'pesapal_routes' in imported_blueprints else "inactive"
-            },
-            "admin_auth_system": "active" if 'admin_auth_routes' in imported_blueprints else "inactive",
-            "admin_google_auth_system": "active" if 'admin_google_auth_routes' in imported_blueprints else "inactive",
-            "admin_email_system": "active" if 'admin_email_routes' in imported_blueprints else "inactive",
-            "google_auth_system": "active" if 'google_auth_routes' in imported_blueprints else "inactive",
-            "meilisearch_system": {
+        },
+        "meilisearch_system": {
                 "routes": "active" if 'meilisearch_routes' in imported_blueprints else "inactive",
                 "admin_routes": "active" if 'admin_meilisearch_routes' in imported_blueprints else "inactive"
             },
@@ -1622,10 +1437,7 @@ def create_app(config_name=None, enable_socketio=True):
             "featured_system": {
                 "routes": "active" if 'featured_routes' in imported_blueprints else "inactive"
             },
-            # Add flash sale system to health check
-            "flash_sale_system": {
-                "routes": "active" if 'flash_sale_routes' in imported_blueprints else "inactive"
-            },
+
             "security_features": {
                 "token_blacklisting": True,
                 "rate_limiting": True,
