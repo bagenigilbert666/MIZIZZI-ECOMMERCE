@@ -31,6 +31,17 @@ try:
     
     FAST_JSON = USING_ORJSON
     
+    def get_cache_status() -> dict:
+        """Get current cache status and statistics."""
+        stats = _cache_manager.stats
+        return {
+            'connected': _cache_manager.is_connected,
+            'cache_type': 'Upstash Redis' if _cache_manager.is_connected else 'In-Memory',
+            'prefix': 'mizizzi',
+            'stats': stats,
+            'using_orjson': USING_ORJSON
+        }
+    
     # Backwards compatible wrapper class
     class RedisCache:
         """
