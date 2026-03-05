@@ -4,7 +4,7 @@
   "description": "Mizizzi E-commerce Platform",
   "main": "index.js",
   "scripts": {
-    "dev": "next dev --no-turbo",
+    "dev": "next dev",
     "dev:turbo": "next dev --turbo",
     "build": "next build",
     "start": "next start",
