@@ -2,7 +2,7 @@
 Featured product routes for specific sections like Trending, Top Picks, etc.
 PRODUCTION-READY: Configuration-driven, DRY, with unified query/serialization logic.
 """
-from flask import Blueprint, request, current_app, Response
+from flask import Blueprint, request, current_app, Response, jsonify
 from sqlalchemy.orm import load_only
 from datetime import datetime
 import time
@@ -320,16 +320,16 @@ def get_all_featured_cached():
             cache_stats['misses'] += 1
             results[section_name] = {'items': [], 'count': 0, 'from_cache': False}
         
-        return {
+        return jsonify({
             'sections': results,
             'cache_stats': cache_stats,
             'redis_connected': getattr(product_cache, 'is_connected', False),
             'timestamp': datetime.utcnow().isoformat()
-        }, 200
+        }), 200
         
     except Exception as e:
         current_app.logger.error(f"Get all featured error: {str(e)}")
-        return {'error': str(e)}, 500
+        return jsonify({'error': str(e)}), 500
 
 
 @featured_routes.route('/cache/status', methods=['GET'])
@@ -368,11 +368,11 @@ def get_featured_cache_status():
         status['global_stats'] = getattr(product_cache, 'stats', {})
         status['timestamp'] = datetime.utcnow().isoformat()
         
-        return status, 200
+        return jsonify(status), 200
         
     except Exception as e:
         current_app.logger.error(f"Featured cache status error: {str(e)}")
-        return {'error': str(e)}, 500
+        return jsonify({'error': str(e)}), 500
 
 
 # ============================================================================
@@ -384,8 +384,8 @@ def get_featured_cache_status():
 def get_trending_products_fast():
     """FAST: Get trending products with minimal payload."""
     limit = _parse_and_clamp_limit(request.args.get('limit'), max_limit=50, default=20)
-    products = _get_featured_products('trending', limit=limit)
-    return _get_section_handler('trending', format_type='fast', custom_limit=limit)
+    response, status = _get_section_handler('trending', format_type='fast', custom_limit=limit)
+    return jsonify(response), status
 
 
 @featured_routes.route('/fast/flash-sale', methods=['GET'])
@@ -393,7 +393,8 @@ def get_trending_products_fast():
 def get_flash_sale_products_fast():
     """FAST: Get flash sale products with minimal payload."""
     limit = _parse_and_clamp_limit(request.args.get('limit'), max_limit=50, default=20)
-    return _get_section_handler('flash_sale', format_type='fast', custom_limit=limit)
+    response, status = _get_section_handler('flash_sale', format_type='fast', custom_limit=limit)
+    return jsonify(response), status
 
 
 @featured_routes.route('/fast/new-arrivals', methods=['GET'])
@@ -401,7 +402,8 @@ def get_flash_sale_products_fast():
 def get_new_arrivals_fast():
     """FAST: Get new arrivals with minimal payload."""
     limit = _parse_and_clamp_limit(request.args.get('limit'), max_limit=50, default=20)
-    return _get_section_handler('new_arrivals', format_type='fast', custom_limit=limit)
+    response, status = _get_section_handler('new_arrivals', format_type='fast', custom_limit=limit)
+    return jsonify(response), status
 
 
 @featured_routes.route('/fast/top-picks', methods=['GET'])
@@ -409,7 +411,8 @@ def get_new_arrivals_fast():
 def get_top_picks_fast():
     """FAST: Get top picks with minimal payload."""
     limit = _parse_and_clamp_limit(request.args.get('limit'), max_limit=50, default=20)
-    return _get_section_handler('top_picks', format_type='fast', custom_limit=limit)
+    response, status = _get_section_handler('top_picks', format_type='fast', custom_limit=limit)
+    return jsonify(response), status
 
 
 @featured_routes.route('/fast/daily-finds', methods=['GET'])
@@ -417,7 +420,8 @@ def get_top_picks_fast():
 def get_daily_finds_fast():
     """FAST: Get daily finds with minimal payload."""
     limit = _parse_and_clamp_limit(request.args.get('limit'), max_limit=50, default=20)
-    return _get_section_handler('daily_finds', format_type='fast', custom_limit=limit)
+    response, status = _get_section_handler('daily_finds', format_type='fast', custom_limit=limit)
+    return jsonify(response), status
 
 
 @featured_routes.route('/fast/luxury-deals', methods=['GET'])
@@ -425,7 +429,8 @@ def get_daily_finds_fast():
 def get_luxury_deals_fast():
     """FAST: Get luxury deals with minimal payload."""
     limit = _parse_and_clamp_limit(request.args.get('limit'), max_limit=50, default=20)
-    return _get_section_handler('luxury_deals', format_type='fast', custom_limit=limit)
+    response, status = _get_section_handler('luxury_deals', format_type='fast', custom_limit=limit)
+    return jsonify(response), status
 
 
 # ============================================================================
@@ -437,15 +442,17 @@ def get_luxury_deals_fast():
 def get_trending_products():
     """Get trending products."""
     limit = _parse_and_clamp_limit(request.args.get('limit'), max_limit=50, default=20)
-    return _get_section_handler('trending', format_type='normal', custom_limit=limit)
+    response, status = _get_section_handler('trending', format_type='normal', custom_limit=limit)
+    return jsonify(response), status
 
 
 @featured_routes.route('/flash-sale', methods=['GET'])
 @cached_response('featured:flash_sale', ttl=CACHE_TTL.get('featured_flash_sale', 60), key_params=['limit'])
-def get_flash_sale_products():
+def get_flash_sale():
     """Get flash sale products."""
     limit = _parse_and_clamp_limit(request.args.get('limit'), max_limit=50, default=20)
-    return _get_section_handler('flash_sale', format_type='normal', custom_limit=limit)
+    response, status = _get_section_handler('flash_sale', format_type='normal', custom_limit=limit)
+    return jsonify(response), status
 
 
 @featured_routes.route('/new-arrivals', methods=['GET'])
@@ -453,7 +460,8 @@ def get_flash_sale_products():
 def get_new_arrivals():
     """Get new arrivals."""
     limit = _parse_and_clamp_limit(request.args.get('limit'), max_limit=50, default=20)
-    return _get_section_handler('new_arrivals', format_type='normal', custom_limit=limit)
+    response, status = _get_section_handler('new_arrivals', format_type='normal', custom_limit=limit)
+    return jsonify(response), status
 
 
 @featured_routes.route('/top-picks', methods=['GET'])
@@ -461,7 +469,8 @@ def get_new_arrivals():
 def get_top_picks():
     """Get top picks."""
     limit = _parse_and_clamp_limit(request.args.get('limit'), max_limit=50, default=20)
-    return _get_section_handler('top_picks', format_type='normal', custom_limit=limit)
+    response, status = _get_section_handler('top_picks', format_type='normal', custom_limit=limit)
+    return jsonify(response), status
 
 
 @featured_routes.route('/daily-finds', methods=['GET'])
@@ -469,7 +478,8 @@ def get_top_picks():
 def get_daily_finds():
     """Get daily finds."""
     limit = _parse_and_clamp_limit(request.args.get('limit'), max_limit=50, default=20)
-    return _get_section_handler('daily_finds', format_type='normal', custom_limit=limit)
+    response, status = _get_section_handler('daily_finds', format_type='normal', custom_limit=limit)
+    return jsonify(response), status
 
 
 @featured_routes.route('/luxury-deals', methods=['GET'])
@@ -477,4 +487,25 @@ def get_daily_finds():
 def get_luxury_deals():
     """Get luxury deals."""
     limit = _parse_and_clamp_limit(request.args.get('limit'), max_limit=50, default=20)
-    return _get_section_handler('luxury_deals', format_type='normal', custom_limit=limit)
+    response, status = _get_section_handler('luxury_deals', format_type='normal', custom_limit=limit)
+    return jsonify(response), status
+
+
+# ============================================================================
+# INITIALIZATION HELPER
+# ============================================================================
+
+def init_featured_routes_tables():
+    """
+    Initialize featured routes table structures.
+    This is called during app startup to ensure DB is ready.
+    """
+    try:
+        from app.configuration.extensions import db
+        # Ensure all Product-related tables exist
+        db.create_all()
+    except Exception as e:
+        from flask import current_app
+        if current_app:
+            current_app.logger.warning(f"Featured routes table initialization: {str(e)}")
+
