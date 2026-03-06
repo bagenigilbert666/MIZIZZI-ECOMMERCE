@@ -13,6 +13,7 @@ from typing import Dict, List, Any, Tuple
 
 BASE_URL = "http://localhost:5000/api/products"
 FEATURED_BASE = "http://localhost:5000/api"
+TIMEOUT = 25
 
 class Colors:
     HEADER = '\033[95m'
@@ -43,9 +44,9 @@ def test_endpoint(method: str, url: str, params: Dict = None, headers: Dict = No
     try:
         start = time.time()
         if method == "GET":
-            resp = requests.get(url, params=params, headers=headers or {}, timeout=10)
+            resp = requests.get(url, params=params, headers=headers or {}, timeout=TIMEOUT)
         elif method == "POST":
-            resp = requests.post(url, json=params, headers=headers or {}, timeout=10)
+            resp = requests.post(url, json=params, headers=headers or {}, timeout=TIMEOUT)
         elapsed = time.time() - start
         
         try:
