@@ -87,24 +87,46 @@ async function LoadAllContent() {
       getContactCTASlides().catch(() => []),
     ])
 
-    // Normalize carousel items from UI batch response
-    const carouselItems = Array.isArray(uiBatchData?.carousel)
-      ? uiBatchData.carousel
-      : []
-
-    // Normalize categories from UI batch response  
-    const categories = Array.isArray(uiBatchData?.categories)
-      ? uiBatchData.categories
-      : []
+    // Extract data from UI batch - backend returns { sections: { carousel: {...}, categories: {...}, etc } }
+    const uiBatchSections = uiBatchData?.sections || {}
+    
+    // Extract categories from backend response structure
+    // Backend returns: { featured: [...], root: [...], section: 'categories', success: true }
+    const categoriesSection = uiBatchSections?.categories || {}
+    const categoriesData = [
+      ...(Array.isArray(categoriesSection?.featured) ? categoriesSection.featured : []),
+      ...(Array.isArray(categoriesSection?.root) ? categoriesSection.root : [])
+    ]
+    console.log('[v0] Categories extracted from batch:', categoriesData.length, 'featured:', categoriesSection?.featured_count, 'root:', categoriesSection?.root_count)
+    
+    // Extract carousel from backend response
+    // Backend returns: { data: { homepage: [...] }, section: 'carousel', success: true }
+    const carouselSection = uiBatchSections?.carousel || {}
+    const carouselData = Array.isArray(carouselSection?.data?.homepage)
+      ? carouselSection.data.homepage
+      : Array.isArray(carouselSection?.data)
+        ? carouselSection.data
+        : []
+    console.log('[v0] Carousel extracted from batch:', carouselData.length)
+    
+    // Extract side panels from backend response
+    // Backend returns: { data: { product_showcase_left: [...], premium_experience_right: [...], etc }, section: 'side_panels', success: true }
+    const sidePanelsSection = uiBatchSections?.side_panels || {}
+    const sidePanelsData = sidePanelsSection?.data || {}
+    const premiumExperiencesData = [
+      ...(Array.isArray(sidePanelsData?.premium_experience_left) ? sidePanelsData.premium_experience_left : []),
+      ...(Array.isArray(sidePanelsData?.premium_experience_right) ? sidePanelsData.premium_experience_right : [])
+    ]
+    const productShowcaseData = [
+      ...(Array.isArray(sidePanelsData?.product_showcase_left) ? sidePanelsData.product_showcase_left : []),
+      ...(Array.isArray(sidePanelsData?.product_showcase_right) ? sidePanelsData.product_showcase_right : [])
+    ]
+    console.log('[v0] Side panels extracted - premium:', premiumExperiencesData.length, 'showcase:', productShowcaseData.length)
 
     // Extract side panels from UI batch
     const sidePanels = uiBatchData?.sidePanels || {}
     const premiumExperiences = Array.isArray(sidePanels?.premium) ? sidePanels.premium : []
     const productShowcase = Array.isArray(sidePanels?.showcase) ? sidePanels.showcase : []
-
-    // Extract product sections from homepage batch response (use a local any alias
-    // to narrow the union and allow safe property access). We still validate
-    // arrays with Array.isArray to avoid runtime surprises.
     const hb = homepageBatchData as any
     const sections = hb?.sections ?? {}
     const flashSaleProducts = Array.isArray(sections?.flash_sales?.products)
@@ -134,10 +156,10 @@ async function LoadAllContent() {
     })
 
     return {
-      categories: Array.isArray(categories) ? categories : [],
-      carouselItems: Array.isArray(carouselItems) ? carouselItems : [],
-      premiumExperiences: Array.isArray(premiumExperiences) ? premiumExperiences : [],
-      productShowcase: Array.isArray(productShowcase) ? productShowcase : [],
+      categories: categoriesData,
+      carouselItems: carouselData,
+      premiumExperiences: premiumExperiencesData,
+      productShowcase: productShowcaseData,
       contactCTASlides: Array.isArray(contactCTASlides) ? contactCTASlides : [],
       featureCards: Array.isArray(featureCards) ? featureCards : [],
       flashSaleProducts: Array.isArray(flashSaleProducts) ? flashSaleProducts : [],
