@@ -110,7 +110,7 @@ except ImportError as e:
 
 
 def init_carousel_tables():
-    """Initialize carousel tables if they don't exist."""
+    """Initialize carousel tables if they don't exist - DEPRECATED, use ensure_carousel_tables()."""
     if db is None:
         logger.warning("Database not available for carousel table initialization")
         return
@@ -188,29 +188,54 @@ def seed_default_carousels():
 
 # Track initialization state
 _tables_initialized = False
+_initialization_attempts = 0
+_max_initialization_attempts = 3
 
 def ensure_carousel_tables():
     """Ensure carousel tables are initialized (called within app context)."""
-    global _tables_initialized
+    global _tables_initialized, _initialization_attempts
     
-    if _tables_initialized or db is None:
+    # If already initialized successfully, skip
+    if _tables_initialized:
         return
     
+    # Prevent infinite retry loops
+    if _initialization_attempts >= _max_initialization_attempts:
+        logger.warning(f"Carousel initialization max attempts ({_max_initialization_attempts}) reached")
+        return
+    
+    if db is None:
+        logger.error("Database is not available for carousel table initialization")
+        _initialization_attempts += 1
+        return
+    
+    _initialization_attempts += 1
+    
     try:
+        logger.info(f"Attempting to initialize carousel tables (attempt {_initialization_attempts}/{_max_initialization_attempts})...")
+        
         # Create all tables defined in models
         db.create_all()
         logger.info("✅ Carousel tables initialized successfully")
         
         # Seed with default data if table is empty
         if CAROUSEL_AVAILABLE and CarouselBanner is not None:
-            existing_count = CarouselBanner.query.count()
-            if existing_count == 0:
-                logger.info("Database is empty, seeding with default carousel data...")
-                seed_default_carousels()
+            try:
+                existing_count = CarouselBanner.query.count()
+                logger.info(f"Found {existing_count} existing carousel banners")
+                
+                if existing_count == 0:
+                    logger.info("Database is empty, seeding with default carousel data...")
+                    seed_default_carousels()
+            except Exception as e:
+                logger.error(f"Error checking carousel count or seeding: {str(e)}")
         
         _tables_initialized = True
+        logger.info("✅ Carousel system fully initialized")
     except Exception as e:
         logger.error(f"❌ Error initializing carousel tables: {str(e)}")
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}")
 
 # ============================================================================
 # PUBLIC ROUTES - Get carousel items for display (OPTIMIZED with Redis)

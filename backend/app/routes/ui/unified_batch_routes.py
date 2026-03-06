@@ -75,22 +75,34 @@ def fetch_carousel():
     cached_data, was_cached = try_get_cached_section(section_name)
     if was_cached:
         PERF_METRICS['cache_hits'] += 1
+        logger.info(f"[v0] Returning cached carousel data")
         return cached_data
     
     try:
         from app.models.carousel_model import CarouselBanner
+        from app.routes.carousel.carousel_routes import ensure_carousel_tables
+        
+        # Ensure tables are initialized
+        ensure_carousel_tables()
+        logger.info(f"[v0] Tables ensured, now fetching carousel data")
         
         carousel_data = {}
         for position in ['homepage', 'category_page', 'flash_sales', 'luxury_deals']:
             items = CarouselBanner.query.filter_by(position=position, is_active=True).order_by(CarouselBanner.sort_order).limit(5).all()
             carousel_data[position] = [{'id': item.id, 'name': item.name, 'title': item.title, 'description': item.description, 'badge_text': item.badge_text, 'discount': item.discount, 'button_text': item.button_text, 'link_url': item.link_url, 'image_url': item.image_url, 'sort_order': item.sort_order} for item in items]
+            logger.info(f"[v0] Carousel {position}: {len(carousel_data[position])} items")
         
-        result = {'section': section_name, 'data': carousel_data, 'count': sum(len(items) for items in carousel_data.values()), 'success': True}
+        total_count = sum(len(items) for items in carousel_data.values())
+        logger.info(f"[v0] Total carousel items fetched: {total_count}")
+        
+        result = {'section': section_name, 'data': carousel_data, 'count': total_count, 'success': True}
         try_cache_section(section_name, result)
         PERF_METRICS['cache_misses'] += 1
         return result
     except Exception as e:
-        logger.error(f"Error fetching {section_name}: {str(e)}")
+        logger.error(f"[v0] Error fetching {section_name}: {str(e)}")
+        import traceback
+        logger.error(f"[v0] Traceback: {traceback.format_exc()}")
         PERF_METRICS['cache_misses'] += 1
         return {'section': section_name, 'data': {}, 'error': str(e), 'success': False}
 
@@ -191,6 +203,7 @@ def get_ui_batch():
             cached_data = product_cache.get(cache_key)
             if cached_data:
                 execution_time = time.time() - start_time
+                # Ensure proper format in cached data
                 cached_data['cached'] = True
                 cached_data['total_execution_ms'] = round(execution_time * 1000, 2)
                 PERF_METRICS['cache_hits'] += 1
@@ -223,11 +236,43 @@ def get_ui_batch():
                     results[section] = {'success': False, 'error': str(e), 'section': section}
         
         execution_time = time.time() - start_time
+        
+        # Transform results to flat structure expected by frontend
+        # Frontend expects: { carousel: [...], categories: [...], sidePanels: {...}, ... }
+        transformed_results = {}
+        
+        for section_name, section_data in results.items():
+            if section_data.get('success'):
+                if section_name == 'carousel':
+                    # Extract carousel array from data.homepage
+                    carousel_data = section_data.get('data', {})
+                    # Get all carousel items from different positions
+                    all_items = []
+                    if isinstance(carousel_data, dict):
+                        for position, items in carousel_data.items():
+                            if isinstance(items, list):
+                                all_items.extend(items)
+                    transformed_results['carousel'] = all_items
+                elif section_name == 'topbar':
+                    transformed_results['topbar'] = section_data.get('data', [])
+                elif section_name == 'categories':
+                    transformed_results['categories'] = section_data.get('data', [])
+                elif section_name == 'side_panels':
+                    # Keep side_panels as nested structure
+                    transformed_results['sidePanels'] = section_data.get('data', {})
+            else:
+                # Handle error cases
+                transformed_results[section_name] = [] if section_name != 'side_panels' else {}
+        
         response_data = {
             'timestamp': datetime.utcnow().isoformat() + 'Z',
             'total_execution_ms': round(execution_time * 1000, 2),
             'cached': False,
-            'sections': results,
+            'carousel': transformed_results.get('carousel', []),
+            'topbar': transformed_results.get('topbar'),
+            'categories': transformed_results.get('categories', []),
+            'sidePanels': transformed_results.get('sidePanels', {}),
+            'sections': results,  # Keep original nested structure for debugging
             'meta': {'sections_fetched': len(results), 'parallel_execution': True}
         }
         
