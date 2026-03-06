@@ -152,55 +152,21 @@ export const getUIBatch = cache(
       const executionTime = rawData.total_execution_ms || 0
       console.log('[v0] getUIBatch: Successfully fetched batch data in', executionTime.toFixed(2), 'ms (Cached:', rawData.cached, ')')
 
-      // Extract data from nested sections structure that backend returns
-      // Backend response: { sections: { carousel: {...}, categories: {...}, side_panels: {...}, topbar: {...} }, timestamp, total_execution_ms, cached }
-      const sections = rawData.sections || {}
-      
-      // Extract carousel from sections.carousel.data.homepage or sections.carousel.data
-      const carouselSection = sections.carousel || {}
-      const carouselData = Array.isArray(carouselSection?.data?.homepage)
-        ? carouselSection.data.homepage
-        : Array.isArray(carouselSection?.data)
-          ? carouselSection.data
-          : Array.isArray(carouselSection?.carousel)
-            ? carouselSection.carousel
-            : []
-      
-      // Extract categories from sections.categories.featured and sections.categories.root
-      const categoriesSection = sections.categories || {}
-      const categoriesData = [
-        ...(Array.isArray(categoriesSection?.featured) ? categoriesSection.featured : []),
-        ...(Array.isArray(categoriesSection?.root) ? categoriesSection.root : [])
-      ]
-      
-      // Extract topbar
-      const topbarSection = sections.topbar || {}
-      const topbarData = Array.isArray(topbarSection?.data) ? topbarSection.data : null
-      
-      // Extract side panels from sections.side_panels
-      const sidePanelsSection = sections.side_panels || {}
-      const sidePanelsData = sidePanelsSection?.data || {}
-      const sidePanelsFormatted = {
-        premium: Array.isArray(sidePanelsData?.premium_experience_left) 
-          ? sidePanelsData.premium_experience_left 
-          : Array.isArray(sidePanelsData?.premium_experience_right)
-            ? sidePanelsData.premium_experience_right
-            : [],
-        showcase: Array.isArray(sidePanelsData?.product_showcase_left)
-          ? sidePanelsData.product_showcase_left
-          : Array.isArray(sidePanelsData?.product_showcase_right)
-            ? sidePanelsData.product_showcase_right
-            : []
-      }
+      // Backend returns FLAT structure: { carousel: [...], categories: [...], sidePanels: {...}, topbar: null, ... }
+      // NOT nested under sections
+      const carouselData = Array.isArray(rawData?.carousel) ? rawData.carousel : []
+      const categoriesData = Array.isArray(rawData?.categories) ? rawData.categories : []
+      const topbarData = Array.isArray(rawData?.topbar) ? rawData.topbar : null
+      const sidePanelsData = rawData?.sidePanels || null
 
-      console.log('[v0] Extracted from backend:', { carouselCount: carouselData.length, categoriesCount: categoriesData.length, sidePanelsCount: Object.values(sidePanelsFormatted).flat().length })
+      console.log('[v0] Extracted from backend - carousel:', carouselData.length, 'categories:', categoriesData.length, 'sidePanels:', sidePanelsData ? 'present' : 'null')
 
       // Normalize and validate response data
       return {
         carousel: carouselData.length > 0 ? carouselData : DEFAULT_UI_BATCH.carousel,
         topbar: topbarData,
-        categories: categoriesData.length > 0 ? categoriesData : [],
-        sidePanels: (sidePanelsFormatted.premium.length > 0 || sidePanelsFormatted.showcase.length > 0) ? sidePanelsFormatted : null,
+        categories: categoriesData,
+        sidePanels: sidePanelsData,
         timestamp: rawData.timestamp ? new Date(rawData.timestamp).getTime() : Date.now(),
         duration: executionTime,
         cached: rawData.cached || false,
