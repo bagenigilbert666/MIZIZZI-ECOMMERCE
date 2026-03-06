@@ -153,13 +153,10 @@ export const getUIBatch = cache(
       console.log('[v0] getUIBatch: Successfully fetched batch data in', executionTime.toFixed(2), 'ms (Cached:', rawData.cached, ')')
 
       // Backend returns FLAT structure: { carousel: [...], categories: [...], sidePanels: {...}, topbar: null, ... }
-      // NOT nested under sections
       const carouselData = Array.isArray(rawData?.carousel) ? rawData.carousel : []
       const categoriesData = Array.isArray(rawData?.categories) ? rawData.categories : []
       const topbarData = Array.isArray(rawData?.topbar) ? rawData.topbar : null
       const sidePanelsData = rawData?.sidePanels || null
-
-      console.log('[v0] Extracted from backend - carousel:', carouselData.length, 'categories:', categoriesData.length, 'sidePanels:', sidePanelsData ? 'present' : 'null')
 
       // Normalize and validate response data
       return {

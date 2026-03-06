@@ -88,17 +88,12 @@ async function LoadAllContent() {
     ])
 
     // Extract data from UI batch - backend returns FLAT structure: { carousel: [...], categories: [...], sidePanels: {...}, ... }
-    // NOT nested under sections like we expected
     const carouselData = Array.isArray(uiBatchData?.carousel) ? uiBatchData.carousel : []
     const categoriesData = Array.isArray(uiBatchData?.categories) ? uiBatchData.categories : []
     const sidePanelsData = uiBatchData?.sidePanels || {}
     
     const premiumExperiencesData = Array.isArray(sidePanelsData?.premium) ? sidePanelsData.premium : []
     const productShowcaseData = Array.isArray(sidePanelsData?.showcase) ? sidePanelsData.showcase : []
-
-    console.log('[v0] Carousel extracted:', carouselData.length)
-    console.log('[v0] Categories extracted:', categoriesData.length)
-    console.log('[v0] Premium experiences:', premiumExperiencesData.length, 'Product showcase:', productShowcaseData.length)
 
     // Extract product sections from homepage batch
     const hb = homepageBatchData as any
