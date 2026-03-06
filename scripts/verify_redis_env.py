@@ -5,15 +5,16 @@ from pathlib import Path
 
 print("Checking Redis .env configuration...\n")
 
-# Find .env
-backend_dir = Path(__file__).parent.parent / 'backend'
+# Find .env (script lives in <project>/backend/scripts)
+# parent.parent -> <project>/backend, so don't append another 'backend'
+backend_dir = Path(__file__).parent.parent
 env_file = backend_dir / '.env'
 
 if not env_file.exists():
-    print(f"✗ .env not found at {env_file}")
+    print(f"✗ .env not found at {env_file.resolve()}")
     exit(1)
 
-print(f"✓ Found .env at {env_file}")
+print(f"✓ Found .env at {env_file.resolve()}")
 
 # Read and check variables
 with open(env_file) as f:
@@ -29,7 +30,7 @@ if url_in_file and token_in_file:
     print("\n✓ .env looks good! Variables are present.")
     print("\nTo use these in Python:")
     print("  from dotenv import load_dotenv")
-    print("  load_dotenv('backend/.env')")
+    print(f"  load_dotenv('{env_file.resolve()}')")
 else:
     print("\n✗ Missing one or both variables in .env")
     exit(1)
