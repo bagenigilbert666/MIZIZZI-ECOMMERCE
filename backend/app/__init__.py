@@ -242,7 +242,7 @@ def create_app(config_name=None, enable_socketio=True):
         supports_credentials=True,
         allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Cache-Control", "cache-control", "Pragma", "Expires", "X-MFA-Token", "Accept", "Origin"],
         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-        expose_headers=["Content-Range", "X-Content-Range"],
+        expose_headers=["Content-Range", "X-Content-Range", "X-Cache", "X-Cache-Time-Ms", "X-Response-Time-Ms", "X-Products-Cached", "X-All-Products-Cache"],
         send_wildcard=False,
         vary_header=True
     )
