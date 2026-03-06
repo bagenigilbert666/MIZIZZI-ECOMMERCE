@@ -186,10 +186,31 @@ def seed_default_carousels():
         db.session.rollback()
 
 
-# ============================================================================
-# Initialize carousel tables on first import
-# ============================================================================
-init_carousel_tables()
+# Track initialization state
+_tables_initialized = False
+
+def ensure_carousel_tables():
+    """Ensure carousel tables are initialized (called within app context)."""
+    global _tables_initialized
+    
+    if _tables_initialized or db is None:
+        return
+    
+    try:
+        # Create all tables defined in models
+        db.create_all()
+        logger.info("✅ Carousel tables initialized successfully")
+        
+        # Seed with default data if table is empty
+        if CAROUSEL_AVAILABLE and CarouselBanner is not None:
+            existing_count = CarouselBanner.query.count()
+            if existing_count == 0:
+                logger.info("Database is empty, seeding with default carousel data...")
+                seed_default_carousels()
+        
+        _tables_initialized = True
+    except Exception as e:
+        logger.error(f"❌ Error initializing carousel tables: {str(e)}")
 
 # ============================================================================
 # PUBLIC ROUTES - Get carousel items for display (OPTIMIZED with Redis)
@@ -204,6 +225,9 @@ def get_carousel_items():
     Query params: position (homepage, category_page, flash_sales, luxury_deals), limit (max items to return)
     """
     try:
+        # Ensure tables are initialized on first request
+        ensure_carousel_tables()
+        
         position = request.args.get('position', 'homepage')
         limit = request.args.get('limit', 5, type=int)
         
@@ -303,6 +327,8 @@ def get_carousel_item(item_id):
 def get_all_carousel_items():
     """Get all carousel items for a specific position (admin)."""
     try:
+        # Ensure tables are initialized on first request
+        ensure_carousel_tables()
         position = request.args.get('position', 'homepage')
         
         if not CAROUSEL_AVAILABLE or CarouselBanner is None:
