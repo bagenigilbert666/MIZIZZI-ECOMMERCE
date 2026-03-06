@@ -63,8 +63,7 @@ async function LoadAllContent() {
       getContactCTASlides().catch(() => []),
     ])
 
-    console.log('[v0] UI Batch Response sections:', Object.keys(uiBatchSections))
-    console.log('[v0] Homepage Batch Response sections:', Object.keys(homepageBatchData?.sections || {}))
+    console.log('[v0] UI Batch received - sections:', Object.keys(uiBatchSections), 'Categories count:', categories.length)
 
     // Extract data from UI batch sections (backend returns nested structure)
     const uiBatchSections = uiBatchData?.sections || {}
@@ -89,21 +88,24 @@ async function LoadAllContent() {
 
     console.log('[v0] Carousel items extracted:', carouselItems.length, carouselItems)
 
-    // Normalize categories from UI batch response - backend returns in sections.categories.data
-    const categoriesData = Array.isArray(categoriesSection?.data) 
-      ? categoriesSection.data 
-      : []
+    // Normalize categories from UI batch response - backend returns featured and root categories
+    // The categories section has structure: { featured: [...], root: [...], featured_count, root_count }
+    const allCategoriesFromBatch = [
+      ...(Array.isArray(categoriesSection?.featured) ? categoriesSection.featured : []),
+      ...(Array.isArray(categoriesSection?.root) ? categoriesSection.root : [])
+    ]
     
-    // Transform categories to include image field if available
-    const categories = categoriesData.map((cat: any) => ({
+    // Transform categories to include required fields for rendering
+    const categories = allCategoriesFromBatch.map((cat: any) => ({
       id: cat.id,
       name: cat.name,
       slug: cat.slug,
-      image: cat.image || cat.category_image,
-      product_count: cat.product_count || 0,
+      image: cat.image_url, // Backend sends image_url
+      product_count: cat.products_count || cat.product_count || 0,
+      description: cat.description || '',
     }))
 
-    console.log('[v0] Categories extracted:', categories.length, categories)
+    console.log('[v0] Categories extracted from featured+root:', categories.length, 'Featured:', categoriesSection?.featured_count, 'Root:', categoriesSection?.root_count)
 
     // Extract side panels from UI batch - backend returns in sections.side_panels.data
     const sidePanelsData = sidePanelsSection?.data || {}
