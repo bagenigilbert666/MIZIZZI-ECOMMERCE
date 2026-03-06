@@ -57,14 +57,6 @@ export function HomeContent({
   featureCards = [],
   productShowcase = [],
 }: HomeContentProps) {
-  console.log('[v0] HomeContent props:', {
-    carouselItems: carouselItems.length,
-    categories: categories.length,
-    premiumExperiences: premiumExperiences.length,
-    productShowcase: productShowcase.length,
-    flashSaleProducts: flashSaleProducts.length,
-  })
-  
   // Use 3-layer caching: sessionStorage → localStorage → server data
   const { categories: cachedCategories } = useCategoriesCache(categories)
   return (
