@@ -4,7 +4,7 @@ from datetime import datetime
 
 # Upstash Redis credentials
 REDIS_URL = "https://nearby-rabbit-63956.upstash.io"
-REDIS_TOKEN = "AfnUAAIncDI4NmVmOGJhM2I1OTU0NWE0OTAwYmVkNzYzZWU4ZTIyMHAyNjM5NTYNow"
+REDIS_TOKEN = "AfnUAAIncDI4NmVmOGJhM2I1OTU0NWE0OTAwYmVkNzYzZWU4ZTIyMHAyNjM5NTY"
 
 def send_redis_command(command):
     """Send a command to Redis REST API"""
