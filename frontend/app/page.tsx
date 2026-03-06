@@ -124,6 +124,14 @@ async function LoadAllContent() {
     const trendingProducts = transformProducts(sections?.trending?.products || [])
     const dailyFinds = transformProducts(sections?.daily_finds?.products || [])
 
+    console.log('[v0] LoadAllContent extracted data:', {
+      carousel: carouselData.length,
+      categories: categoriesData.length,
+      premiumExperiences: premiumExperiencesData.length,
+      productShowcase: productShowcaseData.length,
+      flashSale: flashSaleProducts.length,
+    })
+
     return {
       categories: categoriesData,
       carouselItems: carouselData,
