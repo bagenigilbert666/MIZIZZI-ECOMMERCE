@@ -489,6 +489,7 @@ def create_app(config_name=None, enable_socketio=True):
         'meilisearch_routes': Blueprint('meilisearch_routes', __name__),
         'admin_meilisearch_routes': Blueprint('admin_meilisearch_routes', __name__),
         'admin_settings_routes': Blueprint('admin_settings_routes', __name__),
+        'carousel_routes': Blueprint('carousel_routes', __name__),
     }
     
     # Add basic routes to fallback blueprints
@@ -608,6 +609,10 @@ def create_app(config_name=None, enable_socketio=True):
     @fallback_blueprints['admin_meilisearch_routes'].route('/health', methods=['GET'])
     def fallback_admin_meilisearch_health():
         return jsonify({"status": "ok", "message": "Fallback admin Meilisearch routes active"}), 200
+    
+    @fallback_blueprints['carousel_routes'].route('/health', methods=['GET'])
+    def fallback_carousel_health():
+        return jsonify({"status": "ok", "message": "Fallback carousel routes active"}), 200
     
     # Blueprint import paths dictionary
     blueprint_imports = {
@@ -785,6 +790,12 @@ def create_app(config_name=None, enable_socketio=True):
             ('backend.app.routes.meilisearch.meilisearch_routes', 'admin_meilisearch_routes'),
             ('backend.routes.meilisearch.meilisearch_routes', 'admin_meilisearch_routes')
         ],
+        'carousel_routes': [
+            ('app.routes.carousel.carousel_routes', 'carousel_routes'),
+            ('routes.carousel.carousel_routes', 'carousel_routes'),
+            ('backend.app.routes.carousel.carousel_routes', 'carousel_routes'),
+            ('backend.routes.carousel.carousel_routes', 'carousel_routes')
+        ],
     }
     
     # Import blueprints with clean logging
@@ -940,6 +951,9 @@ def create_app(config_name=None, enable_socketio=True):
         app.register_blueprint(final_blueprints['meilisearch_routes'], url_prefix='/api/meilisearch')
         app.register_blueprint(final_blueprints['admin_meilisearch_routes'], url_prefix='/api/admin/meilisearch')
         app.logger.info("✅ Meilisearch routes registered successfully")
+        
+        app.register_blueprint(final_blueprints['carousel_routes'], url_prefix='/api/carousel')
+        app.logger.info("✅ Carousel routes registered successfully")
 
         try:
             app.logger.debug("Importing Google Auth routes...")
@@ -1009,6 +1023,7 @@ def create_app(config_name=None, enable_socketio=True):
                 'footer_routes': '/api/footer',
                 'meilisearch_routes': '/api/meilisearch',
                 'admin_meilisearch_routes': '/api/admin/meilisearch',
+                'carousel_routes': '/api/carousel',
                 }
             
             for blueprint_name in final_blueprints:
@@ -1131,7 +1146,7 @@ def create_app(config_name=None, enable_socketio=True):
             # System Status
             app.logger.info("⚙️ SYSTEM STATUS")
             app.logger.info("-" * 15)
-            app.logger.info(f"Database: {'✅' if db else '❌'}")
+            app.logger.info(f"Database: {'���' if db else '❌'}")
             app.logger.info(f"SocketIO: {'✅' if enable_socketio else '❌'}")
             app.logger.info(f"JWT: ✅")
             app.logger.info(f"CORS: ✅")
