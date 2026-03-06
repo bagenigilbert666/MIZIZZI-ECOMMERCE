@@ -152,46 +152,62 @@ export const getUIBatch = cache(
       const executionTime = rawData.total_execution_ms || 0
       console.log('[v0] getUIBatch: Successfully fetched batch data in', executionTime.toFixed(2), 'ms (Cached:', rawData.cached, ')')
 
-      // Backend returns: { sections: { carousel: {...}, categories: {...}, side_panels: {...}, topbar: {...} }, ...metadata }
-      const sections = rawData?.sections || {}
+      // Handle BOTH flat and nested response structures
+      // Flat: { carousel: [...], categories: [...], sidePanels: {...}, ... }
+      // Nested: { sections: { carousel: {...}, categories: {...}, ... }, ...metadata }
       
-      // Extract each section from the nested structure
-      const carouselSection = sections.carousel || {}
-      const categoriesSection = sections.categories || {}
-      const sidePanelsSection = sections.side_panels || {}
-      const topbarSection = sections.topbar || {}
+      let carouselData: CarouselItem[] = []
+      let categoriesData: Category[] = []
+      let topbarData: TopbarItem[] | null = null
+      let sidePanelsFormatted: { premium: PanelItem[], showcase: PanelItem[] } = { premium: [], showcase: [] }
       
-      // Get carousel data - it's in carousel.data.homepage or carousel.data
-      const carouselData = Array.isArray(carouselSection?.data?.homepage)
-        ? carouselSection.data.homepage
-        : Array.isArray(carouselSection?.data)
-          ? carouselSection.data
-          : Array.isArray(carouselSection?.carousel)
-            ? carouselSection.carousel
-            : []
-      
-      // Get categories data - combine featured and root categories
-      const categoriesData = [
-        ...(Array.isArray(categoriesSection?.featured) ? categoriesSection.featured : []),
-        ...(Array.isArray(categoriesSection?.root) ? categoriesSection.root : [])
-      ]
-      
-      // Get topbar data
-      const topbarData = Array.isArray(topbarSection?.data) ? topbarSection.data : null
-      
-      // Get side panels data - extract premium and showcase
-      const sidePanelsData = sidePanelsSection?.data || {}
-      const sidePanelsFormatted = {
-        premium: Array.isArray(sidePanelsData?.premium_experience_left)
-          ? sidePanelsData.premium_experience_left
-          : Array.isArray(sidePanelsData?.premium_experience_right)
-            ? sidePanelsData.premium_experience_right
-            : [],
-        showcase: Array.isArray(sidePanelsData?.product_showcase_left)
-          ? sidePanelsData.product_showcase_left
-          : Array.isArray(sidePanelsData?.product_showcase_right)
-            ? sidePanelsData.product_showcase_right
-            : []
+      // Check if response is flat structure
+      if (Array.isArray(rawData?.carousel) || Array.isArray(rawData?.categories)) {
+        // Response is FLAT - data is at top level
+        carouselData = Array.isArray(rawData?.carousel) ? rawData.carousel : []
+        categoriesData = Array.isArray(rawData?.categories) ? rawData.categories : []
+        topbarData = Array.isArray(rawData?.topbar) ? rawData.topbar : null
+        const sidePanelsData = rawData?.sidePanels || {}
+        sidePanelsFormatted = {
+          premium: Array.isArray(sidePanelsData?.premium) ? sidePanelsData.premium : [],
+          showcase: Array.isArray(sidePanelsData?.showcase) ? sidePanelsData.showcase : []
+        }
+      } else {
+        // Response is NESTED - data is under sections
+        const sections = rawData?.sections || {}
+        
+        const carouselSection = sections.carousel || {}
+        carouselData = Array.isArray(carouselSection?.data?.homepage)
+          ? carouselSection.data.homepage
+          : Array.isArray(carouselSection?.data)
+            ? carouselSection.data
+            : Array.isArray(carouselSection?.carousel)
+              ? carouselSection.carousel
+              : []
+        
+        const categoriesSection = sections.categories || {}
+        categoriesData = [
+          ...(Array.isArray(categoriesSection?.featured) ? categoriesSection.featured : []),
+          ...(Array.isArray(categoriesSection?.root) ? categoriesSection.root : [])
+        ]
+        
+        const topbarSection = sections.topbar || {}
+        topbarData = Array.isArray(topbarSection?.data) ? topbarSection.data : null
+        
+        const sidePanelsSection = sections.side_panels || {}
+        const sidePanelsData = sidePanelsSection?.data || {}
+        sidePanelsFormatted = {
+          premium: Array.isArray(sidePanelsData?.premium_experience_left)
+            ? sidePanelsData.premium_experience_left
+            : Array.isArray(sidePanelsData?.premium_experience_right)
+              ? sidePanelsData.premium_experience_right
+              : [],
+          showcase: Array.isArray(sidePanelsData?.product_showcase_left)
+            ? sidePanelsData.product_showcase_left
+            : Array.isArray(sidePanelsData?.product_showcase_right)
+              ? sidePanelsData.product_showcase_right
+              : []
+        }
       }
 
       console.log('[v0] UI Batch extracted - carousel:', carouselData.length, 'categories:', categoriesData.length, 'sidePanels:', Object.values(sidePanelsFormatted).flat().length)
