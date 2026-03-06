@@ -45,17 +45,20 @@ from .cache_keys import (
     CACHE_TTL
 )
 
+# Import cache utilities for shared list logic
+from .cache_utils import (
+    normalize_bool_param,
+    extract_filter_params,
+    build_cache_key_for_filters,
+    apply_product_filters,
+    build_pagination_response,
+    safe_cache_get,
+    safe_cache_set
+)
+from app.validations.validation import admin_required
+
 # Create blueprint for user-facing product routes
 products_routes = Blueprint('products_routes', __name__, url_prefix='/api/products')
-
-# Cache warming configuration
-CACHE_CONFIG = {
-    'products_list_ttl': 300,      # 5 minutes for product lists
-    'single_product_ttl': 600,     # 10 minutes for single products
-    'featured_ttl': 180,           # 3 minutes for featured sections
-    'search_ttl': 120,             # 2 minutes for search results
-    'all_products_ttl': 600,       # 10 minutes for all products cache
-}
 
 # Cache warming state
 _cache_warming_state = {
@@ -147,7 +150,6 @@ def cache_status():
             **stats,
             'fast_json': True,
         },
-        'config': CACHE_CONFIG,
         'warming': {
             'last_warmed': _cache_warming_state['last_warmed'],
             'is_warming': _cache_warming_state['is_warming'],
@@ -160,11 +162,9 @@ def cache_status():
 
 
 @products_routes.route('/cache/invalidate', methods=['POST'])
+@admin_required
 def invalidate_cache():
     """Invalidate all product caches (admin only)."""
-    if not is_admin_user():
-        return jsonify({'error': 'Admin access required'}), 403
-
     try:
         total_cleared = product_cache.invalidate_all_products() if product_cache and hasattr(product_cache, 'invalidate_all_products') else 0
     except Exception:
@@ -178,14 +178,13 @@ def invalidate_cache():
 
 
 @products_routes.route('/cache/warm', methods=['POST'])
-def warm_cache():
+@admin_required
+def warm_cache_endpoint():
     """
-    Warm the cache by pre-loading all products.
+    Trigger background cache warming for all featured products.
+    This is an admin-only operation.
     This dramatically improves cache hit rates.
     """
-    if not is_admin_user():
-        return jsonify({'error': 'Admin access required'}), 403
-    
     if _cache_warming_state['is_warming']:
         return jsonify({
             'success': False,
@@ -193,11 +192,16 @@ def warm_cache():
             'state': _cache_warming_state
         }), 409
     
-    # Start cache warming in background
-    def warm_cache_background():
-        _warm_all_products_cache()
+    # Start cache warming in background with app context
+    def warm_cache_background(app):
+        with app.app_context():
+            try:
+                _warm_all_products_cache()
+            except Exception as e:
+                current_app.logger.error(f"Error in background cache warming: {str(e)}")
+                _cache_warming_state['warm_errors'].append(str(e))
     
-    thread = threading.Thread(target=warm_cache_background)
+    thread = threading.Thread(target=warm_cache_background, args=(current_app._get_current_object(),))
     thread.daemon = True
     thread.start()
     
@@ -275,7 +279,7 @@ def get_all_cached_products():
         
         json_str = fast_json_dumps(data)
         if product_cache and hasattr(product_cache, 'set_raw'):
-            product_cache.set_raw(cache_key, json_str, ttl=CACHE_CONFIG['all_products_ttl'])
+            product_cache.set_raw(cache_key, json_str, ttl=CACHE_TTL.get('all_products', 600))
         
         total_time = (time.perf_counter() - start) * 1000
         response = Response(json_str, status=200, mimetype='application/json')
@@ -290,12 +294,16 @@ def get_all_cached_products():
 
 
 @products_routes.route('/cache/warming-status', methods=['GET'])
-def get_warming_status():
-    """Get the current cache warming status."""
+@admin_required
+def get_cache_warming_status():
+    """Get the current cache warming status. Admin only."""
+    cache_connected = getattr(product_cache, 'is_connected', False)
+    cache_stats = getattr(product_cache, 'stats', {})
+    
     return jsonify({
         'state': _cache_warming_state,
-        'cache_connected': product_cache.is_connected,
-        'cache_stats': product_cache.stats,
+        'cache_connected': cache_connected,
+        'cache_stats': cache_stats,
         'timestamp': datetime.utcnow().isoformat()
     }), 200
 
@@ -343,7 +351,7 @@ def _warm_all_products_cache():
                 product_cache.set_raw(
                     "mizizzi:all_products", 
                     fast_json_dumps(all_products_data), 
-                    ttl=CACHE_CONFIG['all_products_ttl']
+                    ttl=CACHE_TTL.get('all_products', 600)
                 )
             _cache_warming_state['products_cached'] = len(all_serialized)
             
@@ -366,7 +374,7 @@ def _warm_all_products_cache():
                             product_cache.set_raw(
                                 f"mizizzi:products:category:{category.id}",
                                 fast_json_dumps(cat_data),
-                                ttl=CACHE_CONFIG['products_list_ttl']
+                                ttl=CACHE_TTL.get('category_list', 300)
                             )
                         _cache_warming_state['categories_cached'].append(category.name)
                 except Exception as e:
@@ -400,7 +408,7 @@ def _warm_all_products_cache():
                             product_cache.set_raw(
                                 f"mizizzi:{cache_name}",
                                 fast_json_dumps(section_data),
-                                ttl=CACHE_CONFIG['featured_ttl']
+                                ttl=CACHE_TTL.get('featured_section', 180)
                             )
                 except Exception as e:
                     _cache_warming_state['warm_errors'].append(f"Section {cache_name}: {str(e)}")
@@ -419,48 +427,36 @@ def _warm_all_products_cache():
 
 @products_routes.route('/', methods=['GET'])
 @limiter.limit("600 per minute")
-@cached_response("products", ttl=30, key_params=[
-    "page", "per_page", "category_id", "brand_id", "min_price", "max_price",
-    "is_featured", "is_new", "is_sale", "is_flash_sale", "is_luxury_deal",
-    "is_new_arrival", "search", "sort_by", "sort_order"
-])
 def get_products():
     """
     Get products with filtering, sorting, and pagination.
     OPTIMIZED: Uses Redis caching and lightweight serialization.
+    HARDENED: Compute admin once, don't cache admin/inactive responses, normalize boolean params.
     """
     try:
-        # Get query parameters
-        page = request.args.get('page', 1, type=int)
-        per_page = min(request.args.get('per_page', 20, type=int), 100)
-        category_id = request.args.get('category_id', type=int)
-        brand_id = request.args.get('brand_id', type=int)
-        min_price = request.args.get('min_price', type=float)
-        max_price = request.args.get('max_price', type=float)
-        is_featured = request.args.get('is_featured', type=str)
-        is_new = request.args.get('is_new', type=str)
-        is_sale = request.args.get('is_sale', type=str)
-        is_flash_sale = request.args.get('is_flash_sale', type=str)
-        is_luxury_deal = request.args.get('is_luxury_deal', type=str)
-        is_new_arrival = request.args.get('is_new_arrival', type=str)
-        search = request.args.get('search', '').strip()
-        sort_by = request.args.get('sort_by', 'created_at')
-        sort_order = request.args.get('sort_order', 'desc')
-        include_inactive = request.args.get('include_inactive', False, type=bool)
-
-        # Convert string booleans
-        def str_to_bool(val):
-            if val is None:
-                return None
-            return val.lower() in ('true', '1', 'yes')
-
-        is_featured = str_to_bool(is_featured)
-        is_new = str_to_bool(is_new)
-        is_sale = str_to_bool(is_sale)
-        is_flash_sale = str_to_bool(is_flash_sale)
-        is_luxury_deal = str_to_bool(is_luxury_deal)
-        is_new_arrival = str_to_bool(is_new_arrival)
-
+        # Compute admin status once for entire request
+        is_admin = is_admin_user()
+        
+        # Extract and normalize all parameters
+        params = extract_filter_params(request.args)
+        include_inactive = params.pop('include_inactive')  # Remove from general params
+        
+        # Build cache key only for public (non-admin, non-inactive) requests
+        should_cache = not is_admin and include_inactive == 0
+        cache_key = None
+        
+        if should_cache:
+            cache_key = build_cache_key_for_filters(
+                'mizizzi:products:public',
+                params,
+                include_admin=False
+            )
+            cached = safe_cache_get(product_cache, cache_key)
+            if cached:
+                current_app.logger.info(f"[CACHE HIT] {cache_key}")
+                return jsonify(cached), 200
+        
+        # Build query
         query = Product.query.options(
             load_only(
                 Product.id, Product.name, Product.slug, Product.price,
@@ -473,97 +469,38 @@ def get_products():
                 Product.brand_id, Product.created_at, Product.sort_order
             )
         )
-
-        # Filter by active status (unless admin requests inactive products)
-        if not (include_inactive and is_admin_user()):
-            query = query.filter(Product.is_active == True)
-
-        # Only show visible products for non-admin users
-        if not is_admin_user():
-            query = query.filter(Product.is_visible == True)
-
-        # Apply filters using indexed columns
-        if category_id:
-            query = query.filter(Product.category_id == category_id)
-
-        if brand_id:
-            query = query.filter(Product.brand_id == brand_id)
-
-        if min_price is not None:
-            query = query.filter(Product.price >= min_price)
-
-        if max_price is not None:
-            query = query.filter(Product.price <= max_price)
-
-        if is_featured is not None:
-            query = query.filter(Product.is_featured == is_featured)
-
-        if is_new is not None:
-            query = query.filter(Product.is_new == is_new)
-
-        if is_sale is not None:
-            query = query.filter(Product.is_sale == is_sale)
-
-        if is_flash_sale is not None:
-            query = query.filter(Product.is_flash_sale == is_flash_sale)
-
-        if is_luxury_deal is not None:
-            query = query.filter(Product.is_luxury_deal == is_luxury_deal)
-
-        if is_new_arrival is not None:
-            query = query.filter(Product.is_new_arrival == is_new_arrival)
-
-        # Search functionality
-        if search:
-            search_term = f"%{search}%"
-            query = query.filter(
-                or_(
-                    Product.name.ilike(search_term),
-                    Product.description.ilike(search_term),
-                    Product.short_description.ilike(search_term)
-                )
-            )
-
-        # Sorting (using indexed columns for speed)
-        valid_sort_fields = ['name', 'price', 'created_at', 'updated_at', 'stock', 'sort_order']
-        if sort_by in valid_sort_fields:
-            sort_column = getattr(Product, sort_by)
-            if sort_order.lower() == 'desc':
-                query = query.order_by(sort_column.desc())
-            else:
-                query = query.order_by(sort_column.asc())
-        else:
-            query = query.order_by(Product.created_at.desc())
-
+        
+        # Apply filters using helper - this includes visibility/active filtering
+        query = apply_product_filters(query, params, include_inactive=is_admin and include_inactive == 1)
+        
         # Execute query with pagination
         try:
             pagination = query.paginate(
-                page=page,
-                per_page=per_page,
+                page=params['page'],
+                per_page=params['per_page'],
                 error_out=False
             )
         except SQLAlchemyError as e:
             current_app.logger.error(f"Database error during pagination: {str(e)}")
             return jsonify({'error': 'Database error occurred'}), 500
-
-        products = []
-        for product in pagination.items:
-            serialized = serialize_product_lightweight(product)
-            if serialized:
-                products.append(serialized)
-
-        return jsonify({
-            'items': products,
-            'products': products,
-            'pagination': {
-                'page': pagination.page,
-                'per_page': pagination.per_page,
-                'total_items': pagination.total,
-                'total_pages': pagination.pages,
-                'has_next': pagination.has_next,
-                'has_prev': pagination.has_prev
-            }
-        }), 200
+        
+        # Serialize products
+        products = [serialize_product_lightweight(p) for p in pagination.items if p]
+        
+        # Build response
+        response = build_pagination_response(
+            pagination.items,
+            serialize_product_lightweight,
+            pagination.page,
+            pagination.per_page,
+            pagination.total
+        )
+        
+        # Cache if appropriate
+        if should_cache and cache_key:
+            safe_cache_set(product_cache, cache_key, response, ttl=CACHE_TTL.get('products_list', 300))
+        
+        return jsonify(response), 200
 
     except SQLAlchemyError as e:
         current_app.logger.error(f"Database error getting products: {str(e)}")
