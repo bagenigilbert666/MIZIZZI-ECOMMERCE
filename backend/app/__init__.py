@@ -984,7 +984,6 @@ def create_app(config_name=None, enable_socketio=True):
         app.register_blueprint(final_blueprints['admin_wishlist_routes'], url_prefix='/api/admin/wishlist')
         
         app.register_blueprint(final_blueprints['products_routes'], url_prefix='/api/products')
-        app.register_blueprint(final_blueprints['featured_routes'], url_prefix='/api/products')
         app.register_blueprint(final_blueprints['categories_routes'], url_prefix='/api/categories')
         
         app.register_blueprint(final_blueprints['user_address_routes'], url_prefix='/api/addresses/user')
@@ -1002,6 +1001,7 @@ def create_app(config_name=None, enable_socketio=True):
         app.register_blueprint(final_blueprints['side_panel_routes'], url_prefix='/api/panels')
         app.register_blueprint(final_blueprints['topbar_routes'], url_prefix='/api/topbar')
         app.register_blueprint(final_blueprints['contact_cta_routes'], url_prefix='/api/contact-cta')
+        app.register_blueprint(final_blueprints['featured_routes'], url_prefix='/api/products/featured')
 
         app.register_blueprint(final_blueprints['meilisearch_routes'], url_prefix='/api/meilisearch')
         app.register_blueprint(final_blueprints['admin_meilisearch_routes'], url_prefix='/api/admin/meilisearch')
@@ -1080,7 +1080,7 @@ def create_app(config_name=None, enable_socketio=True):
                 'side_panel_routes': '/api/panels',
                 'topbar_routes': '/api/topbar',
                 'contact_cta_routes': '/api/contact-cta',
-                'featured_routes': '/api/products',
+                'featured_routes': '/api/products/featured',
                 'meilisearch_routes': '/api/meilisearch',
                 'admin_meilisearch_routes': '/api/admin/meilisearch',
                 'flash_sale_routes': '/api/flash-sale',
