@@ -87,31 +87,39 @@ async function LoadAllContent() {
       getContactCTASlides().catch(() => []),
     ])
 
+    console.log('[v0] ===== DEBUGGING UI BATCH RESPONSE =====')
+    console.log('[v0] Full uiBatchData:', JSON.stringify(uiBatchData, null, 2).substring(0, 1000))
+    console.log('[v0] uiBatchData keys:', Object.keys(uiBatchData || {}))
+    
     // Extract data from UI batch - backend returns { sections: { carousel: {...}, categories: {...}, etc } }
     const uiBatchSections = uiBatchData?.sections || {}
+    console.log('[v0] uiBatchSections:', uiBatchSections)
+    console.log('[v0] uiBatchSections keys:', Object.keys(uiBatchSections))
     
     // Extract categories from backend response structure
-    // Backend returns: { featured: [...], root: [...], section: 'categories', success: true }
     const categoriesSection = uiBatchSections?.categories || {}
+    console.log('[v0] categoriesSection:', categoriesSection)
     const categoriesData = [
       ...(Array.isArray(categoriesSection?.featured) ? categoriesSection.featured : []),
       ...(Array.isArray(categoriesSection?.root) ? categoriesSection.root : [])
     ]
-    console.log('[v0] Categories extracted from batch:', categoriesData.length, 'featured:', categoriesSection?.featured_count, 'root:', categoriesSection?.root_count)
+    console.log('[v0] Categories extracted:', categoriesData.length)
     
     // Extract carousel from backend response
-    // Backend returns: { data: { homepage: [...] }, section: 'carousel', success: true }
     const carouselSection = uiBatchSections?.carousel || {}
+    console.log('[v0] carouselSection:', carouselSection)
     const carouselData = Array.isArray(carouselSection?.data?.homepage)
       ? carouselSection.data.homepage
       : Array.isArray(carouselSection?.data)
         ? carouselSection.data
-        : []
-    console.log('[v0] Carousel extracted from batch:', carouselData.length)
+        : Array.isArray(carouselSection?.items)
+          ? carouselSection.items
+          : []
+    console.log('[v0] Carousel extracted:', carouselData.length)
     
     // Extract side panels from backend response
-    // Backend returns: { data: { product_showcase_left: [...], premium_experience_right: [...], etc }, section: 'side_panels', success: true }
     const sidePanelsSection = uiBatchSections?.side_panels || {}
+    console.log('[v0] sidePanelsSection:', sidePanelsSection)
     const sidePanelsData = sidePanelsSection?.data || {}
     const premiumExperiencesData = [
       ...(Array.isArray(sidePanelsData?.premium_experience_left) ? sidePanelsData.premium_experience_left : []),
@@ -121,12 +129,14 @@ async function LoadAllContent() {
       ...(Array.isArray(sidePanelsData?.product_showcase_left) ? sidePanelsData.product_showcase_left : []),
       ...(Array.isArray(sidePanelsData?.product_showcase_right) ? sidePanelsData.product_showcase_right : [])
     ]
-    console.log('[v0] Side panels extracted - premium:', premiumExperiencesData.length, 'showcase:', productShowcaseData.length)
+    console.log('[v0] Premium experiences:', premiumExperiencesData.length, 'Product showcase:', productShowcaseData.length)
 
     // Extract side panels from UI batch
     const sidePanels = uiBatchData?.sidePanels || {}
     const premiumExperiences = Array.isArray(sidePanels?.premium) ? sidePanels.premium : []
     const productShowcase = Array.isArray(sidePanels?.showcase) ? sidePanels.showcase : []
+
+    // Use extracted data for product sections
     const hb = homepageBatchData as any
     const sections = hb?.sections ?? {}
     const flashSaleProducts = Array.isArray(sections?.flash_sales?.products)
@@ -162,12 +172,6 @@ async function LoadAllContent() {
       productShowcase: productShowcaseData,
       contactCTASlides: Array.isArray(contactCTASlides) ? contactCTASlides : [],
       featureCards: Array.isArray(featureCards) ? featureCards : [],
-      flashSaleProducts: Array.isArray(flashSaleProducts) ? flashSaleProducts : [],
-      luxuryProducts: Array.isArray(luxuryProducts) ? luxuryProducts : [],
-      newArrivals: Array.isArray(newArrivals) ? newArrivals : [],
-      topPicks: Array.isArray(topPicks) ? topPicks : [],
-      trendingProducts: Array.isArray(trendingProducts) ? trendingProducts : [],
-      dailyFinds: Array.isArray(dailyFinds) ? dailyFinds : [],
       allProducts: [...flashSaleProducts, ...trendingProducts, ...topPicks].slice(0, 12),
       allProductsHasMore: true,
     }
