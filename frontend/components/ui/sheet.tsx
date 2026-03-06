@@ -5,6 +5,7 @@ import * as SheetPrimitive from "@radix-ui/react-dialog"
 import { cva, type VariantProps } from "class-variance-authority"
 import { X } from "lucide-react"
 import { motion } from "framer-motion"
+import * as VisuallyHidden from "@radix-ui/react-visually-hidden"
 
 import { cn } from "@/lib/utils"
 
@@ -58,9 +59,13 @@ const SheetContent = React.forwardRef<React.ElementRef<typeof SheetPrimitive.Con
   ({ side = "right", className, children, ...props }, ref) => (
     <SheetPortal>
       <SheetOverlay />
+      <VisuallyHidden.Root asChild>
+        <SheetPrimitive.Title>Sheet</SheetPrimitive.Title>
+      </VisuallyHidden.Root>
+      <VisuallyHidden.Root asChild>
+        <SheetPrimitive.Description>Sheet content</SheetPrimitive.Description>
+      </VisuallyHidden.Root>
       <SheetPrimitive.Content ref={ref} className={cn(sheetVariants({ side }), className)} {...props}>
-        <SheetPrimitive.Title className="sr-only">Sheet</SheetPrimitive.Title>
-        <SheetPrimitive.Description className="sr-only">Sheet content</SheetPrimitive.Description>
         {children}
         <SheetPrimitive.Close asChild>
           <motion.button

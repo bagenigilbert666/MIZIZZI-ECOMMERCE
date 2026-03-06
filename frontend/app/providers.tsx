@@ -16,7 +16,6 @@ import { InventoryProvider } from "@/contexts/inventory/inventory-context"
 import AnimationErrorBoundary from "@/components/animation/animation-error-boundary"
 import DisableAnimations from "@/components/animation/disable-animations"
 import { suppressRadixUIRefWarning } from "@/lib/suppress-warnings"
-import { SocketInitializer } from "@/components/socket-initializer"
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false)
@@ -37,7 +36,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
       <AuthProvider>
         {/* Performance: Disable autoConnect on WebSocket to prevent blocking initial page load */}
         <SocketProvider autoConnect={false}>
-          <SocketInitializer />
           <VerificationHandler />
           <ProductProvider>
             <CartProvider>

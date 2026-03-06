@@ -145,7 +145,7 @@ export function CategoryGrid({ categories = [] }: CategoryGridProps) {
           }}
         >
           {categories.map((category, index) => (
-            <CategoryCard key={`${category.id}-${index}`} category={category} index={index} />
+            <CategoryCard key={category.id || `category-${index}`} category={category} index={index} />
           ))}
         </div>
 

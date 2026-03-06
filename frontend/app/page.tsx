@@ -1,152 +1,80 @@
 import { Suspense } from "react"
-import { getUIBatch } from "@/lib/server/get-ui-batch"
-import { getHomepageBatch } from "@/lib/server/get-homepage-batch"
-import { getContactCTASlides, getFeatureCards } from "@/lib/server/get-carousel-data"
+import { getCarouselItems, getPremiumExperiences, getProductShowcase, getContactCTASlides, getFeatureCards } from "@/lib/server/get-carousel-data"
+import { getCategories } from "@/lib/server/get-categories"
+import { getFlashSaleProducts } from "@/lib/server/get-flash-sale-products"
+import { getLuxuryProducts } from "@/lib/server/get-luxury-products"
+import { getNewArrivals } from "@/lib/server/get-new-arrivals"
+import { getTopPicks } from "@/lib/server/get-top-picks"
+import { getTrendingProducts } from "@/lib/server/get-trending-products"
+import { getDailyFinds } from "@/lib/server/get-daily-finds"
+import { getAllProductsForHome } from "@/lib/server/get-all-products"
 import { HomeContent } from "@/components/home/home-content"
 
 export const revalidate = 60
 
 /**
- * OPTIMIZED HOMEPAGE: Uses dual batch APIs for maximum performance
- * - UI Batch: Carousel, categories, side panels (single request to /api/ui/batch)
- * - Homepage Batch: All product sections (single request to /api/homepage/batch)
- * 
- * Backend Redis Caching Results:
- * - Cache hits: 5-10ms response time (30-50x faster)
- * - Cache misses: 100-150ms response time (parallel queries)
- * - Automatic invalidation when products are updated
- * - Hit rate: ~62% average (typical e-commerce performance)
- * 
- * Architecture:
- * 1 HTTP request to /api/ui/batch + 1 HTTP request to /api/homepage/batch
- * vs. 10+ separate requests without batching
+ * JUMIA-STYLE HOMEPAGE: Render once with all data, no duplicate components
+ * Critical data has 3-second timeout for instant LCP with defaults
+ * Deferred data loads in parallel with no waterfall delays
+ * Single component render eliminates duplicate page layout issues
  */
 
 async function LoadAllContent() {
-  const timeout = <T = any>(promise: Promise<T>, ms: number = 3000, fallback?: T): Promise<T> => {
-    // Return either the promise result or a typed fallback after `ms` ms.
-    // Accepting a typed `fallback` avoids widening the return type to `[]`.
-    const fallbackValue: T = fallback !== undefined ? fallback : ({} as T)
+  const timeout = <T extends any[] = any>(promise: Promise<T>, ms: number = 3000): Promise<T | []> => {
     return Promise.race([
-      promise as Promise<T>,
-      new Promise<T>(resolve => setTimeout(() => resolve(fallbackValue), ms))
-    ]).catch(() => fallbackValue)
+      promise as Promise<T | []>,
+      new Promise<[]>(resolve => setTimeout(() => resolve([]), ms))
+    ]).catch(() => [] as unknown as T)
   }
 
   try {
-    // Fetch both batch endpoints in parallel
-    const uiBatchPromise = getUIBatch().catch(() => ({
-      carousel: [],
-      topbar: null,
-      categories: [],
-      sidePanels: null,
-      timestamp: Date.now(),
-      duration: 0,
-    }))
-
-    const homepageBatchPromise = getHomepageBatch().catch(() => ({
-      timestamp: new Date().toISOString(),
-      total_execution_ms: 0,
-      cached: false,
-      sections: {},
-    }))
-
-    // Fetch additional data in parallel
     const [
-      uiBatchData,
-      homepageBatchData,
-      featureCards,
+      categories,
+      carouselItems,
+      premiumExperiences,
+      productShowcase,
       contactCTASlides,
-    ] = await Promise.all([
-      timeout(uiBatchPromise, 3000, {
-        carousel: [],
-        topbar: null,
-        categories: [],
-        sidePanels: null,
-        timestamp: Date.now(),
-        duration: 0,
-      }),
-      timeout(homepageBatchPromise, 3000, {
-        timestamp: new Date().toISOString(),
-        total_execution_ms: 0,
-        cached: false,
-        sections: {
-          flash_sales: { products: [] },
-          luxury_deals: { products: [] },
-          new_arrivals: { products: [] },
-          top_picks: { products: [] },
-          trending: { products: [] },
-          daily_finds: { products: [] },
-        },
-        meta: {
-          sections_fetched: 0,
-          parallel_execution: false,
-        },
-      }),
-      getFeatureCards().catch(() => []),
-      getContactCTASlides().catch(() => []),
-    ])
-
-    // Extract data from UI batch - backend returns FLAT structure: { carousel: [...], categories: [...], sidePanels: {...}, ... }
-    const carouselData = Array.isArray(uiBatchData?.carousel) ? uiBatchData.carousel : []
-    const categoriesData = Array.isArray(uiBatchData?.categories) ? uiBatchData.categories : []
-    const sidePanelsData = uiBatchData?.sidePanels || {}
-    
-    const premiumExperiencesData = Array.isArray(sidePanelsData?.premium) ? sidePanelsData.premium : []
-    const productShowcaseData = Array.isArray(sidePanelsData?.showcase) ? sidePanelsData.showcase : []
-
-    // Extract product sections from homepage batch
-    const hb = homepageBatchData as any
-    const sections = hb?.sections ?? {}
-    const transformProducts = (products: any[]) => {
-      return Array.isArray(products) ? products.map(p => ({
-        id: p.id,
-        name: p.name,
-        slug: p.slug,
-        price: p.price,
-        sale_price: p.sale_price,
-        discount_percentage: p.discount_percentage,
-        image: p.image || p.thumbnail_url,
-        image_urls: p.image_urls || [p.image],
-        description: '',
-        rating: 4.5,
-        reviews: 0,
-        in_stock: true,
-        is_active: true,
-        is_visible: true,
-      })) : []
-    }
-
-    const flashSaleProducts = transformProducts(sections?.flash_sales?.products || [])
-    const luxuryProducts = transformProducts(sections?.luxury_deals?.products || [])
-    const newArrivals = transformProducts(sections?.new_arrivals?.products || [])
-    const topPicks = transformProducts(sections?.top_picks?.products || [])
-    const trendingProducts = transformProducts(sections?.trending?.products || [])
-    const dailyFinds = transformProducts(sections?.daily_finds?.products || [])
-
-    console.log('[v0] LoadAllContent extracted data:', {
-      carousel: carouselData.length,
-      categories: categoriesData.length,
-      premiumExperiences: premiumExperiencesData.length,
-      productShowcase: productShowcaseData.length,
-      flashSale: flashSaleProducts.length,
-    })
-
-    return {
-      categories: categoriesData,
-      carouselItems: carouselData,
-      premiumExperiences: premiumExperiencesData,
-      productShowcase: productShowcaseData,
-      contactCTASlides: Array.isArray(contactCTASlides) ? contactCTASlides : [],
-      featureCards: Array.isArray(featureCards) ? featureCards : [],
+      featureCards,
       flashSaleProducts,
       luxuryProducts,
       newArrivals,
       topPicks,
       trendingProducts,
       dailyFinds,
-      allProducts: [...flashSaleProducts, ...trendingProducts, ...topPicks].slice(0, 12),
-      allProductsHasMore: true,
+      allProductsData,
+    ] = await Promise.all([
+      // Critical - with timeout for instant page load
+      timeout(getCategories(20), 3000),
+      timeout(getCarouselItems(), 3000),
+      timeout(getPremiumExperiences(), 3000),
+      timeout(getProductShowcase(), 3000),
+      timeout(getContactCTASlides(), 3000),
+      // Deferred - no timeout, load with critical
+      getFeatureCards().catch(() => []),
+      getFlashSaleProducts(50).catch(() => []),
+      getLuxuryProducts(12).catch(() => []),
+      getNewArrivals(20).catch(() => []),
+      getTopPicks(20).catch(() => []),
+      getTrendingProducts(20).catch(() => []),
+      getDailyFinds(20).catch(() => []),
+      getAllProductsForHome(12).catch(() => ({ products: [], hasMore: false })),
+    ])
+
+    return {
+      categories: Array.isArray(categories) ? categories : [],
+      carouselItems: Array.isArray(carouselItems) ? carouselItems : [],
+      premiumExperiences: Array.isArray(premiumExperiences) ? premiumExperiences : [],
+      productShowcase: Array.isArray(productShowcase) ? productShowcase : [],
+      contactCTASlides: Array.isArray(contactCTASlides) ? contactCTASlides : [],
+      featureCards: Array.isArray(featureCards) ? featureCards : [],
+      flashSaleProducts: Array.isArray(flashSaleProducts) ? flashSaleProducts : [],
+      luxuryProducts: Array.isArray(luxuryProducts) ? luxuryProducts : [],
+      newArrivals: Array.isArray(newArrivals) ? newArrivals : [],
+      topPicks: Array.isArray(topPicks) ? topPicks : [],
+      trendingProducts: Array.isArray(trendingProducts) ? trendingProducts : [],
+      dailyFinds: Array.isArray(dailyFinds) ? dailyFinds : [],
+      allProducts: allProductsData.products || [],
+      allProductsHasMore: allProductsData.hasMore || false,
     }
   } catch (error) {
     console.error("[v0] Content loading error:", error)

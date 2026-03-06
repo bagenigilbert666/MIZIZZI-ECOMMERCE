@@ -1,5 +1,5 @@
 import type { Metadata } from "next"
-import { getCategoriesBatch } from "@/lib/server/get-ui-batch"
+import { getCategories } from "@/lib/server/get-categories"
 import { CategoriesPageContent } from "@/components/categories/page-content"
 import { defaultViewport } from "@/lib/metadata-utils"
 
@@ -17,8 +17,8 @@ export const metadata: Metadata = {
 }
 
 export default async function CategoriesPage() {
-  // Use unified batch API for categories with efficient caching and parallel fetching
-  const categories = await getCategoriesBatch()
+  // Use server-side getCategories with React cache for instant data delivery
+  const categories = await getCategories(100)
 
   return <CategoriesPageContent categories={categories} />
 }

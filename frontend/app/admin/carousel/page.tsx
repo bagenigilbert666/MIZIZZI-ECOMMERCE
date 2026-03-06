@@ -35,7 +35,7 @@ export default function CarouselManagementPage() {
     return localStorage.getItem("admin_token") || localStorage.getItem("token")
   }
 
-  const fetchCarousels = async (retryCount = 0) => {
+  const fetchCarousels = async () => {
     try {
       setIsLoading(true)
       setError(null)
@@ -61,19 +61,9 @@ export default function CarouselManagementPage() {
           throw new Error("Unauthorized. Please login again.")
         }
         if (response.status === 404) {
-          // If it's a 404 and this is the first attempt, wait a moment and retry
-          // This gives the backend time to initialize the tables
-          if (retryCount < 2) {
-            console.log("[v0] Carousel endpoint not ready, retrying in 2 seconds...")
-            await new Promise(resolve => setTimeout(resolve, 2000))
-            return fetchCarousels(retryCount + 1)
-          }
           throw new Error(
             "Carousel API endpoint not found. Please ensure the backend server is running and the database is initialized. Run: python scripts/init_carousel_database.py",
           )
-        }
-        if (response.status === 503) {
-          throw new Error("Carousel system is initializing. Please wait a moment and try again.")
         }
         throw new Error(`Failed to fetch carousels: ${response.statusText}`)
       }

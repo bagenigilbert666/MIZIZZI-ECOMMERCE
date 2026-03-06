@@ -31,17 +31,6 @@ try:
     
     FAST_JSON = USING_ORJSON
     
-    def get_cache_status() -> dict:
-        """Get current cache status and statistics."""
-        stats = _cache_manager.stats
-        return {
-            'connected': _cache_manager.is_connected,
-            'cache_type': 'Upstash Redis' if _cache_manager.is_connected else 'In-Memory',
-            'prefix': 'mizizzi',
-            'stats': stats,
-            'using_orjson': USING_ORJSON
-        }
-    
     # Backwards compatible wrapper class
     class RedisCache:
         """
@@ -102,27 +91,6 @@ try:
     
     # Global instance
     product_cache = RedisCache()
-    
-    # Convenience functions for backwards compatibility
-    def invalidate_products() -> int:
-        """Invalidate all product cache entries."""
-        return product_cache.invalidate_products()
-    
-    def invalidate_featured() -> int:
-        """Invalidate featured products cache."""
-        return product_cache.invalidate_featured()
-    
-    def invalidate_search() -> int:
-        """Invalidate search cache entries."""
-        return product_cache.invalidate_search()
-    
-    def invalidate_all_products() -> int:
-        """Invalidate all product-related cache."""
-        return product_cache.invalidate_all_products()
-    
-    def flush_all() -> bool:
-        """Flush entire cache."""
-        return product_cache.flush_all()
     
     logger.info("Using new modular cache system from app/cache/")
 

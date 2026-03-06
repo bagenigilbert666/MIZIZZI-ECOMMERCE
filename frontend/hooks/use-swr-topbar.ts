@@ -57,15 +57,11 @@ const saveToLocalStorage = (slides: TopBarSlide[]) => {
 // Fetcher function with localStorage fallback
 const topbarFetcher = async (): Promise<TopBarSlide[]> => {
   try {
-    // Note: Topbar data is now served via the UI batch endpoint (/api/ui/batch)
-    // This endpoint is kept as fallback only
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"}/api/topbar/slides`,
-      { signal: AbortSignal.timeout(3000) } // 3 second timeout to fail fast
     )
 
     if (!response.ok) {
-      console.warn(`[v0] Topbar endpoint returned ${response.status} - using UI batch data instead`)
       throw new Error(`HTTP error! status: ${response.status}`)
     }
 
@@ -81,7 +77,7 @@ const topbarFetcher = async (): Promise<TopBarSlide[]> => {
 
     throw new Error("No slides in response")
   } catch (error) {
-    console.warn("[v0] Topbar fetch error (expected - data from UI batch):", error)
+    console.error("[v0] Error fetching topbar slides:", error)
 
     // First try in-memory cache
     if (topbarCache && topbarCache.length > 0) {
@@ -97,9 +93,8 @@ const topbarFetcher = async (): Promise<TopBarSlide[]> => {
       return localCache.slides
     }
 
-    // Return empty array if no cache (UI batch will provide the data)
-    console.log("[v0] No topbar cache available - UI batch endpoint provides this data")
-    return []
+    // Re-throw if no cached data available
+    throw error
   }
 }
 
