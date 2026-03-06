@@ -63,35 +63,82 @@ async function LoadAllContent() {
       getContactCTASlides().catch(() => []),
     ])
 
-    // Normalize carousel items from UI batch response
-    const carouselItems = Array.isArray(uiBatchData?.carousel) 
-      ? uiBatchData.carousel 
+    console.log('[v0] UI Batch Response:', uiBatchData);
+    console.log('[v0] Homepage Batch Response:', homepageBatchData);
+
+    // Extract data from UI batch sections (backend returns nested structure)
+    const uiBatchSections = uiBatchData?.sections || {}
+    const carouselSection = uiBatchSections.carousel || {}
+    const categoriesSection = uiBatchSections.categories || {}
+    const sidePanelsSection = uiBatchSections.side_panels || {}
+    
+    // Normalize carousel items - backend returns carousel data in sections.carousel.data
+    const carouselItems = Array.isArray(carouselSection?.data?.homepage) 
+      ? carouselSection.data.homepage
+      : Array.isArray(carouselSection?.data) 
+        ? carouselSection.data 
+        : []
+
+    console.log('[v0] Carousel items extracted:', carouselItems.length)
+
+    // Normalize categories from UI batch response - backend returns in sections.categories.data
+    const categories = Array.isArray(categoriesSection?.data) 
+      ? categoriesSection.data 
       : []
 
-    // Normalize categories from UI batch response  
-    const categories = Array.isArray(uiBatchData?.categories) 
-      ? uiBatchData.categories 
-      : []
+    console.log('[v0] Categories extracted:', categories.length)
 
-    // Extract side panels from UI batch
-    const sidePanels = uiBatchData?.sidePanels || {}
-    const premiumExperiences = Array.isArray(sidePanels?.premium) ? sidePanels.premium : []
-    const productShowcase = Array.isArray(sidePanels?.showcase) ? sidePanels.showcase : []
+    // Extract side panels from UI batch - backend returns in sections.side_panels.data
+    const sidePanelsData = sidePanelsSection?.data || {}
+    const premiumExperiences = Array.isArray(sidePanelsData?.premium_experience_left) 
+      ? sidePanelsData.premium_experience_left 
+      : Array.isArray(sidePanelsData?.premium_experience_right) 
+        ? sidePanelsData.premium_experience_right 
+        : []
+    const productShowcase = Array.isArray(sidePanelsData?.product_showcase_left) 
+      ? sidePanelsData.product_showcase_left 
+      : Array.isArray(sidePanelsData?.product_showcase_right) 
+        ? sidePanelsData.product_showcase_right 
+        : []
 
     // Extract product sections from homepage batch response
     const sections = homepageBatchData?.sections || {}
-    const flashSaleProducts = sections.flash_sales?.products || []
-    const luxuryProducts = sections.luxury_deals?.products || []
-    const newArrivals = sections.new_arrivals?.products || []
-    const topPicks = sections.top_picks?.products || []
-    const trendingProducts = sections.trending?.products || []
-    const dailyFinds = sections.daily_finds?.products || []
+    
+    // Transform product data - backend sends image as "image" field, frontend expects "image"
+    const transformProducts = (products: any[]) => {
+      return Array.isArray(products) ? products.map(p => ({
+        id: p.id,
+        name: p.name,
+        slug: p.slug,
+        price: p.price,
+        sale_price: p.sale_price,
+        discount_percentage: p.discount_percentage,
+        image: p.image || p.thumbnail_url, // Handle both field names
+        image_urls: p.image_urls || [p.image],
+        // Add other required product fields with defaults
+        description: '',
+        rating: 4.5,
+        reviews: 0,
+        in_stock: true,
+        is_active: true,
+        is_visible: true,
+      })) : []
+    }
+    
+    const flashSaleProducts = transformProducts(sections.flash_sales?.products || [])
+    const luxuryProducts = transformProducts(sections.luxury_deals?.products || [])
+    const newArrivals = transformProducts(sections.new_arrivals?.products || [])
+    const topPicks = transformProducts(sections.top_picks?.products || [])
+    const trendingProducts = transformProducts(sections.trending?.products || [])
+    const dailyFinds = transformProducts(sections.daily_finds?.products || [])
 
-    console.log('[v0] Homepage batch stats:', {
-      cached: homepageBatchData?.cached,
-      executionTime: homepageBatchData?.total_execution_ms,
-      sectionsFetched: homepageBatchData?.meta?.sections_fetched,
-      parallelExecution: homepageBatchData?.meta?.parallel_execution,
+    console.log('[v0] Product sections extracted:', {
+      flashSales: flashSaleProducts.length,
+      luxury: luxuryProducts.length,
+      newArrivals: newArrivals.length,
+      topPicks: topPicks.length,
+      trending: trendingProducts.length,
+      dailyFinds: dailyFinds.length,
     })
 
     return {
@@ -101,12 +148,12 @@ async function LoadAllContent() {
       productShowcase: Array.isArray(productShowcase) ? productShowcase : [],
       contactCTASlides: Array.isArray(contactCTASlides) ? contactCTASlides : [],
       featureCards: Array.isArray(featureCards) ? featureCards : [],
-      flashSaleProducts: Array.isArray(flashSaleProducts) ? flashSaleProducts : [],
-      luxuryProducts: Array.isArray(luxuryProducts) ? luxuryProducts : [],
-      newArrivals: Array.isArray(newArrivals) ? newArrivals : [],
-      topPicks: Array.isArray(topPicks) ? topPicks : [],
-      trendingProducts: Array.isArray(trendingProducts) ? trendingProducts : [],
-      dailyFinds: Array.isArray(dailyFinds) ? dailyFinds : [],
+      flashSaleProducts,
+      luxuryProducts,
+      newArrivals,
+      topPicks,
+      trendingProducts,
+      dailyFinds,
       allProducts: [...flashSaleProducts, ...trendingProducts, ...topPicks].slice(0, 12),
       allProductsHasMore: true,
     }
