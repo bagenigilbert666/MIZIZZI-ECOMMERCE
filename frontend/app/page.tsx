@@ -23,141 +23,114 @@ export const revalidate = 60
  */
 
 async function LoadAllContent() {
-  const timeout = <T,>(promise: Promise<T>, ms: number = 3000, fallback: T): Promise<T> => {
+  const timeout = <T = any>(promise: Promise<T>, ms: number = 3000, fallback?: T): Promise<T> => {
+    // Return either the promise result or a typed fallback after `ms` ms.
+    // Accepting a typed `fallback` avoids widening the return type to `[]`.
+    const fallbackValue: T = fallback !== undefined ? fallback : ({} as T)
     return Promise.race([
-      promise,
-      new Promise<T>(resolve => setTimeout(() => resolve(fallback), ms))
-    ]).catch(() => fallback)
+      promise as Promise<T>,
+      new Promise<T>(resolve => setTimeout(() => resolve(fallbackValue), ms))
+    ]).catch(() => fallbackValue)
   }
 
   try {
     // Fetch both batch endpoints in parallel
-    const uiBatchPromise = getUIBatch()
-    const homepageBatchPromise = getHomepageBatch()
-    
-    const defaultUIBatch = {
+    const uiBatchPromise = getUIBatch().catch(() => ({
       carousel: [],
       topbar: null,
       categories: [],
       sidePanels: null,
       timestamp: Date.now(),
       duration: 0,
-    }
-    
-    const defaultHomepageBatch = {
+    }))
+
+    const homepageBatchPromise = getHomepageBatch().catch(() => ({
       timestamp: new Date().toISOString(),
       total_execution_ms: 0,
       cached: false,
       sections: {},
-    }
+    }))
 
+    // Fetch additional data in parallel
     const [
       uiBatchData,
       homepageBatchData,
       featureCards,
       contactCTASlides,
     ] = await Promise.all([
-      timeout(uiBatchPromise, 3000, defaultUIBatch),
-      timeout(homepageBatchPromise, 3000, defaultHomepageBatch),
+      timeout(uiBatchPromise, 3000, {
+        carousel: [],
+        topbar: null,
+        categories: [],
+        sidePanels: null,
+        timestamp: Date.now(),
+        duration: 0,
+      }),
+      timeout(homepageBatchPromise, 3000, {
+        timestamp: new Date().toISOString(),
+        total_execution_ms: 0,
+        cached: false,
+        sections: {
+          flash_sales: { products: [] },
+          luxury_deals: { products: [] },
+          new_arrivals: { products: [] },
+          top_picks: { products: [] },
+          trending: { products: [] },
+          daily_finds: { products: [] },
+        },
+        meta: {
+          sections_fetched: 0,
+          parallel_execution: false,
+        },
+      }),
       getFeatureCards().catch(() => []),
       getContactCTASlides().catch(() => []),
     ])
 
-    console.log('[v0] UI Batch received - sections:', Object.keys(uiBatchSections), 'Categories count:', categories.length)
+    // Normalize carousel items from UI batch response
+    const carouselItems = Array.isArray(uiBatchData?.carousel)
+      ? uiBatchData.carousel
+      : []
 
-    // Extract data from UI batch sections (backend returns nested structure)
-    const uiBatchSections = uiBatchData?.sections || {}
-    const carouselSection = uiBatchSections.carousel || {}
-    const categoriesSection = uiBatchSections.categories || {}
-    const sidePanelsSection = uiBatchSections.side_panels || {}
-    
-    // Normalize carousel items - backend returns carousel.data as object with position keys
-    // We need to flatten the homepage carousel items
-    const carouselData = carouselSection?.data || {}
-    const homepageCarousel = Array.isArray(carouselData?.homepage) ? carouselData.homepage : []
-    
-    // Transform carousel items to include image field
-    const carouselItems = homepageCarousel.map((item: any) => ({
-      id: item.id,
-      image: item.image_url || item.image, // Backend sends image_url
-      title: item.title || item.name,
-      description: item.description,
-      buttonText: item.button_text,
-      href: item.link_url || '/products',
-    }))
+    // Normalize categories from UI batch response  
+    const categories = Array.isArray(uiBatchData?.categories)
+      ? uiBatchData.categories
+      : []
 
-    console.log('[v0] Carousel items extracted:', carouselItems.length, carouselItems)
+    // Extract side panels from UI batch
+    const sidePanels = uiBatchData?.sidePanels || {}
+    const premiumExperiences = Array.isArray(sidePanels?.premium) ? sidePanels.premium : []
+    const productShowcase = Array.isArray(sidePanels?.showcase) ? sidePanels.showcase : []
 
-    // Normalize categories from UI batch response - backend returns featured and root categories
-    // The categories section has structure: { featured: [...], root: [...], featured_count, root_count }
-    const allCategoriesFromBatch = [
-      ...(Array.isArray(categoriesSection?.featured) ? categoriesSection.featured : []),
-      ...(Array.isArray(categoriesSection?.root) ? categoriesSection.root : [])
-    ]
-    
-    // Transform categories to include required fields for rendering
-    const categories = allCategoriesFromBatch.map((cat: any) => ({
-      id: cat.id,
-      name: cat.name,
-      slug: cat.slug,
-      image: cat.image_url, // Backend sends image_url
-      product_count: cat.products_count || cat.product_count || 0,
-      description: cat.description || '',
-    }))
+    // Extract product sections from homepage batch response (use a local any alias
+    // to narrow the union and allow safe property access). We still validate
+    // arrays with Array.isArray to avoid runtime surprises.
+    const hb = homepageBatchData as any
+    const sections = hb?.sections ?? {}
+    const flashSaleProducts = Array.isArray(sections?.flash_sales?.products)
+      ? sections.flash_sales.products
+      : []
+    const luxuryProducts = Array.isArray(sections?.luxury_deals?.products)
+      ? sections.luxury_deals.products
+      : []
+    const newArrivals = Array.isArray(sections?.new_arrivals?.products)
+      ? sections.new_arrivals.products
+      : []
+    const topPicks = Array.isArray(sections?.top_picks?.products)
+      ? sections.top_picks.products
+      : []
+    const trendingProducts = Array.isArray(sections?.trending?.products)
+      ? sections.trending.products
+      : []
+    const dailyFinds = Array.isArray(sections?.daily_finds?.products)
+      ? sections.daily_finds.products
+      : []
 
-    console.log('[v0] Categories extracted from featured+root:', categories.length, 'Featured:', categoriesSection?.featured_count, 'Root:', categoriesSection?.root_count)
-
-    // Extract side panels from UI batch - backend returns in sections.side_panels.data
-    const sidePanelsData = sidePanelsSection?.data || {}
-    const premiumExperiences = Array.isArray(sidePanelsData?.premium_experience_left) 
-      ? sidePanelsData.premium_experience_left 
-      : Array.isArray(sidePanelsData?.premium_experience_right) 
-        ? sidePanelsData.premium_experience_right 
-        : []
-    const productShowcase = Array.isArray(sidePanelsData?.product_showcase_left) 
-      ? sidePanelsData.product_showcase_left 
-      : Array.isArray(sidePanelsData?.product_showcase_right) 
-        ? sidePanelsData.product_showcase_right 
-        : []
-
-    // Extract product sections from homepage batch response
-    const sections = homepageBatchData?.sections || {}
-    
-    // Transform product data - backend sends image as "image" field, frontend expects "image"
-    const transformProducts = (products: any[]) => {
-      return Array.isArray(products) ? products.map(p => ({
-        id: p.id,
-        name: p.name,
-        slug: p.slug,
-        price: p.price,
-        sale_price: p.sale_price,
-        discount_percentage: p.discount_percentage,
-        image: p.image || p.thumbnail_url, // Handle both field names
-        image_urls: p.image_urls || [p.image],
-        // Add other required product fields with defaults
-        description: '',
-        rating: 4.5,
-        reviews: 0,
-        in_stock: true,
-        is_active: true,
-        is_visible: true,
-      })) : []
-    }
-    
-    const flashSaleProducts = transformProducts(sections.flash_sales?.products || [])
-    const luxuryProducts = transformProducts(sections.luxury_deals?.products || [])
-    const newArrivals = transformProducts(sections.new_arrivals?.products || [])
-    const topPicks = transformProducts(sections.top_picks?.products || [])
-    const trendingProducts = transformProducts(sections.trending?.products || [])
-    const dailyFinds = transformProducts(sections.daily_finds?.products || [])
-
-    console.log('[v0] Product sections extracted:', {
-      flashSales: flashSaleProducts.length,
-      luxury: luxuryProducts.length,
-      newArrivals: newArrivals.length,
-      topPicks: topPicks.length,
-      trending: trendingProducts.length,
-      dailyFinds: dailyFinds.length,
+    console.log('[v0] Homepage batch stats:', {
+      cached: hb?.cached,
+      executionTime: hb?.total_execution_ms,
+      sectionsFetched: hb?.meta?.sections_fetched,
+      parallelExecution: hb?.meta?.parallel_execution,
     })
 
     return {
@@ -167,12 +140,12 @@ async function LoadAllContent() {
       productShowcase: Array.isArray(productShowcase) ? productShowcase : [],
       contactCTASlides: Array.isArray(contactCTASlides) ? contactCTASlides : [],
       featureCards: Array.isArray(featureCards) ? featureCards : [],
-      flashSaleProducts,
-      luxuryProducts,
-      newArrivals,
-      topPicks,
-      trendingProducts,
-      dailyFinds,
+      flashSaleProducts: Array.isArray(flashSaleProducts) ? flashSaleProducts : [],
+      luxuryProducts: Array.isArray(luxuryProducts) ? luxuryProducts : [],
+      newArrivals: Array.isArray(newArrivals) ? newArrivals : [],
+      topPicks: Array.isArray(topPicks) ? topPicks : [],
+      trendingProducts: Array.isArray(trendingProducts) ? trendingProducts : [],
+      dailyFinds: Array.isArray(dailyFinds) ? dailyFinds : [],
       allProducts: [...flashSaleProducts, ...trendingProducts, ...topPicks].slice(0, 12),
       allProductsHasMore: true,
     }
