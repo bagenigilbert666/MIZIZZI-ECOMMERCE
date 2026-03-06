@@ -1,7 +1,7 @@
 from flask import request, Response
 import functools
 
-def cors_middleware(allowed_origins=None, allowed_methods=None, allowed_headers=None):
+def cors_middleware(allowed_origins=None, allowed_methods=None, allowed_headers=None, expose_headers=None):
     """
     A decorator to handle CORS for specific routes
 
@@ -9,6 +9,7 @@ def cors_middleware(allowed_origins=None, allowed_methods=None, allowed_headers=
         allowed_origins: List of allowed origins or '*' for all
         allowed_methods: List of allowed HTTP methods
         allowed_headers: List of allowed headers
+        expose_headers: List of headers to expose to client (e.g., X-Cache, X-Response-Time-Ms)
     """
     if allowed_origins is None:
         allowed_origins = ['*']  # Allow all origins for development
@@ -16,6 +17,11 @@ def cors_middleware(allowed_origins=None, allowed_methods=None, allowed_headers=
         allowed_methods = ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
     if allowed_headers is None:
         allowed_headers = ['Content-Type', 'Authorization', 'X-Requested-With']
+    if expose_headers is None:
+        expose_headers = [
+            'Content-Range', 'X-Content-Range', 'X-Cache', 'X-Cache-Time-Ms', 
+            'X-Response-Time-Ms', 'X-Products-Cached', 'X-All-Products-Cache'
+        ]
 
     def decorator(f):
         @functools.wraps(f)
@@ -31,6 +37,7 @@ def cors_middleware(allowed_origins=None, allowed_methods=None, allowed_headers=
                     response.headers['Access-Control-Allow-Origin'] = origin
                     response.headers['Access-Control-Allow-Methods'] = ', '.join(allowed_methods)
                     response.headers['Access-Control-Allow-Headers'] = ', '.join(allowed_headers)
+                    response.headers['Access-Control-Expose-Headers'] = ', '.join(expose_headers)
                     response.headers['Access-Control-Allow-Credentials'] = 'true'
                     response.headers['Access-Control-Max-Age'] = '3600'  # Cache preflight for 1 hour
                     return response, 204
@@ -48,6 +55,7 @@ def cors_middleware(allowed_origins=None, allowed_methods=None, allowed_headers=
                         response.headers['Access-Control-Allow-Origin'] = origin
                         response.headers['Access-Control-Allow-Methods'] = ', '.join(allowed_methods)
                         response.headers['Access-Control-Allow-Headers'] = ', '.join(allowed_headers)
+                        response.headers['Access-Control-Expose-Headers'] = ', '.join(expose_headers)
                         response.headers['Access-Control-Allow-Credentials'] = 'true'
 
                         # Return the response with the status code and any extra items
@@ -61,6 +69,7 @@ def cors_middleware(allowed_origins=None, allowed_methods=None, allowed_headers=
                     response_obj.headers['Access-Control-Allow-Origin'] = origin
                     response_obj.headers['Access-Control-Allow-Methods'] = ', '.join(allowed_methods)
                     response_obj.headers['Access-Control-Allow-Headers'] = ', '.join(allowed_headers)
+                    response_obj.headers['Access-Control-Expose-Headers'] = ', '.join(expose_headers)
                     response_obj.headers['Access-Control-Allow-Credentials'] = 'true'
 
                     # Return the response with any extra items
@@ -73,6 +82,7 @@ def cors_middleware(allowed_origins=None, allowed_methods=None, allowed_headers=
                     result.headers['Access-Control-Allow-Origin'] = origin
                     result.headers['Access-Control-Allow-Methods'] = ', '.join(allowed_methods)
                     result.headers['Access-Control-Allow-Headers'] = ', '.join(allowed_headers)
+                    result.headers['Access-Control-Expose-Headers'] = ', '.join(expose_headers)
                     result.headers['Access-Control-Allow-Credentials'] = 'true'
                     return result
 
@@ -81,6 +91,7 @@ def cors_middleware(allowed_origins=None, allowed_methods=None, allowed_headers=
                 response.headers['Access-Control-Allow-Origin'] = origin
                 response.headers['Access-Control-Allow-Methods'] = ', '.join(allowed_methods)
                 response.headers['Access-Control-Allow-Headers'] = ', '.join(allowed_headers)
+                response.headers['Access-Control-Expose-Headers'] = ', '.join(expose_headers)
                 response.headers['Access-Control-Allow-Credentials'] = 'true'
                 return response
 
