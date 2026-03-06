@@ -220,6 +220,7 @@ def test_list_endpoints():
 def test_featured_sections():
     """Test featured section endpoints"""
     log_test("Featured Section Endpoints")
+    
     sections = [
         ("trending", "Trending Products"),
         ("flash_sale", "Flash Sale"),
@@ -228,54 +229,35 @@ def test_featured_sections():
         ("daily_finds", "Daily Finds"),
         ("luxury_deals", "Luxury Deals"),
     ]
-
+    
     for section_key, section_name in sections:
-        # Convert underscore keys to hyphenated route names (e.g. flash_sale -> flash-sale)
-        route_name = section_key.replace('_', '-')
-
-        # Test normal endpoint (e.g. /api/products/flash-sale)
-        log_info(f"Testing {BASE_URL}/{route_name}?limit=5")
-        status, data, elapsed = test_endpoint("GET", f"{BASE_URL}/{route_name}", params={"limit": 5})
-
+        # Test normal endpoint
+        log_info(f"Testing /products/{section_key}?limit=5")
+        status, data, elapsed = test_endpoint("GET", f"{BASE_URL}/{section_key}", params={"limit": 5})
+        
         if validate_response(status, data, expected_status=200):
-            # Some endpoints may return a JSON string (double-encoded from cache). Normalize to dict.
-            if isinstance(data, str):
-                try:
-                    data = json.loads(data)
-                except Exception:
-                    log_error("Invalid JSON in response")
-                    data = {}
-
             items = data.get('items', data.get('products', []))
             total = data.get('total', len(items))
             cached_at = data.get('cached_at', 'unknown')
-
+            
             if items:
                 log_success(f"{section_name}: {len(items)} items (total: {total}) - {elapsed*1000:.2f}ms")
             else:
                 log_info(f"{section_name}: no items (may be normal)")
         else:
             log_error(f"Failed to fetch {section_name}")
-
-        # Test fast endpoint (note: fast endpoints are under /fast/<section>, e.g. /api/products/fast/flash-sale)
-        log_info(f"Testing {BASE_URL}/fast/{route_name}?limit=5")
-        status, data, elapsed_fast = test_endpoint("GET", f"{BASE_URL}/fast/{route_name}", params={"limit": 5})
-
+        
+        # Test fast endpoint
+        log_info(f"Testing /products/{section_key}/fast?limit=5")
+        status, data, elapsed_fast = test_endpoint("GET", f"{BASE_URL}/{section_key}/fast", params={"limit": 5})
+        
         if validate_response(status, data, expected_status=200):
-            # Normalize string responses returned from cache
-            if isinstance(data, str):
-                try:
-                    data = json.loads(data)
-                except Exception:
-                    log_error("Invalid JSON in fast response")
-                    data = {}
-
             items = data.get('items', data.get('products', []))
             count = data.get('count', len(items))
-
+            
             if items:
                 log_success(f"{section_name} (fast): {count} items - {elapsed_fast*1000:.2f}ms")
-
+    
     return True
 
 def test_cache_management():
@@ -293,9 +275,9 @@ def test_cache_management():
     else:
         log_info(f"Cache status returned {status} (may require admin auth)")
     
-    # Test cache info endpoint (use /cache/status)
-    log_info("Testing GET /products/cache/status")
-    status, data, elapsed = test_endpoint("GET", f"{BASE_URL}/cache/status")
+    # Test cache info endpoint
+    log_info("Testing GET /products/cache/info")
+    status, data, elapsed = test_endpoint("GET", f"{BASE_URL}/cache/info")
     
     if validate_response(status, data, expected_status=200):
         cache_type = data.get('cache_type', 'unknown')
