@@ -63,8 +63,8 @@ async function LoadAllContent() {
       getContactCTASlides().catch(() => []),
     ])
 
-    console.log('[v0] UI Batch Response:', uiBatchData);
-    console.log('[v0] Homepage Batch Response:', homepageBatchData);
+    console.log('[v0] UI Batch Response sections:', Object.keys(uiBatchSections))
+    console.log('[v0] Homepage Batch Response sections:', Object.keys(homepageBatchData?.sections || {}))
 
     // Extract data from UI batch sections (backend returns nested structure)
     const uiBatchSections = uiBatchData?.sections || {}
@@ -72,21 +72,38 @@ async function LoadAllContent() {
     const categoriesSection = uiBatchSections.categories || {}
     const sidePanelsSection = uiBatchSections.side_panels || {}
     
-    // Normalize carousel items - backend returns carousel data in sections.carousel.data
-    const carouselItems = Array.isArray(carouselSection?.data?.homepage) 
-      ? carouselSection.data.homepage
-      : Array.isArray(carouselSection?.data) 
-        ? carouselSection.data 
-        : []
+    // Normalize carousel items - backend returns carousel.data as object with position keys
+    // We need to flatten the homepage carousel items
+    const carouselData = carouselSection?.data || {}
+    const homepageCarousel = Array.isArray(carouselData?.homepage) ? carouselData.homepage : []
+    
+    // Transform carousel items to include image field
+    const carouselItems = homepageCarousel.map((item: any) => ({
+      id: item.id,
+      image: item.image_url || item.image, // Backend sends image_url
+      title: item.title || item.name,
+      description: item.description,
+      buttonText: item.button_text,
+      href: item.link_url || '/products',
+    }))
 
-    console.log('[v0] Carousel items extracted:', carouselItems.length)
+    console.log('[v0] Carousel items extracted:', carouselItems.length, carouselItems)
 
     // Normalize categories from UI batch response - backend returns in sections.categories.data
-    const categories = Array.isArray(categoriesSection?.data) 
+    const categoriesData = Array.isArray(categoriesSection?.data) 
       ? categoriesSection.data 
       : []
+    
+    // Transform categories to include image field if available
+    const categories = categoriesData.map((cat: any) => ({
+      id: cat.id,
+      name: cat.name,
+      slug: cat.slug,
+      image: cat.image || cat.category_image,
+      product_count: cat.product_count || 0,
+    }))
 
-    console.log('[v0] Categories extracted:', categories.length)
+    console.log('[v0] Categories extracted:', categories.length, categories)
 
     // Extract side panels from UI batch - backend returns in sections.side_panels.data
     const sidePanelsData = sidePanelsSection?.data || {}
