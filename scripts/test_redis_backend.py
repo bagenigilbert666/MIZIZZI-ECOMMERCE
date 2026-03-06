@@ -1,306 +1,173 @@
+#!/usr/bin/env python3
 """
-test_redis_backend.py - Comprehensive Redis connectivity test for Flask backend
+Test script for Upstash Redis connectivity using HTTP REST API.
 
-This script tests the Redis integration with your Upstash instance and verifies
-all caching operations work correctly.
+This script tests the Redis backend connection without requiring the 
+upstash-redis SDK. It uses direct HTTP requests to the Upstash REST API.
+
+Run from project root:
+    python scripts/test_redis_backend.py
 """
-import os
 import sys
-import requests
-import json
+import os
 from datetime import datetime
 
-# Test environment variables
-REDIS_URL = "https://nearby-rabbit-63956.upstash.io"
-REDIS_TOKEN = "AfnUAAIncDI4NmVmOGJhM2I1OTU0NWE0OTAwYmVkNzYzZWU4ZTIyMHAyNjM5NTY"
+# Add the backend to the path
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'backend'))
 
-print("=" * 70)
-print("UPSTASH REDIS BACKEND CONNECTIVITY TEST")
-print("=" * 70)
-print(f"Timestamp: {datetime.now().isoformat()}")
-print()
+def print_header(text):
+    """Print a formatted header."""
+    print("\n" + "=" * 70)
+    print(text)
+    print("=" * 70)
 
-# Test 1: Basic connectivity
-print("[TEST 1] Basic Redis Connectivity")
-print("-" * 70)
-try:
-    headers = {
-        "Authorization": f"Bearer {REDIS_TOKEN}"
-    }
-    response = requests.post(
-        f"{REDIS_URL}/ping",
-        headers=headers
-    )
-    if response.status_code == 200:
-        print("✓ PING successful")
-        print(f"  Response: {response.json()}")
-    else:
-        print(f"✗ PING failed: {response.status_code}")
-        print(f"  Response: {response.text}")
-except Exception as e:
-    print(f"✗ Connection error: {str(e)}")
+def print_test(name, passed, message=""):
+    """Print a test result."""
+    status = "✓" if passed else "✗"
+    print(f"{status} {name}")
+    if message:
+        print(f"  {message}")
 
-print()
-
-# Test 2: SET and GET operations
-print("[TEST 2] SET/GET Operations")
-print("-" * 70)
-test_key = "test:redis:connectivity"
-test_value = {"test": "value", "timestamp": datetime.now().isoformat()}
-
-try:
-    headers = {
-        "Authorization": f"Bearer {REDIS_TOKEN}",
-        "Content-Type": "application/json"
-    }
+def main():
+    """Run all Redis connectivity tests."""
+    print_header("UPSTASH REDIS BACKEND CONNECTIVITY TEST (HTTP REST API)")
+    print(f"Timestamp: {datetime.now().isoformat()}\n")
     
-    # SET operation
-    set_payload = {
-        "commands": [[
-            "SET",
-            test_key,
-            json.dumps(test_value),
-            "EX",
-            "300"
-        ]]
-    }
-    set_response = requests.post(
-        f"{REDIS_URL}",
-        headers=headers,
-        json=set_payload
-    )
+    # Import the Redis client
+    try:
+        from app.cache.redis_client import get_redis_client, is_redis_connected
+        print("✓ Successfully imported Redis client module")
+    except ImportError as e:
+        print(f"✗ Failed to import Redis client: {e}")
+        return False
     
-    if set_response.status_code == 200:
-        print(f"✓ SET operation successful")
-        print(f"  Key: {test_key}")
-        print(f"  TTL: 300 seconds")
-    else:
-        print(f"✗ SET failed: {set_response.status_code}")
-        print(f"  Response: {set_response.text}")
+    # Check environment variables
+    print_header("CHECKING ENVIRONMENT VARIABLES")
+    redis_url = os.environ.get('UPSTASH_REDIS_REST_URL')
+    redis_token = os.environ.get('UPSTASH_REDIS_REST_TOKEN')
     
-    # GET operation
-    get_payload = {
-        "commands": [[
-            "GET",
-            test_key
-        ]]
-    }
-    get_response = requests.post(
-        f"{REDIS_URL}",
-        headers=headers,
-        json=get_payload
-    )
+    print_test("UPSTASH_REDIS_REST_URL set", bool(redis_url), 
+               redis_url[:40] + "..." if redis_url else "NOT SET")
+    print_test("UPSTASH_REDIS_REST_TOKEN set", bool(redis_token), 
+               redis_token[:20] + "..." if redis_token else "NOT SET")
     
-    if get_response.status_code == 200:
-        print(f"✓ GET operation successful")
-        print(f"  Retrieved: {get_response.json()}")
-    else:
-        print(f"✗ GET failed: {get_response.status_code}")
-        print(f"  Response: {get_response.text}")
-        
-except Exception as e:
-    print(f"✗ SET/GET error: {str(e)}")
-
-print()
-
-# Test 3: List operations (LPUSH/LRANGE)
-print("[TEST 3] List Operations (LPUSH/LRANGE)")
-print("-" * 70)
-list_key = "test:list"
-try:
-    headers = {
-        "Authorization": f"Bearer {REDIS_TOKEN}",
-        "Content-Type": "application/json"
-    }
+    if not (redis_url and redis_token):
+        print("\n⚠️  Missing environment variables. Please set:")
+        print("  - UPSTASH_REDIS_REST_URL")
+        print("  - UPSTASH_REDIS_REST_TOKEN")
+        return False
     
-    # LPUSH operation
-    lpush_payload = {
-        "commands": [[
-            "LPUSH",
-            list_key,
-            "item1",
-            "item2",
-            "item3"
-        ]]
-    }
-    lpush_response = requests.post(
-        f"{REDIS_URL}",
-        headers=headers,
-        json=lpush_payload
-    )
+    # Get the client
+    print_header("CONNECTING TO REDIS")
+    client = get_redis_client()
     
-    if lpush_response.status_code == 200:
-        print(f"✓ LPUSH operation successful")
-        print(f"  Items pushed: 3")
-    else:
-        print(f"✗ LPUSH failed: {lpush_response.status_code}")
+    if client is None:
+        print("✗ Failed to create Redis client")
+        return False
     
-    # LRANGE operation
-    lrange_payload = {
-        "commands": [[
-            "LRANGE",
-            list_key,
-            "0",
-            "-1"
-        ]]
-    }
-    lrange_response = requests.post(
-        f"{REDIS_URL}",
-        headers=headers,
-        json=lrange_payload
-    )
+    print("✓ Redis client created successfully")
     
-    if lrange_response.status_code == 200:
-        print(f"✓ LRANGE operation successful")
-        print(f"  List contents: {lrange_response.json()}")
-    else:
-        print(f"✗ LRANGE failed: {lrange_response.status_code}")
-        
-except Exception as e:
-    print(f"✗ List operations error: {str(e)}")
-
-print()
-
-# Test 4: Hash operations (HSET/HGETALL)
-print("[TEST 4] Hash Operations (HSET/HGETALL)")
-print("-" * 70)
-hash_key = "test:hash"
-try:
-    headers = {
-        "Authorization": f"Bearer {REDIS_TOKEN}",
-        "Content-Type": "application/json"
-    }
+    # Test 1: Basic connectivity (PING)
+    print_header("TEST 1: BASIC REDIS CONNECTIVITY")
+    ping_result = client.ping()
+    print_test("PING command", ping_result, 
+               "Connection successful" if ping_result else "Connection failed")
     
-    # HSET operation
-    hset_payload = {
-        "commands": [[
-            "HSET",
-            hash_key,
-            "field1", "value1",
-            "field2", "value2",
-            "field3", "value3"
-        ]]
-    }
-    hset_response = requests.post(
-        f"{REDIS_URL}",
-        headers=headers,
-        json=hset_payload
-    )
+    if not ping_result:
+        print("\n⚠️  Could not establish basic connectivity")
+        return False
     
-    if hset_response.status_code == 200:
-        print(f"✓ HSET operation successful")
-        print(f"  Fields set: 3")
-    else:
-        print(f"✗ HSET failed: {hset_response.status_code}")
+    # Test 2: SET/GET operations
+    print_header("TEST 2: SET/GET OPERATIONS")
     
-    # HGETALL operation
-    hgetall_payload = {
-        "commands": [[
-            "HGETALL",
-            hash_key
-        ]]
-    }
-    hgetall_response = requests.post(
-        f"{REDIS_URL}",
-        headers=headers,
-        json=hgetall_payload
-    )
+    set_result = client.set("test:redis:connectivity", "Hello Redis", ex=60)
+    print_test("SET command", set_result, 
+               "Successfully set key" if set_result else "Failed to set key")
     
-    if hgetall_response.status_code == 200:
-        print(f"✓ HGETALL operation successful")
-        print(f"  Hash contents: {hgetall_response.json()}")
-    else:
-        print(f"✗ HGETALL failed: {hgetall_response.status_code}")
-        
-except Exception as e:
-    print(f"✗ Hash operations error: {str(e)}")
-
-print()
-
-# Test 5: Increment operations (INCR)
-print("[TEST 5] Counter Operations (INCR)")
-print("-" * 70)
-counter_key = "test:counter"
-try:
-    headers = {
-        "Authorization": f"Bearer {REDIS_TOKEN}",
-        "Content-Type": "application/json"
-    }
+    if set_result:
+        get_result = client.get("test:redis:connectivity")
+        print_test("GET command", get_result == "Hello Redis",
+                   f"Retrieved: {get_result}" if get_result else "Failed to get key")
     
-    # INCR operation (multiple times)
-    for i in range(3):
-        incr_payload = {
-            "commands": [[
-                "INCR",
-                counter_key
-            ]]
-        }
-        incr_response = requests.post(
-            f"{REDIS_URL}",
-            headers=headers,
-            json=incr_payload
-        )
-        
-        if incr_response.status_code == 200:
-            print(f"✓ INCR #{i+1} successful: {incr_response.json()}")
-        else:
-            print(f"✗ INCR #{i+1} failed: {incr_response.status_code}")
-            
-except Exception as e:
-    print(f"✗ Counter operations error: {str(e)}")
-
-print()
-
-# Test 6: Cleanup (DEL operations)
-print("[TEST 6] Cleanup (DEL operations)")
-print("-" * 70)
-try:
-    headers = {
-        "Authorization": f"Bearer {REDIS_TOKEN}",
-        "Content-Type": "application/json"
-    }
+    # Test 3: List operations (LPUSH/LRANGE)
+    print_header("TEST 3: LIST OPERATIONS")
     
-    keys_to_delete = [test_key, list_key, hash_key, counter_key]
+    lpush_result = client.lpush("test:list", "item1", "item2", "item3")
+    print_test("LPUSH command", lpush_result > 0,
+               f"Pushed {lpush_result} items" if lpush_result > 0 else "Failed to push items")
     
-    for key in keys_to_delete:
-        del_payload = {
-            "commands": [[
-                "DEL",
-                key
-            ]]
-        }
-        del_response = requests.post(
-            f"{REDIS_URL}",
-            headers=headers,
-            json=del_payload
-        )
-        
-        if del_response.status_code == 200:
-            print(f"✓ Deleted key: {key}")
-        else:
-            print(f"✗ Failed to delete key: {key}")
-            
-except Exception as e:
-    print(f"✗ Cleanup error: {str(e)}")
-
-print()
-print("=" * 70)
-print("TEST SUMMARY")
-print("=" * 70)
-print("""
+    if lpush_result > 0:
+        lrange_result = client.lrange("test:list", 0, -1)
+        print_test("LRANGE command", len(lrange_result) > 0,
+                   f"Retrieved {len(lrange_result)} items" if lrange_result else "Failed to get list")
+    
+    # Test 4: Hash operations (HSET/HGETALL)
+    print_header("TEST 4: HASH OPERATIONS")
+    
+    hset_result = client.hset("test:hash", "field1", "value1")
+    print_test("HSET command", hset_result > 0,
+               f"Set {hset_result} field(s)" if hset_result > 0 else "Failed to set hash field")
+    
+    if hset_result > 0:
+        hgetall_result = client.hgetall("test:hash")
+        print_test("HGETALL command", len(hgetall_result) > 0,
+                   f"Retrieved {len(hgetall_result)} fields" if hgetall_result else "Failed to get hash")
+    
+    # Test 5: Counter operations (INCR)
+    print_header("TEST 5: COUNTER OPERATIONS")
+    
+    incr1 = client.incr("test:counter")
+    print_test("INCR #1", incr1 == 1, f"Counter value: {incr1}")
+    
+    incr2 = client.incr("test:counter")
+    print_test("INCR #2", incr2 == 2, f"Counter value: {incr2}")
+    
+    incr3 = client.incr("test:counter")
+    print_test("INCR #3", incr3 == 3, f"Counter value: {incr3}")
+    
+    # Test 6: Cleanup (DEL operations)
+    print_header("TEST 6: CLEANUP (DEL OPERATIONS)")
+    
+    cleanup_keys = [
+        "test:redis:connectivity",
+        "test:list",
+        "test:hash",
+        "test:counter"
+    ]
+    
+    for key in cleanup_keys:
+        del_result = client.delete(key)
+        print_test(f"DELETE {key}", del_result >= 0)
+    
+    # Summary
+    print_header("TEST SUMMARY")
+    print("""
 If all tests passed with ✓ marks, your Redis integration is working correctly!
 
 Next steps:
-1. Ensure your Flask backend loads the environment variables from .env
+1. Verify that your Flask backend loads the environment variables from .env
 2. Restart your Flask development server
 3. Test the product routes with cache headers:
-   - GET /api/products/health
-   - GET /api/products/cache/status
-   - GET /api/products/cache/warming-status
+   - GET /api/products
+   - GET /api/products/<id>
+   - GET /api/products/category/<slug>
 
 You should see:
 - X-Cache: HIT (when cached)
 - X-Cache: MISS (first request)
-- Connection status showing Upstash Redis connected
+- Cache statistics in response headers
+
+Redis caching is now active for all product routes!
 """)
-print("=" * 70)
+    
+    return True
+
+if __name__ == "__main__":
+    try:
+        success = main()
+        sys.exit(0 if success else 1)
+    except Exception as e:
+        print(f"\n✗ Unexpected error: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
