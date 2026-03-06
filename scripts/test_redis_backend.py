@@ -15,28 +15,35 @@ import sys
 import os
 from datetime import datetime
 
-# Load .env file first
+# Load .env file first using python-dotenv if available
 def load_env_file():
     """Load environment variables from .env file."""
     script_dir = os.path.dirname(os.path.abspath(__file__))
     project_root = os.path.dirname(script_dir)
     backend_dir = os.path.join(project_root, 'backend')
-    
-    # Try loading from backend/.env first
     env_file = os.path.join(backend_dir, '.env')
-    if os.path.exists(env_file):
-        with open(env_file, 'r') as f:
-            for line in f:
-                line = line.strip()
-                if line and not line.startswith('#'):
-                    if '=' in line:
-                        key, value = line.split('=', 1)
-                        os.environ[key.strip()] = value.strip()
-        print(f"✓ Loaded environment from {env_file}\n")
+    
+    # Try using python-dotenv first
+    try:
+        from dotenv import load_dotenv
+        load_dotenv(env_file)
+        print(f"✓ Loaded environment from {env_file} (using python-dotenv)\n")
         return True
+    except ImportError:
+        # Fallback to manual loading
+        if os.path.exists(env_file):
+            with open(env_file, 'r') as f:
+                for line in f:
+                    line = line.strip()
+                    if line and not line.startswith('#'):
+                        if '=' in line:
+                            key, value = line.split('=', 1)
+                            os.environ[key.strip()] = value.strip()
+            print(f"✓ Loaded environment from {env_file} (manual parsing)\n")
+            return True
     return False
 
-# Load environment variables
+# Load environment variables FIRST, before importing anything
 load_env_file()
 
 # Get the script's directory
