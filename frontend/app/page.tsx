@@ -87,83 +87,47 @@ async function LoadAllContent() {
       getContactCTASlides().catch(() => []),
     ])
 
-    console.log('[v0] ===== DEBUGGING UI BATCH RESPONSE =====')
-    console.log('[v0] Full uiBatchData:', JSON.stringify(uiBatchData, null, 2).substring(0, 1000))
-    console.log('[v0] uiBatchData keys:', Object.keys(uiBatchData || {}))
+    // Extract data from UI batch - backend returns FLAT structure: { carousel: [...], categories: [...], sidePanels: {...}, ... }
+    // NOT nested under sections like we expected
+    const carouselData = Array.isArray(uiBatchData?.carousel) ? uiBatchData.carousel : []
+    const categoriesData = Array.isArray(uiBatchData?.categories) ? uiBatchData.categories : []
+    const sidePanelsData = uiBatchData?.sidePanels || {}
     
-    // Extract data from UI batch - backend returns { sections: { carousel: {...}, categories: {...}, etc } }
-    const uiBatchSections = uiBatchData?.sections || {}
-    console.log('[v0] uiBatchSections:', uiBatchSections)
-    console.log('[v0] uiBatchSections keys:', Object.keys(uiBatchSections))
-    
-    // Extract categories from backend response structure
-    const categoriesSection = uiBatchSections?.categories || {}
-    console.log('[v0] categoriesSection:', categoriesSection)
-    const categoriesData = [
-      ...(Array.isArray(categoriesSection?.featured) ? categoriesSection.featured : []),
-      ...(Array.isArray(categoriesSection?.root) ? categoriesSection.root : [])
-    ]
-    console.log('[v0] Categories extracted:', categoriesData.length)
-    
-    // Extract carousel from backend response
-    const carouselSection = uiBatchSections?.carousel || {}
-    console.log('[v0] carouselSection:', carouselSection)
-    const carouselData = Array.isArray(carouselSection?.data?.homepage)
-      ? carouselSection.data.homepage
-      : Array.isArray(carouselSection?.data)
-        ? carouselSection.data
-        : Array.isArray(carouselSection?.items)
-          ? carouselSection.items
-          : []
+    const premiumExperiencesData = Array.isArray(sidePanelsData?.premium) ? sidePanelsData.premium : []
+    const productShowcaseData = Array.isArray(sidePanelsData?.showcase) ? sidePanelsData.showcase : []
+
     console.log('[v0] Carousel extracted:', carouselData.length)
-    
-    // Extract side panels from backend response
-    const sidePanelsSection = uiBatchSections?.side_panels || {}
-    console.log('[v0] sidePanelsSection:', sidePanelsSection)
-    const sidePanelsData = sidePanelsSection?.data || {}
-    const premiumExperiencesData = [
-      ...(Array.isArray(sidePanelsData?.premium_experience_left) ? sidePanelsData.premium_experience_left : []),
-      ...(Array.isArray(sidePanelsData?.premium_experience_right) ? sidePanelsData.premium_experience_right : [])
-    ]
-    const productShowcaseData = [
-      ...(Array.isArray(sidePanelsData?.product_showcase_left) ? sidePanelsData.product_showcase_left : []),
-      ...(Array.isArray(sidePanelsData?.product_showcase_right) ? sidePanelsData.product_showcase_right : [])
-    ]
+    console.log('[v0] Categories extracted:', categoriesData.length)
     console.log('[v0] Premium experiences:', premiumExperiencesData.length, 'Product showcase:', productShowcaseData.length)
 
-    // Extract side panels from UI batch
-    const sidePanels = uiBatchData?.sidePanels || {}
-    const premiumExperiences = Array.isArray(sidePanels?.premium) ? sidePanels.premium : []
-    const productShowcase = Array.isArray(sidePanels?.showcase) ? sidePanels.showcase : []
-
-    // Use extracted data for product sections
+    // Extract product sections from homepage batch
     const hb = homepageBatchData as any
     const sections = hb?.sections ?? {}
-    const flashSaleProducts = Array.isArray(sections?.flash_sales?.products)
-      ? sections.flash_sales.products
-      : []
-    const luxuryProducts = Array.isArray(sections?.luxury_deals?.products)
-      ? sections.luxury_deals.products
-      : []
-    const newArrivals = Array.isArray(sections?.new_arrivals?.products)
-      ? sections.new_arrivals.products
-      : []
-    const topPicks = Array.isArray(sections?.top_picks?.products)
-      ? sections.top_picks.products
-      : []
-    const trendingProducts = Array.isArray(sections?.trending?.products)
-      ? sections.trending.products
-      : []
-    const dailyFinds = Array.isArray(sections?.daily_finds?.products)
-      ? sections.daily_finds.products
-      : []
+    const transformProducts = (products: any[]) => {
+      return Array.isArray(products) ? products.map(p => ({
+        id: p.id,
+        name: p.name,
+        slug: p.slug,
+        price: p.price,
+        sale_price: p.sale_price,
+        discount_percentage: p.discount_percentage,
+        image: p.image || p.thumbnail_url,
+        image_urls: p.image_urls || [p.image],
+        description: '',
+        rating: 4.5,
+        reviews: 0,
+        in_stock: true,
+        is_active: true,
+        is_visible: true,
+      })) : []
+    }
 
-    console.log('[v0] Homepage batch stats:', {
-      cached: hb?.cached,
-      executionTime: hb?.total_execution_ms,
-      sectionsFetched: hb?.meta?.sections_fetched,
-      parallelExecution: hb?.meta?.parallel_execution,
-    })
+    const flashSaleProducts = transformProducts(sections?.flash_sales?.products || [])
+    const luxuryProducts = transformProducts(sections?.luxury_deals?.products || [])
+    const newArrivals = transformProducts(sections?.new_arrivals?.products || [])
+    const topPicks = transformProducts(sections?.top_picks?.products || [])
+    const trendingProducts = transformProducts(sections?.trending?.products || [])
+    const dailyFinds = transformProducts(sections?.daily_finds?.products || [])
 
     return {
       categories: categoriesData,
@@ -172,6 +136,12 @@ async function LoadAllContent() {
       productShowcase: productShowcaseData,
       contactCTASlides: Array.isArray(contactCTASlides) ? contactCTASlides : [],
       featureCards: Array.isArray(featureCards) ? featureCards : [],
+      flashSaleProducts,
+      luxuryProducts,
+      newArrivals,
+      topPicks,
+      trendingProducts,
+      dailyFinds,
       allProducts: [...flashSaleProducts, ...trendingProducts, ...topPicks].slice(0, 12),
       allProductsHasMore: true,
     }
