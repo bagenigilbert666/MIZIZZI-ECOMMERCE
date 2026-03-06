@@ -2,8 +2,8 @@ import { Redis } from '@upstash/redis'
 
 // Initialize Redis client with Upstash credentials
 const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_URL || 'https://nearby-rabbit-63956.upstash.io',
-  token: process.env.UPSTASH_REDIS_TOKEN || '',
+  url: process.env.UPSTASH_REDIS_URL!,
+  token: process.env.UPSTASH_REDIS_TOKEN!,
 })
 
 export default redis
@@ -72,5 +72,18 @@ export async function clearAllCache(): Promise<void> {
     console.log(`[v0] All cache cleared`)
   } catch (error) {
     console.error(`[v0] Redis FLUSHDB error:`, error)
+  }
+}
+
+export async function getRedisHealth(): Promise<{ status: 'healthy' | 'unhealthy'; message: string }> {
+  try {
+    const pong = await redis.ping()
+    if (pong) {
+      return { status: 'healthy', message: 'Redis is connected and operational' }
+    }
+    return { status: 'unhealthy', message: 'Redis ping failed' }
+  } catch (error) {
+    console.error(`[v0] Redis health check failed:`, error)
+    return { status: 'unhealthy', message: `Redis connection error: ${error instanceof Error ? error.message : 'Unknown error'}` }
   }
 }
