@@ -5,14 +5,11 @@ OPTIMIZED with Upstash Redis caching and lightweight JSON responses.
 """
 from flask import Blueprint, request, jsonify, current_app, Response
 from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
-from sqlalchemy import or_, func, text
+from sqlalchemy import or_, func
 from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import load_only, joinedload
+from sqlalchemy.orm import load_only
 from datetime import datetime
-import re
-import time
 import threading
-import json
 
 from app.configuration.extensions import db, limiter
 from app.models.models import (
@@ -309,7 +306,7 @@ def get_cache_warming_status():
 
 
 def _warm_all_products_cache():
-    """Background task to warm the cache with all products."""
+    """Background task to warm the cache with all products. Assumes app context is active."""
     global _cache_warming_state
     
     _cache_warming_state['is_warming'] = True
@@ -318,102 +315,98 @@ def _warm_all_products_cache():
     _cache_warming_state['categories_cached'] = []
     
     try:
-        from flask import current_app
-        app = current_app._get_current_object()
+        # 1. Cache all products
+        products = Product.query.options(
+            load_only(
+                Product.id, Product.name, Product.slug, Product.price,
+                Product.sale_price, Product.stock, Product.thumbnail_url,
+                Product.image_urls, Product.discount_percentage,
+                Product.is_featured, Product.is_new, Product.is_sale,
+                Product.is_flash_sale, Product.is_luxury_deal, Product.is_trending,
+                Product.is_top_pick, Product.is_daily_find, Product.is_new_arrival,
+                Product.is_active, Product.is_visible, Product.category_id,
+                Product.brand_id, Product.created_at, Product.sort_order
+            )
+        ).filter(
+            Product.is_active == True,
+            Product.is_visible == True
+        ).all()
+            
+        # Cache all products list
+        all_serialized = [serialize_product_lightweight(p) for p in products if p]
+        all_products_data = {
+            'items': all_serialized,
+            'products': all_serialized,
+            'total': len(all_serialized),
+            'cached_at': datetime.utcnow().isoformat()
+        }
+        if product_cache and hasattr(product_cache, 'set_raw'):
+            product_cache.set_raw(
+                "mizizzi:all_products", 
+                fast_json_dumps(all_products_data), 
+                ttl=CACHE_TTL.get('all_products', 600)
+            )
+        _cache_warming_state['products_cached'] = len(all_serialized)
         
-        with app.app_context():
-            # 1. Cache all products
-            products = Product.query.options(
-                load_only(
-                    Product.id, Product.name, Product.slug, Product.price,
-                    Product.sale_price, Product.stock, Product.thumbnail_url,
-                    Product.image_urls, Product.discount_percentage,
-                    Product.is_featured, Product.is_new, Product.is_sale,
-                    Product.is_flash_sale, Product.is_luxury_deal, Product.is_trending,
-                    Product.is_top_pick, Product.is_daily_find, Product.is_new_arrival,
-                    Product.is_active, Product.is_visible, Product.category_id,
-                    Product.brand_id, Product.created_at, Product.sort_order
-                )
-            ).filter(
-                Product.is_active == True,
-                Product.is_visible == True
-            ).all()
-            
-            # Cache all products list
-            all_serialized = [serialize_product_lightweight(p) for p in products if p]
-            all_products_data = {
-                'items': all_serialized,
-                'products': all_serialized,
-                'total': len(all_serialized),
-                'cached_at': datetime.utcnow().isoformat()
-            }
-            if product_cache and hasattr(product_cache, 'set_raw'):
-                product_cache.set_raw(
-                    "mizizzi:all_products", 
-                    fast_json_dumps(all_products_data), 
-                    ttl=CACHE_TTL.get('all_products', 600)
-                )
-            _cache_warming_state['products_cached'] = len(all_serialized)
-            
-            # 2. Cache by category
-            categories = Category.query.all()
-            for category in categories:
-                try:
-                    cat_products = [p for p in products if p.category_id == category.id]
-                    if cat_products:
-                        cat_serialized = [serialize_product_lightweight(p) for p in cat_products if p]
-                        cat_data = {
-                            'items': cat_serialized,
-                            'products': cat_serialized,
-                            'total': len(cat_serialized),
-                            'category_id': category.id,
-                            'category_name': category.name,
-                            'cached_at': datetime.utcnow().isoformat()
-                        }
-                        if product_cache and hasattr(product_cache, 'set_raw'):
-                            product_cache.set_raw(
-                                f"mizizzi:products:category:{category.id}",
-                                fast_json_dumps(cat_data),
-                                ttl=CACHE_TTL.get('category_list', 300)
-                            )
-                        _cache_warming_state['categories_cached'].append(category.name)
-                except Exception as e:
-                    _cache_warming_state['warm_errors'].append(f"Category {category.id}: {str(e)}")
-            
-            # 3. Cache featured product sections
-            featured_sections = [
-                ('is_featured', 'featured'),
-                ('is_trending', 'trending'),
-                ('is_flash_sale', 'flash_sale'),
-                ('is_luxury_deal', 'luxury_deals'),
-                ('is_top_pick', 'top_picks'),
-                ('is_daily_find', 'daily_finds'),
-                ('is_new_arrival', 'new_arrivals'),
-                ('is_new', 'new_products'),
-                ('is_sale', 'sale_products'),
-            ]
-            
-            for attr, cache_name in featured_sections:
-                try:
-                    section_products = [p for p in products if getattr(p, attr, False)]
-                    if section_products:
-                        section_serialized = [serialize_product_lightweight(p) for p in section_products if p]
-                        section_data = {
-                            'items': section_serialized,
-                            'products': section_serialized,
-                            'total': len(section_serialized),
-                            'cached_at': datetime.utcnow().isoformat()
-                        }
-                        if product_cache and hasattr(product_cache, 'set_raw'):
-                            product_cache.set_raw(
-                                f"mizizzi:{cache_name}",
-                                fast_json_dumps(section_data),
-                                ttl=CACHE_TTL.get('featured_section', 180)
-                            )
-                except Exception as e:
-                    _cache_warming_state['warm_errors'].append(f"Section {cache_name}: {str(e)}")
-            
-            _cache_warming_state['last_warmed'] = datetime.utcnow().isoformat()
+        # 2. Cache by category
+        categories = Category.query.all()
+        for category in categories:
+            try:
+                cat_products = [p for p in products if p.category_id == category.id]
+                if cat_products:
+                    cat_serialized = [serialize_product_lightweight(p) for p in cat_products if p]
+                    cat_data = {
+                        'items': cat_serialized,
+                        'products': cat_serialized,
+                        'total': len(cat_serialized),
+                        'category_id': category.id,
+                        'category_name': category.name,
+                        'cached_at': datetime.utcnow().isoformat()
+                    }
+                    if product_cache and hasattr(product_cache, 'set_raw'):
+                        product_cache.set_raw(
+                            f"mizizzi:products:category:{category.id}",
+                            fast_json_dumps(cat_data),
+                            ttl=CACHE_TTL.get('category_list', 300)
+                        )
+                    _cache_warming_state['categories_cached'].append(category.name)
+            except Exception as e:
+                _cache_warming_state['warm_errors'].append(f"Category {category.id}: {str(e)}")
+        
+        # 3. Cache featured product sections
+        featured_sections = [
+            ('is_featured', 'featured'),
+            ('is_trending', 'trending'),
+            ('is_flash_sale', 'flash_sale'),
+            ('is_luxury_deal', 'luxury_deals'),
+            ('is_top_pick', 'top_picks'),
+            ('is_daily_find', 'daily_finds'),
+            ('is_new_arrival', 'new_arrivals'),
+            ('is_new', 'new_products'),
+            ('is_sale', 'sale_products'),
+        ]
+        
+        for attr, cache_name in featured_sections:
+            try:
+                section_products = [p for p in products if getattr(p, attr, False)]
+                if section_products:
+                    section_serialized = [serialize_product_lightweight(p) for p in section_products if p]
+                    section_data = {
+                        'items': section_serialized,
+                        'products': section_serialized,
+                        'total': len(section_serialized),
+                        'cached_at': datetime.utcnow().isoformat()
+                    }
+                    if product_cache and hasattr(product_cache, 'set_raw'):
+                        product_cache.set_raw(
+                            f"mizizzi:{cache_name}",
+                            fast_json_dumps(section_data),
+                            ttl=CACHE_TTL.get('featured_section', 180)
+                        )
+            except Exception as e:
+                _cache_warming_state['warm_errors'].append(f"Section {cache_name}: {str(e)}")
+        
+        _cache_warming_state['last_warmed'] = datetime.utcnow().isoformat()
             
     except Exception as e:
         _cache_warming_state['warm_errors'].append(f"Global error: {str(e)}")
@@ -613,8 +606,8 @@ def get_product_by_id(product_id):
         if is_admin:
             cache_key = f"mizizzi:product:admin:{product_id}"
         
-        # Check cache first
-        cached = product_cache.get(cache_key)
+        # Check cache first using safe helper
+        cached = safe_cache_get(product_cache, cache_key)
         if cached:
             current_app.logger.info(f"[CACHE HIT] {cache_key}")
             return jsonify(cached), 200
@@ -628,9 +621,9 @@ def get_product_by_id(product_id):
         # Serialize with appropriate view (admin or public)
         serialized = serialize_product_detail(product, for_admin=is_admin)
 
-        # Cache with appropriate TTL
+        # Cache with appropriate TTL using safe helper
         ttl = CACHE_TTL.get('product_detail_admin' if is_admin else 'product_detail', 600)
-        product_cache.set(cache_key, serialized, ttl=ttl)
+        safe_cache_set(product_cache, cache_key, serialized, ttl=ttl)
 
         return jsonify(serialized), 200
 
@@ -654,8 +647,8 @@ def get_product_by_slug(slug):
         if is_admin:
             cache_key = f"mizizzi:product:admin:slug:{slug}"
         
-        # Check cache first
-        cached = product_cache.get(cache_key)
+        # Check cache first using safe helper
+        cached = safe_cache_get(product_cache, cache_key)
         if cached:
             current_app.logger.info(f"[CACHE HIT] {cache_key}")
             return jsonify(cached), 200
@@ -669,9 +662,9 @@ def get_product_by_slug(slug):
         # Serialize with appropriate view (admin or public)
         serialized = serialize_product_detail(product, for_admin=is_admin)
 
-        # Cache with appropriate TTL
+        # Cache with appropriate TTL using safe helper
         ttl = CACHE_TTL.get('product_detail_admin' if is_admin else 'product_detail', 600)
-        product_cache.set(cache_key, serialized, ttl=ttl)
+        safe_cache_set(product_cache, cache_key, serialized, ttl=ttl)
 
         return jsonify(serialized), 200
 
@@ -1236,8 +1229,12 @@ def get_products_fast():
         sort_by = request.args.get('sort_by', 'created_at')
         sort_order = request.args.get('sort_order', 'desc')
 
-        # Build cache key
-        cache_key = f"mizizzi:products:fast:{page}:{per_page}:{category_id}:{brand_id}:{is_featured}:{is_sale}:{sort_by}:{sort_order}"
+        # Normalize boolean parameters before cache key generation
+        is_featured_norm = normalize_bool_param(is_featured)
+        is_sale_norm = normalize_bool_param(is_sale)
+
+        # Build cache key with normalized values
+        cache_key = f"mizizzi:products:fast:{page}:{per_page}:{category_id}:{brand_id}:{is_featured_norm}:{is_sale_norm}:{sort_by}:{sort_order}"
 
         # Try cache first
         cached = product_cache.get_raw(cache_key) if product_cache and hasattr(product_cache, 'get_raw') else None
@@ -1270,8 +1267,8 @@ def get_products_fast():
                 return None
             return val.lower() in ('true', '1', 'yes')
 
-        is_featured = str_to_bool(is_featured)
-        is_sale = str_to_bool(is_sale)
+        is_featured_bool = str_to_bool(is_featured)
+        is_sale_bool = str_to_bool(is_sale)
 
         # Optimized query with minimal columns
         query = Product.query.options(
@@ -1292,10 +1289,10 @@ def get_products_fast():
             query = query.filter(Product.category_id == category_id)
         if brand_id:
             query = query.filter(Product.brand_id == brand_id)
-        if is_featured is not None:
-            query = query.filter(Product.is_featured == is_featured)
-        if is_sale is not None:
-            query = query.filter(Product.is_sale == is_sale)
+        if is_featured_bool is not None:
+            query = query.filter(Product.is_featured == is_featured_bool)
+        if is_sale_bool is not None:
+            query = query.filter(Product.is_sale == is_sale_bool)
 
         # Sorting
         valid_sort_fields = ['name', 'price', 'created_at', 'stock']
