@@ -2,9 +2,7 @@
 redis_client.py - Initializes Upstash Redis client using REST API.
 
 This module provides a singleton Redis client that connects to Upstash Redis
-using their official Python SDK (upstash-redis). It supports both the 
-Upstash REST API credentials and falls back to in-memory caching if 
-credentials are not available.
+using HTTP REST API calls. It works without requiring the upstash-redis SDK.
 
 Environment Variables Required:
     - UPSTASH_REDIS_REST_URL: The Upstash Redis REST API URL
@@ -25,7 +23,9 @@ Usage:
 """
 import os
 import logging
-from typing import Optional
+import requests
+import json
+from typing import Optional, Any, List
 
 logger = logging.getLogger(__name__)
 
@@ -53,6 +53,131 @@ def get_upstash_credentials() -> tuple[Optional[str], Optional[str]]:
     return url, token
 
 
+class UpstashRedisClient:
+    """
+    HTTP-based Upstash Redis client using REST API.
+    
+    Connects to Upstash Redis without requiring the upstash-redis SDK.
+    All commands are sent as HTTP POST requests with proper formatting.
+    """
+    
+    def __init__(self, url: str, token: str):
+        """
+        Initialize the Upstash Redis client.
+        
+        Args:
+            url: The Upstash Redis REST API URL
+            token: The authentication token
+        """
+        # Ensure URL ends with a slash for consistency
+        self.url = url.rstrip('/') + '/'
+        self.token = token
+        self.headers = {
+            'Authorization': f'Bearer {token}',
+            'Content-Type': 'application/json'
+        }
+    
+    def _execute_command(self, *args, **kwargs) -> Any:
+        """
+        Execute a Redis command via HTTP REST API.
+        
+        Args:
+            *args: Redis command and its arguments
+            **kwargs: Optional parameters like 'ex' for expiration
+        
+        Returns:
+            The command result
+        """
+        try:
+            # Build the command payload
+            command = list(args)
+            
+            # Handle expiration parameter for SET commands
+            if kwargs.get('ex') and len(args) >= 2 and args[0].upper() == 'SET':
+                # Append EX and TTL to the command: SET key value EX ttl
+                command.extend(['EX', str(kwargs['ex'])])
+            
+            # Send to Upstash REST API
+            response = requests.post(
+                self.url,
+                headers=self.headers,
+                json=command,
+                timeout=10
+            )
+            
+            # Check for errors
+            if response.status_code != 200:
+                logger.error(
+                    f"Redis command failed: {response.status_code} - {response.text}"
+                )
+                return None
+            
+            result = response.json()
+            
+            # Upstash returns {'result': value}
+            if isinstance(result, dict) and 'result' in result:
+                return result['result']
+            
+            return result
+            
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Redis HTTP request failed: {e}")
+            return None
+        except Exception as e:
+            logger.error(f"Redis command execution error: {e}")
+            return None
+    
+    def ping(self) -> bool:
+        """Test the connection with PING command."""
+        result = self._execute_command('PING')
+        return result == 'PONG'
+    
+    def get(self, key: str) -> Optional[str]:
+        """Get a value from Redis."""
+        return self._execute_command('GET', key)
+    
+    def set(self, key: str, value: str, ex: Optional[int] = None) -> bool:
+        """Set a value in Redis with optional expiration."""
+        result = self._execute_command('SET', key, value, ex=ex)
+        return result == 'OK'
+    
+    def delete(self, key: str) -> int:
+        """Delete a key from Redis."""
+        result = self._execute_command('DEL', key)
+        return result if isinstance(result, int) else 0
+    
+    def keys(self, pattern: str) -> List[str]:
+        """Get all keys matching a pattern."""
+        result = self._execute_command('KEYS', pattern)
+        return result if isinstance(result, list) else []
+    
+    def lpush(self, key: str, *values) -> int:
+        """Push values to a list."""
+        command = ['LPUSH', key] + list(values)
+        result = self._execute_command(*command)
+        return result if isinstance(result, int) else 0
+    
+    def lrange(self, key: str, start: int, stop: int) -> List[str]:
+        """Get a range of values from a list."""
+        result = self._execute_command('LRANGE', key, str(start), str(stop))
+        return result if isinstance(result, list) else []
+    
+    def hset(self, key: str, field: str, value: str) -> int:
+        """Set a hash field."""
+        result = self._execute_command('HSET', key, field, value)
+        return result if isinstance(result, int) else 0
+    
+    def hgetall(self, key: str) -> dict:
+        """Get all fields from a hash."""
+        result = self._execute_command('HGETALL', key)
+        return result if isinstance(result, dict) else {}
+    
+    def incr(self, key: str) -> int:
+        """Increment a counter."""
+        result = self._execute_command('INCR', key)
+        return result if isinstance(result, int) else 0
+
+
 def create_upstash_client():
     """
     Create and return an Upstash Redis client instance.
@@ -61,7 +186,7 @@ def create_upstash_client():
     and validates it with a ping command.
     
     Returns:
-        UpstashRedis client or None if connection fails
+        UpstashRedisClient instance or None if connection fails
     """
     global _redis_client, _is_connected
     
@@ -81,14 +206,11 @@ def create_upstash_client():
         return None
     
     try:
-        from upstash_redis import Redis as UpstashRedis
-        
-        # Create the Upstash Redis client
-        client = UpstashRedis(url=url, token=token)
+        # Create the HTTP-based client
+        client = UpstashRedisClient(url=url, token=token)
         
         # Test connection with ping
-        response = client.ping()
-        if response:
+        if client.ping():
             logger.info(f"Upstash Redis connected successfully to {url}")
             _redis_client = client
             _is_connected = True
@@ -98,16 +220,8 @@ def create_upstash_client():
             _is_connected = False
             return None
             
-    except ImportError:
-        logger.error(
-            "upstash-redis package not installed. "
-            "Install with: pip install upstash-redis"
-        )
-        _is_connected = False
-        return None
-        
     except Exception as e:
-        logger.error(f"Failed to connect to Upstash Redis: {e}")
+        logger.error(f"Failed to create Upstash Redis client: {e}")
         _is_connected = False
         return None
 
@@ -117,7 +231,7 @@ def get_redis_client():
     Get the singleton Upstash Redis client instance.
     
     Returns:
-        UpstashRedis client or None if not available
+        UpstashRedisClient instance or None if not available
     """
     global _redis_client
     
