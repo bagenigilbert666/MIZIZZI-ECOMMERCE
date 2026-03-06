@@ -34,7 +34,6 @@ interface ProductShowcaseProps {
 export const ProductShowcase = React.memo(({ categories: serverCategories }: ProductShowcaseProps) => {
   const [categories] = useState<ProductCategory[]>(() => {
     if (serverCategories && serverCategories.length > 0) {
-      console.log('[v0] ProductShowcase received:', serverCategories)
       return serverCategories
     }
     // Default fallback for instant display

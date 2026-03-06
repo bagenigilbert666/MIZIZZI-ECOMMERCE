@@ -96,13 +96,6 @@ export const Carousel = memo(function Carousel({
   const activeItem = useMemo(() => carouselItems[currentSlide], [carouselItems, currentSlide])
   const prevItem = useMemo(() => carouselItems[prevSlideIndex], [carouselItems, prevSlideIndex])
 
-  console.log('[v0] Carousel state:', { 
-    itemCount: carouselItems.length, 
-    activeItem: activeItem?.image, 
-    prevItem: prevItem?.image,
-    currentSlide,
-  })
-
   if (carouselItems.length === 0) {
     return null
   }
@@ -146,10 +139,10 @@ export const Carousel = memo(function Carousel({
           aria-label="Featured products carousel"
           aria-live="polite"
         >
-          <div className="absolute inset-0 z-0 bg-gray-100">
-            {prevItem && (
+          <div className="absolute inset-0 z-0 bg-gradient-to-br from-maroon-600 via-maroon-700 to-maroon-800">
+            {prevItem?.image && (
               <Image
-                src={prevItem.image || "/placeholder.svg"}
+                src={prevItem.image}
                 alt=""
                 fill
                 className="object-cover"

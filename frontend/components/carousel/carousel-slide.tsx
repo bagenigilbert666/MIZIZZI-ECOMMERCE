@@ -54,7 +54,7 @@ export const CarouselSlide = React.memo<CarouselSlideProps>(({ item, isActive, i
       }}
     >
       {/* Background Image with optimized loading */}
-      <div className="relative h-full w-full bg-gray-100">
+      <div className="relative h-full w-full bg-gradient-to-br from-maroon-600 via-maroon-700 to-maroon-800">
         {isDataUrl ? (
           // Use native img for data URLs (don't use Next.js Image for data: URLs)
           <img
@@ -62,7 +62,7 @@ export const CarouselSlide = React.memo<CarouselSlideProps>(({ item, isActive, i
             alt={item.title}
             className="absolute inset-0 h-full w-full object-cover"
           />
-        ) : (
+        ) : imageSrc !== "/placeholder.svg" ? (
           // Use Next.js Image for network URLs
           <Image
             src={imageSrc}
@@ -75,7 +75,7 @@ export const CarouselSlide = React.memo<CarouselSlideProps>(({ item, isActive, i
             quality={82}
             placeholder="empty"
           />
-        )}
+        ) : null}
       </div>
     </motion.div>
   )
