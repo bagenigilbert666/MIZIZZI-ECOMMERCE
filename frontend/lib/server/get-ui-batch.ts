@@ -152,6 +152,18 @@ export const getUIBatch = cache(
       const executionTime = rawData.total_execution_ms || 0
       console.log('[v0] getUIBatch: Successfully fetched batch data in', executionTime.toFixed(2), 'ms (Cached:', rawData.cached, ')')
 
+      // Log the raw response structure to understand what we're dealing with
+      console.log('[v0] Raw response structure:', {
+        hasCarousel: !!rawData?.carousel,
+        carouselType: typeof rawData?.carousel,
+        carouselIsArray: Array.isArray(rawData?.carousel),
+        hasCategories: !!rawData?.categories,
+        categoriesType: typeof rawData?.categories,
+        categoriesIsArray: Array.isArray(rawData?.categories),
+        hasSections: !!rawData?.sections,
+        sectionsKeys: rawData?.sections ? Object.keys(rawData.sections) : [],
+      })
+
       // Handle BOTH flat and nested response structures
       // Flat: { carousel: [...], categories: [...], sidePanels: {...}, ... }
       // Nested: { sections: { carousel: {...}, categories: {...}, ... }, ...metadata }
@@ -163,6 +175,7 @@ export const getUIBatch = cache(
       
       // Check if response is flat structure
       if (Array.isArray(rawData?.carousel) || Array.isArray(rawData?.categories)) {
+        console.log('[v0] Detected FLAT response structure')
         // Response is FLAT - data is at top level
         carouselData = Array.isArray(rawData?.carousel) ? rawData.carousel : []
         categoriesData = Array.isArray(rawData?.categories) ? rawData.categories : []
@@ -173,8 +186,19 @@ export const getUIBatch = cache(
           showcase: Array.isArray(sidePanelsData?.showcase) ? sidePanelsData.showcase : []
         }
       } else {
+        console.log('[v0] Detected NESTED response structure - examining sections')
         // Response is NESTED - data is under sections
         const sections = rawData?.sections || {}
+        console.log('[v0] Sections keys:', Object.keys(sections))
+        console.log('[v0] Carousel section structure:', {
+          hasCarousel: !!sections.carousel,
+          carouselKeys: sections.carousel ? Object.keys(sections.carousel) : [],
+          carouselData: sections.carousel?.data ? typeof sections.carousel.data : 'N/A',
+        })
+        console.log('[v0] Categories section structure:', {
+          hasCategories: !!sections.categories,
+          categoriesKeys: sections.categories ? Object.keys(sections.categories) : [],
+        })
         
         const carouselSection = sections.carousel || {}
         carouselData = Array.isArray(carouselSection?.data?.homepage)
@@ -208,6 +232,12 @@ export const getUIBatch = cache(
               ? sidePanelsData.product_showcase_right
               : []
         }
+        
+        console.log('[v0] Extracted nested data:', {
+          carousel: carouselData.length,
+          categories: categoriesData.length,
+          sidePanels: Object.values(sidePanelsFormatted).flat().length,
+        })
       }
 
       // Normalize and validate response data
