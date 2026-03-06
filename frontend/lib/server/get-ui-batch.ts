@@ -73,8 +73,10 @@ export interface UIBatchData {
     premium?: PanelItem[]
     showcase?: PanelItem[]
   } | null
-  timestamp: number
+  timestamp?: number
   duration: number
+  cached?: boolean
+  total_execution_ms?: number
   error?: string
 }
 
@@ -94,6 +96,7 @@ const DEFAULT_UI_BATCH: UIBatchData = {
   sidePanels: null,
   timestamp: Date.now(),
   duration: 0,
+  cached: false,
 }
 
 /**
@@ -144,18 +147,97 @@ export const getUIBatch = cache(
         return DEFAULT_UI_BATCH
       }
 
-      const data = await response.json() as UIBatchData
+      const rawData = await response.json() as any
 
-      console.log('[v0] getUIBatch: Successfully fetched batch data in', data.duration.toFixed(2), 'ms')
+      const executionTime = rawData.total_execution_ms || 0
+      console.log('[v0] getUIBatch: Successfully fetched batch data in', executionTime.toFixed(2), 'ms (Cached:', rawData.cached, ')')
+      console.log('[v0] UI Batch raw response:', {
+        carouselCount: Array.isArray(rawData?.carousel) ? rawData.carousel.length : (typeof rawData?.carousel),
+        categoriesCount: Array.isArray(rawData?.categories) ? rawData.categories.length : 0,
+        sidePanelsCount: rawData?.sidePanels ? Object.keys(rawData.sidePanels) : 'none',
+        firstCarouselItem: Array.isArray(rawData?.carousel) ? rawData.carousel[0] : 'N/A',
+      })
+
+      // Handle BOTH flat and nested response structures
+      // Flat: { carousel: [...], categories: [...], sidePanels: {...}, ... }
+      // Nested: { sections: { carousel: {...}, categories: {...}, ... }, ...metadata }
+      
+      let carouselData: CarouselItem[] = []
+      let categoriesData: Category[] = []
+      let topbarData: TopbarItem[] | null = null
+      let sidePanelsFormatted: { premium: PanelItem[], showcase: PanelItem[] } = { premium: [], showcase: [] }
+      
+      // Check if response is flat structure
+      if (Array.isArray(rawData?.carousel) || Array.isArray(rawData?.categories)) {
+        // Response is FLAT - data is at top level
+        carouselData = Array.isArray(rawData?.carousel) ? rawData.carousel : []
+        categoriesData = Array.isArray(rawData?.categories) ? rawData.categories : []
+        topbarData = Array.isArray(rawData?.topbar) ? rawData.topbar : null
+        const sidePanelsData = rawData?.sidePanels || {}
+        sidePanelsFormatted = {
+          premium: Array.isArray(sidePanelsData?.premium) ? sidePanelsData.premium : [],
+          showcase: Array.isArray(sidePanelsData?.showcase) ? sidePanelsData.showcase : []
+        }
+      } else {
+        // Response is NESTED - data is under sections
+        const sections = rawData?.sections || {}
+        
+        const carouselSection = sections.carousel || {}
+        // Handle carousel data - it could be in data.homepage, data, or carousel properties
+        // If data is an object, try to find array within it
+        let carouselArray: any[] = []
+        if (Array.isArray(carouselSection?.data?.homepage)) {
+          carouselArray = carouselSection.data.homepage
+        } else if (Array.isArray(carouselSection?.data)) {
+          carouselArray = carouselSection.data
+        } else if (carouselSection?.data && typeof carouselSection.data === 'object' && !Array.isArray(carouselSection.data)) {
+          // Data is an object, try to find first array property
+          const dataObj = carouselSection.data as Record<string, any>
+          for (const key in dataObj) {
+            if (Array.isArray(dataObj[key])) {
+              carouselArray = dataObj[key]
+              break
+            }
+          }
+        } else if (Array.isArray(carouselSection?.carousel)) {
+          carouselArray = carouselSection.carousel
+        }
+        carouselData = carouselArray
+        
+        const categoriesSection = sections.categories || {}
+        categoriesData = [
+          ...(Array.isArray(categoriesSection?.featured) ? categoriesSection.featured : []),
+          ...(Array.isArray(categoriesSection?.root) ? categoriesSection.root : [])
+        ]
+        
+        const topbarSection = sections.topbar || {}
+        topbarData = Array.isArray(topbarSection?.data) ? topbarSection.data : null
+        
+        const sidePanelsSection = sections.side_panels || {}
+        const sidePanelsData = sidePanelsSection?.data || {}
+        sidePanelsFormatted = {
+          premium: Array.isArray(sidePanelsData?.premium_experience_left)
+            ? sidePanelsData.premium_experience_left
+            : Array.isArray(sidePanelsData?.premium_experience_right)
+              ? sidePanelsData.premium_experience_right
+              : [],
+          showcase: Array.isArray(sidePanelsData?.product_showcase_left)
+            ? sidePanelsData.product_showcase_left
+            : Array.isArray(sidePanelsData?.product_showcase_right)
+              ? sidePanelsData.product_showcase_right
+              : []
+        }
+      }
 
       // Normalize and validate response data
       return {
-        carousel: Array.isArray(data.carousel) ? data.carousel : DEFAULT_UI_BATCH.carousel,
-        topbar: Array.isArray(data.topbar) ? data.topbar : null,
-        categories: Array.isArray(data.categories) ? data.categories : [],
-        sidePanels: data.sidePanels || null,
-        timestamp: data.timestamp || Date.now(),
-        duration: data.duration || 0,
+        carousel: carouselData.length > 0 ? carouselData : DEFAULT_UI_BATCH.carousel,
+        topbar: topbarData,
+        categories: categoriesData,
+        sidePanels: (sidePanelsFormatted.premium.length > 0 || sidePanelsFormatted.showcase.length > 0) ? sidePanelsFormatted : null,
+        timestamp: rawData.timestamp ? new Date(rawData.timestamp).getTime() : Date.now(),
+        duration: executionTime,
+        cached: rawData.cached || false,
       }
     } catch (error) {
       console.error('[v0] getUIBatch: Error fetching batch data:', error)
