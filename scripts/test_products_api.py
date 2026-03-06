@@ -93,10 +93,22 @@ def check_serialized_product(product: Dict, lightweight: bool = False) -> bool:
 def test_single_product_endpoints():
     """Test GET /products/<id> and /products/slug/<slug>"""
     log_test("Single Product Endpoints")
-    
+    # Pick an existing product from the list so tests don't assume id=1
+    log_info("Fetching product list to pick a product for single-product tests")
+    status_list, data_list, _ = test_endpoint("GET", f"{BASE_URL}/", params={"page": 1, "per_page": 1})
+
+    product_id = 1
+    product_slug = None
+    if status_list == 200:
+        items = data_list.get('items', data_list.get('products', []))
+        if items and len(items) > 0:
+            first = items[0]
+            product_id = first.get('id', 1)
+            product_slug = first.get('slug')
+
     # Test product by ID
-    log_info("Testing GET /products/1")
-    status, data, elapsed = test_endpoint("GET", f"{BASE_URL}/1")
+    log_info(f"Testing GET /products/{product_id}")
+    status, data, elapsed = test_endpoint("GET", f"{BASE_URL}/{product_id}")
     
     if validate_response(status, data):
         if check_serialized_product(data):
@@ -313,7 +325,15 @@ def test_serialization_quality():
     log_test("Serialization Quality")
     
     # Fetch a full product
-    status, full_product, _ = test_endpoint("GET", f"{BASE_URL}/1")
+    # Pick a product from the list instead of assuming id=1
+    status_list, data_list, _ = test_endpoint("GET", f"{BASE_URL}/", params={"page": 1, "per_page": 1})
+    product_id = 1
+    if status_list == 200:
+        items = data_list.get('items', data_list.get('products', []))
+        if items and len(items) > 0:
+            product_id = items[0].get('id', 1)
+
+    status, full_product, _ = test_endpoint("GET", f"{BASE_URL}/{product_id}")
     
     if status != 200:
         log_error("Could not fetch full product")
