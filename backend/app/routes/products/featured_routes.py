@@ -17,41 +17,39 @@ from app.utils.redis_cache import (
     cached_response
 )
 
+# Import unified serializers and cache keys
+from .serializers import serialize_product_minimal
+from .cache_keys import (
+    get_public_featured_key,
+    PUBLIC_TRENDING_KEY,
+    PUBLIC_FLASH_SALE_KEY,
+    PUBLIC_NEW_ARRIVALS_KEY,
+    PUBLIC_TOP_PICKS_KEY,
+    PUBLIC_DAILY_FINDS_KEY,
+    PUBLIC_LUXURY_DEALS_KEY,
+    CACHE_TTL
+)
+
 featured_routes = Blueprint('featured_routes', __name__)
 
+# Use centralized cache configuration from cache_keys.py
 FEATURED_CACHE_CONFIG = {
-    'trending': {'ttl': 120, 'key': 'featured:trending'},
-    'flash_sale': {'ttl': 60, 'key': 'featured:flash_sale'},
-    'new_arrivals': {'ttl': 180, 'key': 'featured:new_arrivals'},
-    'top_picks': {'ttl': 120, 'key': 'featured:top_picks'},
-    'daily_finds': {'ttl': 300, 'key': 'featured:daily_finds'},
-    'luxury_deals': {'ttl': 180, 'key': 'featured:luxury_deals'},
-    'all_featured': {'ttl': 300, 'key': 'featured:all'},
+    'trending': {'ttl': CACHE_TTL.get('featured_trending', 120), 'key': PUBLIC_TRENDING_KEY},
+    'flash_sale': {'ttl': CACHE_TTL.get('featured_flash_sale', 60), 'key': PUBLIC_FLASH_SALE_KEY},
+    'new_arrivals': {'ttl': CACHE_TTL.get('featured_new_arrivals', 180), 'key': PUBLIC_NEW_ARRIVALS_KEY},
+    'top_picks': {'ttl': CACHE_TTL.get('featured_top_picks', 120), 'key': PUBLIC_TOP_PICKS_KEY},
+    'daily_finds': {'ttl': CACHE_TTL.get('featured_daily_finds', 300), 'key': PUBLIC_DAILY_FINDS_KEY},
+    'luxury_deals': {'ttl': CACHE_TTL.get('featured_luxury_deals', 180), 'key': PUBLIC_LUXURY_DEALS_KEY},
+    'all_featured': {'ttl': 300, 'key': 'mizizzi:featured:public:all'},
 }
 
 
-def serialize_minimal_product(product):
+def serialize_product_minimal_local(product):
     """
-    ULTRA-FAST: Minimal serialization for listing views.
-    Returns only the 6 fields the frontend actually needs.
-    ~80% smaller payload than full serialization.
+    ULTRA-FAST: Wrapper for centralized serialize_product_minimal.
+    Kept for backwards compatibility.
     """
-    # Get primary image
-    image_url = product.thumbnail_url
-    if not image_url and hasattr(product, 'image_urls') and product.image_urls:
-        if isinstance(product.image_urls, list) and len(product.image_urls) > 0:
-            image_url = product.image_urls[0]
-        elif isinstance(product.image_urls, str):
-            image_url = product.image_urls.split(',')[0] if product.image_urls else None
-    
-    return {
-        'id': product.id,
-        'name': product.name,
-        'slug': product.slug,
-        'price': float(product.price) if product.price else 0,
-        'sale_price': float(product.sale_price) if product.sale_price else None,
-        'image': image_url
-    }
+    return serialize_product_minimal(product)
 
 
 def get_minimal_product_query():
@@ -105,8 +103,8 @@ def cache_all_featured_products():
                     config['fallback']
                 ).limit(50).all()
             
-            # Serialize and cache
-            serialized = [serialize_minimal_product(p) for p in products]
+            # Serialize and cache using centralized serializer
+            serialized = [serialize_product_minimal(p) for p in products]
             cache_data = {
                 'items': serialized,
                 'count': len(serialized),
@@ -277,7 +275,7 @@ def get_fast_trending():
             ).limit(limit).all()
         
         return {
-            'items': [serialize_minimal_product(p) for p in products],
+            'items': [serialize_product_minimal(p) for p in products],
             'count': len(products),
             'ts': datetime.utcnow().isoformat()
         }, 200
@@ -301,7 +299,7 @@ def get_fast_flash_sale():
         ).limit(limit).all()
         
         return {
-            'items': [serialize_minimal_product(p) for p in products],
+            'items': [serialize_product_minimal(p) for p in products],
             'count': len(products),
             'ts': datetime.utcnow().isoformat()
         }, 200
@@ -325,7 +323,7 @@ def get_fast_new_arrivals():
         ).order_by(Product.created_at.desc()).limit(limit).all()
         
         return {
-            'items': [serialize_minimal_product(p) for p in products],
+            'items': [serialize_product_minimal(p) for p in products],
             'count': len(products),
             'ts': datetime.utcnow().isoformat()
         }, 200
@@ -355,7 +353,7 @@ def get_fast_top_picks():
             ).order_by(Product.price.desc()).limit(limit).all()
         
         return {
-            'items': [serialize_minimal_product(p) for p in products],
+            'items': [serialize_product_minimal(p) for p in products],
             'count': len(products),
             'ts': datetime.utcnow().isoformat()
         }, 200
@@ -386,7 +384,7 @@ def get_fast_daily_finds():
             ).limit(limit).all()
         
         return {
-            'items': [serialize_minimal_product(p) for p in products],
+            'items': [serialize_product_minimal(p) for p in products],
             'count': len(products),
             'ts': datetime.utcnow().isoformat()
         }, 200
@@ -410,7 +408,7 @@ def get_fast_luxury_deals():
         ).limit(limit).all()
         
         return {
-            'items': [serialize_minimal_product(p) for p in products],
+            'items': [serialize_product_minimal(p) for p in products],
             'count': len(products),
             'ts': datetime.utcnow().isoformat()
         }, 200

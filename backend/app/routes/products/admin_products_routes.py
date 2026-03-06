@@ -17,6 +17,21 @@ from app.models.models import (
 )
 from app.validations.validation import admin_required, validate_product_creation, validate_product_update
 
+# Import unified serializers and cache invalidation utilities
+from .serializers import (
+    serialize_product_detail,
+    serialize_product_list,
+    serialize_variant,
+    serialize_image,
+    get_product_with_relationships
+)
+from .cache_invalidation import (
+    invalidate_product_cache,
+    invalidate_all_product_caches,
+    get_changed_flags,
+    should_invalidate_visibility
+)
+
 try:
     from app.websocket import broadcast_to_all
 except ImportError:
@@ -33,144 +48,10 @@ admin_products_routes = Blueprint('admin_products_routes', __name__, url_prefix=
 
 def serialize_product(product, include_variants=False, include_images=False):
     """
-    Serialize a product to dictionary format.
-
-    Args:
-        product: Product instance
-        include_variants: Whether to include variants
-        include_images: Whether to include images
-
-    Returns:
-        Dictionary representation of the product
+    Wrapper for unified serializer - admin view includes all fields.
+    Uses centralized serializers.serialize_product_detail with for_admin=True.
     """
-    try:
-        data = {
-            'id': product.id,
-            'name': product.name,
-            'slug': product.slug,
-            'description': product.description,
-            'price': float(product.price) if product.price else None,
-            'sale_price': float(product.sale_price) if product.sale_price else None,
-            'stock': product.stock,
-            'category_id': product.category_id,
-            'brand_id': product.brand_id,
-            'image_urls': product.get_image_urls(),
-            'thumbnail_url': product.thumbnail_url,
-            'is_featured': product.is_featured,
-            'is_new': product.is_new,
-            'is_sale': product.is_sale,
-            'is_flash_sale': product.is_flash_sale,
-            'is_luxury_deal': product.is_luxury_deal,
-            'is_daily_find': product.is_daily_find,
-            'is_top_pick': product.is_top_pick,
-            'is_trending': product.is_trending,
-            'is_new_arrival': product.is_new_arrival,
-            'is_active': product.is_active,
-            'sku': product.sku,
-            'weight': product.weight,
-            'dimensions': product.dimensions,
-            'meta_title': product.meta_title,
-            'meta_description': product.meta_description,
-            'short_description': product.short_description,
-            'specifications': product.specifications,
-            'warranty_info': product.warranty_info,
-            'shipping_info': product.shipping_info,
-            'availability_status': product.availability_status,
-            'min_order_quantity': product.min_order_quantity,
-            'max_order_quantity': product.max_order_quantity,
-            'related_products': product.get_related_products(),
-            'cross_sell_products': product.get_cross_sell_products(),
-            'up_sell_products': product.get_up_sell_products(),
-            'discount_percentage': product.discount_percentage,
-            'tax_rate': product.tax_rate,
-            'tax_class': product.tax_class,
-            'barcode': product.barcode,
-            'manufacturer': product.manufacturer,
-            'country_of_origin': product.country_of_origin,
-            'is_digital': product.is_digital,
-            'download_link': product.download_link,
-            'download_expiry_days': product.download_expiry_days,
-            'is_taxable': product.is_taxable,
-            'is_shippable': product.is_shippable,
-            'requires_shipping': product.requires_shipping,
-            'is_gift_card': product.is_gift_card,
-            'gift_card_value': float(product.gift_card_value) if product.gift_card_value else None,
-            'is_customizable': product.is_customizable,
-            'customization_options': product.customization_options,
-            'seo_keywords': product.get_seo_keywords(),
-            'canonical_url': product.canonical_url,
-            'condition': product.condition,
-            'video_url': product.video_url,
-            'is_visible': product.is_visible,
-            'is_searchable': product.is_searchable,
-            'is_comparable': product.is_comparable,
-            'is_preorder': product.is_preorder,
-            'preorder_release_date': product.preorder_release_date.isoformat() if product.preorder_release_date else None,
-            'preorder_message': product.preorder_message,
-            'badge_text': product.badge_text,
-            'badge_color': product.badge_color,
-            'sort_order': product.sort_order,
-            'created_at': product.created_at.isoformat() if product.created_at else None,
-            'updated_at': product.updated_at.isoformat() if product.updated_at else None
-        }
-
-        # Include category and brand details if available
-        if product.category:
-            data['category'] = {
-                'id': product.category.id,
-                'name': product.category.name,
-                'slug': product.category.slug
-            }
-
-        if product.brand:
-            data['brand'] = {
-                'id': product.brand.id,
-                'name': product.brand.name,
-                'slug': product.brand.slug
-            }
-
-        # Include variants if requested
-        if include_variants and product.variants:
-            data['variants'] = [serialize_variant(variant) for variant in product.variants]
-
-        # Include images if requested
-        if include_images and product.images:
-            data['images'] = [serialize_image(image) for image in product.images]
-
-        return data
-    except Exception as e:
-        current_app.logger.error(f"Error serializing product {product.id}: {str(e)}")
-        return None
-
-def serialize_variant(variant):
-    """Serialize a product variant to dictionary format."""
-    return {
-        'id': variant.id,
-        'product_id': variant.product_id,
-        'color': variant.color,
-        'size': variant.size,
-        'price': float(variant.price) if variant.price else None,
-        'sale_price': float(variant.sale_price) if variant.sale_price else None,
-        'stock': variant.stock,
-        'sku': variant.sku,
-        'image_url': variant.image_url,
-        'created_at': variant.created_at.isoformat() if variant.created_at else None,
-        'updated_at': variant.updated_at.isoformat() if variant.updated_at else None
-    }
-
-def serialize_image(image):
-    """Serialize a product image to dictionary format."""
-    return {
-        'id': image.id,
-        'product_id': image.product_id,
-        'filename': image.filename,
-        'url': image.url,
-        'is_primary': image.is_primary,
-        'sort_order': image.sort_order,
-        'alt_text': image.alt_text,
-        'created_at': image.created_at.isoformat() if image.created_at else None,
-        'updated_at': image.updated_at.isoformat() if image.updated_at else None
-    }
+    return serialize_product_detail(product, for_admin=True)
 
 def generate_slug(name):
     """Generate a URL-friendly slug from product name."""
@@ -520,6 +401,18 @@ def create_product():
 
         current_app.logger.info(f"Product created by admin {get_jwt_identity()}: {product.id}")
 
+        # Invalidate caches - new product affects lists and featured sections
+        category_slug = product.category.slug if product.category else None
+        invalidate_product_cache(
+            product_id=product.id,
+            slug=product.slug,
+            category_slug=category_slug,
+            invalidate_type='lists'  # New product only affects lists, not single product cache
+        )
+
+        # Broadcast WebSocket event
+        broadcast_to_all('product_created', {'product_id': product.id, 'name': product.name})
+
         # Return created product
         return jsonify({
             'message': 'Product created successfully',
@@ -562,6 +455,24 @@ def update_product(product_id):
 
         if not data:
             return jsonify({'error': 'No data provided'}), 400
+
+        # Capture old state for cache invalidation decisions
+        old_product_state = {
+            'slug': product.slug,
+            'category_id': product.category_id,
+            'is_active': product.is_active,
+            'is_visible': product.is_visible,
+            'is_featured': product.is_featured,
+            'is_new': product.is_new,
+            'is_sale': product.is_sale,
+            'is_flash_sale': product.is_flash_sale,
+            'is_luxury_deal': product.is_luxury_deal,
+            'is_trending': product.is_trending,
+            'is_top_pick': product.is_top_pick,
+            'is_daily_find': product.is_daily_find,
+            'is_new_arrival': product.is_new_arrival,
+        }
+        old_category_slug = product.category.slug if product.category else None
 
         # Validate price if provided
         if 'price' in data:
@@ -629,6 +540,49 @@ def update_product(product_id):
 
         current_app.logger.info(f"Product updated by admin {get_jwt_identity()}: {product_id}")
 
+        # Determine cache invalidation scope based on what changed
+        changed_flags = get_changed_flags(old_product_state, data)
+        visibility_changed = should_invalidate_visibility(old_product_state, data)
+        category_changed = old_product_state.get('category_id') != product.category_id
+        
+        # Get new category slug if category changed
+        new_category_slug = product.category.slug if product.category else None
+        
+        if visibility_changed or category_changed:
+            # Full invalidation if visibility or category changed
+            invalidate_product_cache(
+                product_id=product.id,
+                slug=product.slug,
+                category_slug=new_category_slug,
+                invalidate_type='all'
+            )
+            # Also invalidate old category if it changed
+            if category_changed and old_category_slug:
+                invalidate_product_cache(
+                    product_id=product.id,
+                    category_slug=old_category_slug,
+                    invalidate_type='lists'
+                )
+        elif changed_flags:
+            # Feature flags changed, invalidate featured sections + single product
+            invalidate_product_cache(
+                product_id=product.id,
+                slug=product.slug,
+                category_slug=new_category_slug,
+                invalidate_type='featured',
+                changed_flags=changed_flags
+            )
+        else:
+            # Just content update, invalidate single product cache
+            invalidate_product_cache(
+                product_id=product.id,
+                slug=product.slug,
+                invalidate_type='single'
+            )
+        
+        # Broadcast WebSocket event
+        broadcast_to_all('product_updated', {'product_id': product.id, 'name': product.name})
+
         return jsonify({
             'message': 'Product updated successfully',
             'product': serialize_product(product, include_variants=True, include_images=True)
@@ -665,12 +619,28 @@ def delete_product(product_id):
         if not product:
             return jsonify({'error': 'Product not found'}), 404
 
+        # Capture info for cache invalidation before deletion
+        product_slug = product.slug
+        category_slug = product.category.slug if product.category else None
+        product_name = product.name
+        
         # Soft delete by setting is_active to False
         product.is_active = False
         product.updated_at = datetime.utcnow()
         db.session.commit()
 
         current_app.logger.info(f"Product soft deleted by admin {get_jwt_identity()}: {product_id}")
+
+        # Invalidate all caches - deleted product should disappear from everywhere
+        invalidate_product_cache(
+            product_id=product_id,
+            slug=product_slug,
+            category_slug=category_slug,
+            invalidate_type='all'
+        )
+        
+        # Broadcast WebSocket event
+        broadcast_to_all('product_deleted', {'product_id': product_id, 'name': product_name})
 
         return jsonify({'message': 'Product deleted successfully'}), 200
 
@@ -701,6 +671,18 @@ def restore_product(product_id):
         db.session.commit()
 
         current_app.logger.info(f"Product restored by admin {get_jwt_identity()}: {product_id}")
+
+        # Invalidate all caches - restored product should appear in public views
+        category_slug = product.category.slug if product.category else None
+        invalidate_product_cache(
+            product_id=product.id,
+            slug=product.slug,
+            category_slug=category_slug,
+            invalidate_type='all'
+        )
+        
+        # Broadcast WebSocket event
+        broadcast_to_all('product_restored', {'product_id': product.id, 'name': product.name})
 
         return jsonify({
             'message': 'Product restored successfully',
@@ -760,6 +742,13 @@ def create_product_variant(product_id):
 
         current_app.logger.info(f"Product variant created by admin {get_jwt_identity()}: {variant.id}")
 
+        # Invalidate single product cache - variant change affects product details
+        invalidate_product_cache(
+            product_id=product.id,
+            slug=product.slug,
+            invalidate_type='single'
+        )
+
         return jsonify({
             'message': 'Product variant created successfully',
             'variant': serialize_variant(variant)
@@ -795,6 +784,15 @@ def update_product_variant(variant_id):
 
         current_app.logger.info(f"Product variant updated by admin {get_jwt_identity()}: {variant_id}")
 
+        # Invalidate single product cache - variant change affects product details
+        product = db.session.get(Product, variant.product_id)
+        if product:
+            invalidate_product_cache(
+                product_id=product.id,
+                slug=product.slug,
+                invalidate_type='single'
+            )
+
         return jsonify({
             'message': 'Product variant updated successfully',
             'variant': serialize_variant(variant)
@@ -815,10 +813,23 @@ def delete_product_variant(variant_id):
         if not variant:
             return jsonify({'error': 'Variant not found'}), 404
 
+        # Capture product info before deletion for cache invalidation
+        product = db.session.get(Product, variant.product_id)
+        product_id = variant.product_id
+        product_slug = product.slug if product else None
+
         db.session.delete(variant)
         db.session.commit()
 
         current_app.logger.info(f"Product variant deleted by admin {get_jwt_identity()}: {variant_id}")
+
+        # Invalidate single product cache
+        if product_id and product_slug:
+            invalidate_product_cache(
+                product_id=product_id,
+                slug=product_slug,
+                invalidate_type='single'
+            )
 
         return jsonify({'message': 'Product variant deleted successfully'}), 200
 
@@ -920,6 +931,13 @@ def add_product_image(product_id):
 
         current_app.logger.info(f"Product image added by admin {get_jwt_identity()}: {image.id}")
 
+        # Invalidate single product cache - image change affects product details
+        invalidate_product_cache(
+            product_id=product.id,
+            slug=product.slug,
+            invalidate_type='single'
+        )
+
         try:
             broadcast_to_all('product_update', {
                 'product_id': product_id,
@@ -977,6 +995,15 @@ def update_product_image(image_id):
 
         current_app.logger.info(f"Product image updated by admin {get_jwt_identity()}: {image_id}")
 
+        # Invalidate single product cache - image change affects product details
+        product = db.session.get(Product, image.product_id)
+        if product:
+            invalidate_product_cache(
+                product_id=product.id,
+                slug=product.slug,
+                invalidate_type='single'
+            )
+
         return jsonify({
             'message': 'Product image updated successfully',
             'image': serialize_image(image)
@@ -1031,6 +1058,14 @@ def delete_product_image(image_id):
         db.session.commit()
 
         current_app.logger.info(f"Product image deleted by admin {get_jwt_identity()}: {image_id}")
+
+        # Invalidate single product cache - image change affects product details
+        if product:
+            invalidate_product_cache(
+                product_id=product.id,
+                slug=product.slug,
+                invalidate_type='single'
+            )
 
         try:
             broadcast_to_all('product_update', {
@@ -1090,6 +1125,13 @@ def reorder_product_images(product_id):
 
         current_app.logger.info(f"Product images reordered by admin {get_jwt_identity()}: {product_id}")
 
+        # Invalidate single product cache
+        invalidate_product_cache(
+            product_id=product.id,
+            slug=product.slug,
+            invalidate_type='single'
+        )
+
         return jsonify({'message': 'Product images reordered successfully'}), 200
 
     except Exception as e:
@@ -1133,6 +1175,13 @@ def set_primary_image(product_id, image_id):
         db.session.commit()
 
         current_app.logger.info(f"Primary image set by admin {get_jwt_identity()}: image {image_id} for product {product_id}")
+
+        # Invalidate single product cache
+        invalidate_product_cache(
+            product_id=product.id,
+            slug=product.slug,
+            invalidate_type='single'
+        )
 
         return jsonify({'message': 'Primary image set successfully'}), 200
 
@@ -1186,6 +1235,9 @@ def bulk_update_products():
 
         current_app.logger.info(f"Bulk update performed by admin {get_jwt_identity()}: {len(products)} products")
 
+        # Bulk updates likely affect many caches - invalidate all
+        invalidate_all_product_caches()
+
         return jsonify({
             'message': f'Successfully updated {len(products)} products',
             'updated_count': updated_count
@@ -1226,6 +1278,9 @@ def bulk_delete_products():
         db.session.commit()
 
         current_app.logger.info(f"Bulk delete performed by admin {get_jwt_identity()}: {updated_count} products")
+
+        # Bulk deletes affect all public caches - invalidate everything
+        invalidate_all_product_caches()
 
         return jsonify({
             'message': f'Successfully deleted {updated_count} products'
