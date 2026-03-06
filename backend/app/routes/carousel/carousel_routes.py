@@ -116,11 +116,80 @@ def init_carousel_tables():
         return
     
     try:
+        # Create all tables defined in models
         db.create_all()
         logger.info("✅ Carousel tables initialized successfully")
+        
+        # Seed with default data if table is empty
+        if CAROUSEL_AVAILABLE and CarouselBanner is not None:
+            existing_count = CarouselBanner.query.count()
+            if existing_count == 0:
+                logger.info("Database is empty, seeding with default carousel data...")
+                seed_default_carousels()
     except Exception as e:
         logger.error(f"❌ Error initializing carousel tables: {str(e)}")
 
+
+def seed_default_carousels():
+    """Seed database with default carousel data."""
+    try:
+        sample_banners = [
+            {
+                'name': 'Innovation Tech Banner',
+                'position': 'homepage',
+                'image_url': 'https://images.unsplash.com/photo-1550009158-9ebf69173e03?q=80&w=2070&auto=format&fit=crop',
+                'title': 'Innovate Your Life',
+                'description': 'Cutting-edge electronics and gadgets for the modern home.',
+                'badge_text': '% INNOVATION',
+                'discount': '15% OFF',
+                'button_text': 'TECH DEALS',
+                'link_url': '/products?category=electronics',
+                'is_active': True,
+                'sort_order': 1
+            },
+            {
+                'name': 'Fashion Forward',
+                'position': 'homepage',
+                'image_url': 'https://images.unsplash.com/photo-1483985988355-763728e1935b?q=80&w=2070&auto=format&fit=crop',
+                'title': 'Style That Speaks',
+                'description': 'Discover the latest fashion trends and timeless classics.',
+                'badge_text': 'NEW SEASON',
+                'discount': '30% OFF',
+                'button_text': 'SHOP FASHION',
+                'link_url': '/products?category=fashion',
+                'is_active': True,
+                'sort_order': 2
+            },
+            {
+                'name': 'Beauty Essentials',
+                'position': 'homepage',
+                'image_url': 'https://images.unsplash.com/photo-1596462502278-27ddab8a248d?q=80&w=2070&auto=format&fit=crop',
+                'title': 'Glow Naturally',
+                'description': 'Premium beauty products for radiant skin and confidence.',
+                'badge_text': 'BESTSELLERS',
+                'discount': '25% OFF',
+                'button_text': 'EXPLORE BEAUTY',
+                'link_url': '/products?category=beauty',
+                'is_active': True,
+                'sort_order': 3
+            },
+        ]
+        
+        for banner_data in sample_banners:
+            banner = CarouselBanner(**banner_data)
+            db.session.add(banner)
+        
+        db.session.commit()
+        logger.info(f"✅ Successfully seeded {len(sample_banners)} default carousel banners")
+    except Exception as e:
+        logger.error(f"❌ Error seeding default carousels: {str(e)}")
+        db.session.rollback()
+
+
+# ============================================================================
+# Initialize carousel tables on first import
+# ============================================================================
+init_carousel_tables()
 
 # ============================================================================
 # PUBLIC ROUTES - Get carousel items for display (OPTIMIZED with Redis)
