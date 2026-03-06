@@ -1,9 +1,9 @@
 import { Redis } from '@upstash/redis'
 
-// Initialize Redis client with Upstash credentials
+// Initialize Redis client with Upstash REST API credentials
 const redis = new Redis({
-  url: process.env.UPSTASH_REDIS_URL!,
-  token: process.env.UPSTASH_REDIS_TOKEN!,
+  url: process.env.UPSTASH_REDIS_REST_URL!,
+  token: process.env.UPSTASH_REDIS_REST_TOKEN!,
 })
 
 export default redis
