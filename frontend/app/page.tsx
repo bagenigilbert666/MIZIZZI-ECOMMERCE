@@ -92,6 +92,8 @@ async function LoadAllContent() {
     const categoriesData = Array.isArray(uiBatchData?.categories) ? uiBatchData.categories : []
     const sidePanelsData = uiBatchData?.sidePanels || {}
     
+    console.log('[v0] Carousel data:', { count: carouselData.length, first: carouselData[0] })
+    
     const premiumExperiencesData = Array.isArray(sidePanelsData?.premium) ? sidePanelsData.premium : []
     const productShowcaseData = Array.isArray(sidePanelsData?.showcase) ? sidePanelsData.showcase : []
 

@@ -96,6 +96,13 @@ export const Carousel = memo(function Carousel({
   const activeItem = useMemo(() => carouselItems[currentSlide], [carouselItems, currentSlide])
   const prevItem = useMemo(() => carouselItems[prevSlideIndex], [carouselItems, prevSlideIndex])
 
+  console.log('[v0] Carousel state:', { 
+    itemCount: carouselItems.length, 
+    activeItem: activeItem?.image, 
+    prevItem: prevItem?.image,
+    currentSlide,
+  })
+
   if (carouselItems.length === 0) {
     return null
   }

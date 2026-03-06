@@ -151,6 +151,12 @@ export const getUIBatch = cache(
 
       const executionTime = rawData.total_execution_ms || 0
       console.log('[v0] getUIBatch: Successfully fetched batch data in', executionTime.toFixed(2), 'ms (Cached:', rawData.cached, ')')
+      console.log('[v0] UI Batch raw response:', {
+        carouselCount: Array.isArray(rawData?.carousel) ? rawData.carousel.length : (typeof rawData?.carousel),
+        categoriesCount: Array.isArray(rawData?.categories) ? rawData.categories.length : 0,
+        sidePanelsCount: rawData?.sidePanels ? Object.keys(rawData.sidePanels) : 'none',
+        firstCarouselItem: Array.isArray(rawData?.carousel) ? rawData.carousel[0] : 'N/A',
+      })
 
       // Handle BOTH flat and nested response structures
       // Flat: { carousel: [...], categories: [...], sidePanels: {...}, ... }
