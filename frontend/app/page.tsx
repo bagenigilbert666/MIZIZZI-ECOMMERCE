@@ -88,7 +88,21 @@ async function LoadAllContent() {
     ])
 
     // Extract data from UI batch - backend returns FLAT structure: { carousel: [...], categories: [...], sidePanels: {...}, ... }
-    const carouselData = Array.isArray(uiBatchData?.carousel) ? uiBatchData.carousel : []
+    const carouselData = Array.isArray(uiBatchData?.carousel) 
+      ? uiBatchData.carousel.map((item: any) => ({
+          // Transform backend snake_case to component camelCase
+          id: item.id,
+          name: item.name,
+          title: item.title || item.name,
+          description: item.description || '',
+          badge: item.badge_text || '',
+          discount: item.discount || '',
+          image: item.image_url || '/placeholder.svg',
+          buttonText: item.button_text || 'VIEW COLLECTION',
+          href: item.link_url || '/products',
+          sort_order: item.sort_order,
+        }))
+      : []
     const categoriesData = Array.isArray(uiBatchData?.categories) ? uiBatchData.categories : []
     const sidePanelsData = uiBatchData?.sidePanels || {}
     

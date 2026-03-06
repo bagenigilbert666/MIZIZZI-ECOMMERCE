@@ -46,7 +46,18 @@ export const Carousel = memo(function Carousel({
   // This ensures carousel always displays something
   const displayItems = useMemo(() => {
     if (serverCarouselItems && serverCarouselItems.length > 0) {
-      return serverCarouselItems;
+      // Transform carousel items to ensure all required fields exist
+      return serverCarouselItems.map(item => ({
+        id: item.id || undefined,
+        name: item.name || '',
+        title: item.title || item.name || '',
+        description: item.description || '',
+        badge: item.badge || item.badge_text || '',
+        discount: item.discount || '',
+        image: item.image || item.image_url || '/placeholder.svg',
+        buttonText: item.buttonText || item.button_text || 'Learn More',
+        href: item.href || item.link_url || '/products',
+      }));
     }
     // Show feature cards as fallback if carousel is empty
     if (featureCards && featureCards.length > 0) {
@@ -77,6 +88,12 @@ export const Carousel = memo(function Carousel({
 
   // Memoize carousel items to prevent unnecessary re-renders
   const carouselItems = useMemo(() => displayItems, [displayItems])
+
+  console.log("[v0] Carousel component received:", {
+    itemsCount: carouselItems.length,
+    firstItem: carouselItems[0],
+    serverItemsCount: serverCarouselItems?.length || 0,
+  })
 
   const { currentSlide, direction, isPaused, nextSlide, prevSlide, pause, resume } = useCarousel({
     itemsLength: carouselItems.length || 1,
