@@ -488,7 +488,6 @@ def create_app(config_name=None, enable_socketio=True):
         'topbar_routes': Blueprint('topbar_routes', __name__),
         'contact_cta_routes': Blueprint('contact_cta_routes', __name__),
         'featured_routes': Blueprint('featured_routes', __name__),
-        'homepage_routes': Blueprint('homepage_routes', __name__),
         'meilisearch_routes': Blueprint('meilisearch_routes', __name__),
         'admin_meilisearch_routes': Blueprint('admin_meilisearch_routes', __name__),
         'flash_sale_routes': Blueprint('flash_sale_routes', __name__),
@@ -819,12 +818,6 @@ def create_app(config_name=None, enable_socketio=True):
             ('backend.app.routes.products.featured_routes', 'featured_bp'),
             ('backend.routes.products.featured_routes', 'featured_bp'),
         ],
-        'homepage_routes': [
-            ('app.routes.homepage_routes', 'homepage_routes'),
-            ('routes.homepage_routes', 'homepage_routes'),
-            ('backend.app.routes.homepage_routes', 'homepage_routes'),
-            ('backend.routes.homepage_routes', 'homepage_routes'),
-        ],
         'meilisearch_routes': [
             ('app.routes.meilisearch', 'meilisearch_routes'),
             ('routes.meilisearch', 'meilisearch_routes'),
@@ -1009,7 +1002,6 @@ def create_app(config_name=None, enable_socketio=True):
         app.register_blueprint(final_blueprints['topbar_routes'], url_prefix='/api/topbar')
         app.register_blueprint(final_blueprints['contact_cta_routes'], url_prefix='/api/contact-cta')
         app.register_blueprint(final_blueprints['featured_routes'], url_prefix='/api/products/featured')
-        app.register_blueprint(final_blueprints['homepage_routes'], url_prefix='/api/homepage')
 
         app.register_blueprint(final_blueprints['meilisearch_routes'], url_prefix='/api/meilisearch')
         app.register_blueprint(final_blueprints['admin_meilisearch_routes'], url_prefix='/api/admin/meilisearch')
@@ -1089,7 +1081,6 @@ def create_app(config_name=None, enable_socketio=True):
                 'topbar_routes': '/api/topbar',
                 'contact_cta_routes': '/api/contact-cta',
                 'featured_routes': '/api/products/featured',
-                'homepage_routes': '/api/homepage',
                 'meilisearch_routes': '/api/meilisearch',
                 'admin_meilisearch_routes': '/api/admin/meilisearch',
                 'flash_sale_routes': '/api/flash-sale',
