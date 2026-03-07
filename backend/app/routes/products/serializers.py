@@ -197,7 +197,7 @@ def serialize_product_list(product):
 def serialize_product_minimal(product):
     """
     Ultra-minimal serialization for fast endpoints (trending, featured sections).
-    Returns only 6 essential fields for maximum speed.
+    Returns only 6 essential fields for maximum speed. OPTIMIZED: No JSON parsing per product.
     
     Args:
         product: Product instance
@@ -206,12 +206,10 @@ def serialize_product_minimal(product):
         Dictionary with minimal product data
     """
     try:
+        # OPTIMIZATION: Use thumbnail_url directly (already parsed from DB)
+        # Don't re-parse image_urls JSON string per product - that's wasteful
+        # If thumbnail is needed, it should be pre-selected at query time
         image_url = product.thumbnail_url
-        if not image_url and hasattr(product, 'image_urls') and product.image_urls:
-            if isinstance(product.image_urls, list) and len(product.image_urls) > 0:
-                image_url = product.image_urls[0]
-            elif isinstance(product.image_urls, str):
-                image_url = product.image_urls.split(',')[0] if product.image_urls else None
         
         return {
             'id': product.id,

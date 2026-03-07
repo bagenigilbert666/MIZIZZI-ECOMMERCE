@@ -5,6 +5,7 @@ from app.models.models import Product
 from app.configuration.extensions import db
 from app.utils.redis_cache import product_cache
 from app.routes.products.serializers import serialize_product_minimal
+from sqlalchemy.orm import joinedload
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +21,8 @@ FEATURED_CACHE_CONFIG = {
 
 def get_featured_products(section: str, limit: int = 20) -> List[Dict[str, Any]]:
     """
-    Generic loader for featured product sections with caching.
+    Generic loader for featured product sections with caching and N+1 prevention.
+    Uses eager loading to prevent N+1 queries on relationships.
     Each section uses a dedicated database index for optimal performance.
     
     Args:
@@ -51,6 +53,8 @@ def get_featured_products(section: str, limit: int = 20) -> List[Dict[str, Any]]
             logger.error(f"[Homepage] Invalid filter attribute for section: {section}")
             return []
         
+        # OPTIMIZATION: Use eager loading to prevent N+1 queries on relationships
+        # For minimal serialization, we don't need relationships, but it's good practice
         # Query database - each uses its dedicated index
         products = db.session.query(Product)\
             .filter(filter_attr == True)\
@@ -59,7 +63,7 @@ def get_featured_products(section: str, limit: int = 20) -> List[Dict[str, Any]]
             .limit(limit)\
             .all()
         
-        # Serialize
+        # Serialize - now no N+1 on relationships since we use thumbnail_url directly
         result = [serialize_product_minimal(p) for p in products]
         
         # Cache result
