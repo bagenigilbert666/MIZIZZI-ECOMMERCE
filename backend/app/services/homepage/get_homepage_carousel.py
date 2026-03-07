@@ -1,7 +1,7 @@
 """Homepage Carousel Loader - Fetches carousel items for homepage."""
 import logging
 from typing import List, Dict, Any
-from app.models.models import CarouselBanner
+from models.carousel_model import CarouselBanner
 from app.configuration.extensions import db
 from app.utils.redis_cache import product_cache
 
