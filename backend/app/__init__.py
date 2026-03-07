@@ -166,7 +166,32 @@ def create_app(config_name=None, enable_socketio=True):
         config_name = os.environ.get('FLASK_CONFIG', 'default')
     
     app = Flask(__name__)
-    app.config.from_object(config[config_name])
+    # Resolve configuration object robustly by importing the configuration
+    # module at runtime. This avoids relying on a possibly shadowed `config`
+    # name in the current module's globals (which caused intermittent failures).
+    import importlib
+
+    cfg_obj = None
+    try:
+        cfg_mod = importlib.import_module('app.configuration.config')
+        # If the module exports a mapping called `config` use it first
+        if hasattr(cfg_mod, 'config') and isinstance(getattr(cfg_mod, 'config'), dict):
+            cfg_map = getattr(cfg_mod, 'config')
+            cfg_obj = cfg_map.get(config_name) or cfg_map.get('default')
+        else:
+            # Look for a class named e.g. DevelopmentConfig or <Name>Config
+            candidate_attr = f"{str(config_name).capitalize()}Config"
+            cfg_obj = getattr(cfg_mod, candidate_attr, None) or getattr(cfg_mod, 'default', None) or getattr(cfg_mod, config_name, None)
+        # As last resort, if cfg_mod itself *is* a mapping, accept it
+        if cfg_obj is None and isinstance(cfg_mod, dict):
+            cfg_obj = cfg_mod.get(config_name) or cfg_mod.get('default')
+    except Exception as e:
+        logger.debug(f"Error importing app.configuration.config: {e}")
+
+    if cfg_obj is None:
+        raise RuntimeError("Could not resolve configuration object from app.configuration.config. Check exports there.")
+
+    app.config.from_object(cfg_obj)
     
     # Set secret key for SocketIO
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key')
