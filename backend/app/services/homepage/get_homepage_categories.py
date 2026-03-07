@@ -38,7 +38,7 @@ async def get_homepage_categories(limit: int = 20) -> List[Dict[str, Any]]:
                 "id": c.id,
                 "name": c.name,
                 "slug": c.slug,
-                "image": c.image,
+                "image": c.image_url,
                 "description": c.description or ""
             }
             for c in categories

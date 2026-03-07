@@ -41,7 +41,7 @@ async def get_homepage_carousel() -> List[Dict[str, Any]]:
                 "description": b.description or "",
                 "image_url": b.image_url or "",
                 "button_text": b.button_text or "",
-                "button_url": b.button_url or "",
+                "button_url": b.link_url or "",
                 "position": b.position or 0
             }
             for b in banners
