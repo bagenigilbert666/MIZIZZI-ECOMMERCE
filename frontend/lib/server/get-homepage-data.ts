@@ -1,16 +1,15 @@
-// Frontend homepage data fetcher - Single unified call to batch homepage endpoint.
+/**
+ * Frontend homepage data fetcher - Single unified call to batch homepage endpoint.
+ */
 import { cache } from "react"
 
-const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ||
-  process.env.NEXT_PUBLIC_API_URL ||
-  "http://localhost:5000"
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
 /**
  * Get all homepage data in a single batch request.
  *
  * Architecture:
- * - Single API call to /api/homepage instead of multiple separate calls
+ * - Single API call to /api/homepage instead of 13 separate calls
  * - Returns all homepage sections in parallel
  * - Reuses per-section Redis caching from backend
  * - ISR revalidate: 60s for freshness
@@ -26,10 +25,6 @@ const API_BASE_URL =
  *     trending_products: Product[]
  *     daily_finds: Product[]
  *     all_products: { products: Product[], has_more: boolean, total: number, page: number }
- *     contact_cta_slides: ContactCTA[]
- *     topbar_slides: TopBarSlide[]
- *     product_showcase: SidePanel[]
- *     premium_experiences: SidePanel[]
  *   }
  */
 export const getHomepageData = cache(async () => {
@@ -40,6 +35,7 @@ export const getHomepageData = cache(async () => {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
+      // Revalidate every 60 seconds
       next: { revalidate: 60, tags: ["homepage"] },
     })
 
@@ -50,6 +46,7 @@ export const getHomepageData = cache(async () => {
 
     const result = await response.json()
 
+    // Log cache header for debugging
     const cacheHeader = response.headers.get("X-Cache")
     if (cacheHeader) {
       console.debug(`[Homepage] Cache: ${cacheHeader}`)
@@ -68,7 +65,7 @@ export const getHomepageData = cache(async () => {
 
 /**
  * Safe fallback structure when API is unavailable.
- * All section components handle empty arrays gracefully.
+ * HomeContent component handles empty arrays gracefully.
  */
 function getHomepageDataFallback() {
   return {
@@ -86,9 +83,5 @@ function getHomepageDataFallback() {
       total: 0,
       page: 1,
     },
-    contact_cta_slides: [],
-    topbar_slides: [],
-    product_showcase: [],
-    premium_experiences: [],
   }
 }
