@@ -8,7 +8,7 @@ from app.utils.redis_cache import product_cache, fast_json_dumps
 logger = logging.getLogger(__name__)
 
 CACHE_KEY = "mizizzi:homepage:categories"
-CACHE_TTL = 300  # 5 minutes
+CACHE_TTL = 3600  # 1 hour - stable admin content, long TTL to maximize reuse
 
 
 def get_homepage_categories(limit: int = 20) -> List[Dict[str, Any]]:

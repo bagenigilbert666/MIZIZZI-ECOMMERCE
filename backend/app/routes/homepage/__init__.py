@@ -1,10 +1,11 @@
 """Homepage Batch API Route - Single endpoint for all homepage data.
 
 Correct Cache-Control header strategy:
-- HOMEPAGE_CACHE_TTL in cache_utils.py = 180 seconds (3 minutes)
-- Cache-Control header must match: max-age=180
+- HOMEPAGE_CACHE_TTL in cache_utils.py = 600 seconds (10 minutes)
+- Cache-Control header must match: max-age=600
 - Prevents misalignment between server cache and proxy/browser cache
 - If you change HOMEPAGE_CACHE_TTL, update this header too!
+- Individual section TTLs range from 120s (dynamic) to 3600s (stable content)
 """
 import logging
 from flask import Blueprint, jsonify, request
@@ -173,10 +174,11 @@ def get_homepage():
         # Create Flask response
         response = jsonify(response_data)
         
-        # Set Cache-Control header to match ACTUAL top-level cache TTL (180s, not 60s)
-        # The aggregator uses HOMEPAGE_CACHE_TTL = 180 seconds
+        # Set Cache-Control header to match ACTUAL top-level cache TTL (600s)
+        # The aggregator uses HOMEPAGE_CACHE_TTL = 600 seconds (10 minutes)
         # This header must match that TTL for correct cache behavior in proxies/browsers
-        response.headers['Cache-Control'] = 'public, max-age=180'
+        # Increased TTL reduces uncached-first-load latency for new visitors
+        response.headers['Cache-Control'] = 'public, max-age=600'
         
         # STANDARDIZE X-Cache Header:
         # HIT → served from Redis top-level cache (fast-path, aggregation skipped)

@@ -8,7 +8,7 @@ from app.utils.redis_cache import product_cache
 logger = logging.getLogger(__name__)
 
 PREMIUM_EXPERIENCES_CACHE_KEY = "mizizzi:homepage:premium_experiences"
-PREMIUM_EXPERIENCES_CACHE_TTL = 600  # 10 minutes
+PREMIUM_EXPERIENCES_CACHE_TTL = 3600  # 1 hour - stable admin content, long TTL to maximize reuse
 
 
 def get_homepage_premium_experiences() -> List[Dict[str, Any]]:

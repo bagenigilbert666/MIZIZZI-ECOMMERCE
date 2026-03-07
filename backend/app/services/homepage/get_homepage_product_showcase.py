@@ -8,7 +8,7 @@ from app.utils.redis_cache import product_cache
 logger = logging.getLogger(__name__)
 
 PRODUCT_SHOWCASE_CACHE_KEY = "mizizzi:homepage:product_showcase"
-PRODUCT_SHOWCASE_CACHE_TTL = 600  # 10 minutes
+PRODUCT_SHOWCASE_CACHE_TTL = 3600  # 1 hour - stable admin content, long TTL to maximize reuse
 
 
 def get_homepage_product_showcase() -> List[Dict[str, Any]]:

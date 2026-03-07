@@ -10,11 +10,11 @@ logger = logging.getLogger(__name__)
 
 # Cache configuration for each featured section
 FEATURED_CACHE_CONFIG = {
-    "luxury": {"key": "mizizzi:homepage:luxury", "ttl": 180, "flag": "is_luxury_deal"},
-    "new_arrivals": {"key": "mizizzi:homepage:new_arrivals", "ttl": 180, "flag": "is_new_arrival"},
-    "top_picks": {"key": "mizizzi:homepage:top_picks", "ttl": 120, "flag": "is_top_pick"},
-    "trending": {"key": "mizizzi:homepage:trending", "ttl": 120, "flag": "is_trending"},
-    "daily_finds": {"key": "mizizzi:homepage:daily_finds", "ttl": 300, "flag": "is_daily_find"},
+    "luxury": {"key": "mizizzi:homepage:luxury", "ttl": 300, "flag": "is_luxury_deal"},
+    "new_arrivals": {"key": "mizizzi:homepage:new_arrivals", "ttl": 300, "flag": "is_new_arrival"},
+    "top_picks": {"key": "mizizzi:homepage:top_picks", "ttl": 300, "flag": "is_top_pick"},
+    "trending": {"key": "mizizzi:homepage:trending", "ttl": 300, "flag": "is_trending"},
+    "daily_finds": {"key": "mizizzi:homepage:daily_finds", "ttl": 1800, "flag": "is_daily_find"},  # 30 min - long TTL to avoid recomputation after cache hit
 }
 
 

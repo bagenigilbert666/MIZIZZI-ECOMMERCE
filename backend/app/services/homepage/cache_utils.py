@@ -5,17 +5,29 @@ from typing import Tuple, Dict, Any
 logger = logging.getLogger(__name__)
 
 # Homepage cache configuration
-HOMEPAGE_CACHE_TTL = 180  # 3 minutes for main cache (increased for better cache efficiency)
+# Optimized TTLs for performance - tuned for first-uncached-build speed
+HOMEPAGE_CACHE_TTL = 600  # 10 minutes for main cache (increased from 180s per recommendations)
+
+# Section-level TTLs optimized for content type:
+# - Stable content (categories, carousel, etc.): 1800-3600s (reusable for many requests)
+# - Dynamic content (flash sales, products): 60-300s (updates more frequently)
 SECTIONS_CACHE_TTL = {
-    "categories": 300,  # 5 minutes
-    "carousel": 600,    # 10 minutes
-    "flash_sale": 180,  # 3 minutes
-    "luxury": 180,
-    "new_arrivals": 180,
-    "top_picks": 120,
-    "trending": 120,
-    "daily_finds": 300,
-    "all_products": 120,
+    # Stable content - rarely changes, long TTLs to maximize cache reuse
+    "categories": 3600,           # 1 hour - stable admin content
+    "carousel": 3600,             # 1 hour - stable admin content
+    "contact_cta": 3600,          # 1 hour - stable admin content
+    "premium_experiences": 3600,  # 1 hour - stable admin content
+    "product_showcase": 3600,     # 1 hour - stable admin content
+    "feature_cards": 3600,        # 1 hour - stable feature cards
+    
+    # Dynamic content - updates frequently, shorter TTLs
+    "flash_sale": 120,            # 2 minutes - changes often
+    "luxury": 300,                # 5 minutes - less frequent updates
+    "new_arrivals": 300,          # 5 minutes - less frequent updates
+    "top_picks": 300,             # 5 minutes - curated content
+    "trending": 300,              # 5 minutes - algorithm-based
+    "daily_finds": 1800,          # 30 minutes - curated daily content (long TTL to avoid recomputation)
+    "all_products": 300,          # 5 minutes - paginated product list
 }
 
 # Pagination limits
