@@ -1,4 +1,6 @@
-"""Frontend homepage data fetcher - Single unified call to batch homepage endpoint."""
+/**
+ * Frontend homepage data fetcher - Single unified call to batch homepage endpoint.
+ */
 import { cache } from "react"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000"
