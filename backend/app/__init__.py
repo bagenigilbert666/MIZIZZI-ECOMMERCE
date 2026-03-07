@@ -190,12 +190,42 @@ def create_app(config_name=None, enable_socketio=True):
             pass
     app.config.setdefault('SQLALCHEMY_TRACK_MODIFICATIONS', False)
 
-    # Initialize extensions
-    db.init_app(app)
-    ma.init_app(app)
-    mail.init_app(app)
-    cache.init_app(app)
-    limiter.init_app(app)
+    # Initialize extensions. Prefer centralized initializer from configuration.extensions
+    # which performs extra binding and defensive setup. Fall back to per-extension init
+    # only if the centralized initializer is not available.
+    try:
+        from .configuration.extensions import init_extensions
+        init_extensions(app)
+    except Exception:
+        # Defensive per-extension initialization (handles edge-cases where names
+        # like `cache` may refer to the app.cache module instead of the Cache
+        # extension instance due to import-order/name collisions).
+        try:
+            if hasattr(db, 'init_app'):
+                db.init_app(app)
+        except Exception:
+            pass
+        try:
+            if hasattr(ma, 'init_app'):
+                ma.init_app(app)
+        except Exception:
+            pass
+        try:
+            if hasattr(mail, 'init_app'):
+                mail.init_app(app)
+        except Exception:
+            pass
+        try:
+            if hasattr(cache, 'init_app'):
+                cache.init_app(app)
+        except Exception:
+            # If cache is a module (app.cache) it won't have init_app; log and continue
+            logger.warning("Cache extension not initialized via cache.init_app (name may be a module). Continuing.")
+        try:
+            if hasattr(limiter, 'init_app'):
+                limiter.init_app(app)
+        except Exception:
+            pass
 
     # Disable strict slashes to avoid Flask redirecting requests which breaks CORS preflight
     try:
