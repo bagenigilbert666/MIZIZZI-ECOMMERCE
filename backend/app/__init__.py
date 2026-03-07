@@ -296,94 +296,13 @@ def create_app(config_name=None, enable_socketio=True):
     # Set up database migrations
     Migrate(app, db)
     
-    # Configure CORS properly
-    CORS(
-        app,
-        origins=['http://localhost:3000', 'http://127.0.0.1:3000', 'https://mizizzi-shop.vercel.app'],
-        supports_credentials=True,
-        allow_headers=["Content-Type", "Authorization", "X-Requested-With", "Cache-Control", "cache-control", "Pragma", "Expires", "X-MFA-Token", "Accept", "Origin"],
-        methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-        expose_headers=["Content-Range", "X-Content-Range", "X-Cache", "X-Cache-Time-Ms", "X-Response-Time-Ms", "X-Products-Cached", "X-All-Products-Cache"],
-        send_wildcard=False,
-        vary_header=True
-    )
-
-    @app.before_request
-    def _handle_options_preflight():
-        if request.method != 'OPTIONS':
-            return None
-
-        from flask import make_response
-        response = make_response(jsonify({'status': 'ok'}), 200)
-
-        origin = request.headers.get('Origin')
-        allowed_origins = app.config.get('CORS_ORIGINS', ['http://localhost:3000', 'http://127.0.0.1:3000','https://mizizzi-shop.vercel.app'])
-        if origin and ("*" in allowed_origins or origin in allowed_origins):
-            response.headers['Access-Control-Allow-Origin'] = origin     
-        else:
-            response.headers['Access-Control-Allow-Origin'] = ','.join(allowed_origins)
-
-        response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization, X-Requested-With, X-MFA-Token, Accept, Origin, Cache-Control, cache-control, Pragma, Expires'
-        response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS, PATCH'
-        response.headers['Access-Control-Allow-Credentials'] = 'true'
-        response.headers['Vary'] = 'Origin'
-
-        return response
+    # Configure CORS with centralized setup
+    from .configuration.cors_config import setup_cors
+    setup_cors(app)
     
-    # Initialize JWT
-    jwt = JWTManager(app)
-    
-    @jwt.token_in_blocklist_loader
-    def check_if_token_revoked(jwt_header, jwt_payload):
-        try:
-            from .routes.admin.admin_auth import is_token_blacklisted
-            jti = jwt_payload["jti"]
-            revoked = is_token_blacklisted(jti)
-            if revoked:
-                app.logger.warning(f"Token revoked (jti={jti}) for request {request.path}")
-            return revoked
-        except Exception as e:
-            app.logger.error(f"Error checking token blacklist: {str(e)}")
-            return False
-    
-    @jwt.expired_token_loader
-    def expired_token_callback(jwt_header, jwt_payload):
-        return jsonify({
-            "error": "Token has expired",
-            "code": "token_expired"
-        }), 401
-    
-    @jwt.invalid_token_loader
-    def invalid_token_callback(error):
-        try:
-            app.logger.warning(f"Invalid token encountered on {request.path}: {error}")
-        except Exception:
-            pass
-        return jsonify({
-            "error": "Invalid token",
-            "code": "invalid_token"
-        }), 401
-    
-    @jwt.unauthorized_loader
-    def missing_token_callback(error):
-        return jsonify({
-            "error": "Authorization required",
-            "code": "authorization_required"
-        }), 401
-    
-    @jwt.needs_fresh_token_loader
-    def token_not_fresh_callback(jwt_header, jwt_payload):
-        return jsonify({
-            "error": "Fresh token required",
-            "code": "fresh_token_required"
-        }), 401
-    
-    @jwt.revoked_token_loader
-    def revoked_token_callback(jwt_header, jwt_payload):
-        return jsonify({
-            "error": "Token has been revoked",
-            "code": "token_revoked"
-        }), 401
+    # Initialize JWT with centralized configuration
+    from .configuration.jwt_config import setup_jwt
+    jwt = setup_jwt(app)
     
     # Create uploads directory if it doesn't exist
     uploads_dir = os.path.join(app.root_path, 'uploads')
@@ -395,116 +314,17 @@ def create_app(config_name=None, enable_socketio=True):
             os.makedirs(directory)
             app.logger.info(f"Created directory: {directory}")
     
-    # Image upload route
-    @app.route('/api/admin/upload/image', methods=['POST'])
-    @jwt_required()
-    def upload_image():
-        try:
-            if 'file' not in request.files:
-                return jsonify({"error": "No file part in the request"}), 400
-            
-            file = request.files['file']
-            if file.filename == '':
-                return jsonify({"error": "No selected file"}), 400
-            
-            if len(file.read()) > 5 * 1024 * 1024:
-                return jsonify({"error": "File too large (max 5MB)"}), 400
-            file.seek(0)
-            
-            allowed_extensions = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
-            if not ('.' in file.filename and file.filename.rsplit('.', 1)[1].lower() in allowed_extensions):
-                return jsonify({"error": "File type not allowed. Only images are permitted."}), 400
-            
-            original_filename = werkzeug.utils.secure_filename(file.filename)
-            file_extension = original_filename.rsplit('.', 1)[1].lower() if '.' in original_filename else ''
-            unique_filename = f"{uuid.uuid4().hex}.{file_extension}"
-            
-            file_path = os.path.join(product_images_dir, unique_filename)
-            file.save(file_path)
-            
-            current_user_id = get_jwt_identity()
-            app.logger.info(f"User {current_user_id} uploaded image: {unique_filename}")
-            
-            site_url = os.environ.get('SITE_URL', request.host_url.rstrip('/'))
-            image_url = f"{site_url}/api/uploads/product_images/{unique_filename}"
-            
-            return jsonify({
-                "success": True,
-                "filename": unique_filename,
-                "originalName": original_filename,
-                "url": image_url,
-                "size": os.path.getsize(file_path),
-                "uploadedBy": current_user_id,
-                "uploadedAt": datetime.now().isoformat()
-            }), 201
-            
-        except Exception as e:
-            app.logger.error(f"Error uploading image: {str(e)}")
-            return jsonify({"error": f"Failed to upload image: {str(e)}"}), 500
+    # Setup guest cart utility
+    from .utils.cart_utils import get_or_create_guest_cart
+    guest_cart_func = lambda: get_or_create_guest_cart(db, app)
     
-    @app.route('/api/uploads/product_images/<filename>', methods=['GET'])
-    def serve_product_image(filename):
-        secure_name = werkzeug.utils.secure_filename(filename)
-        return send_from_directory(product_images_dir, secure_name)
+    # Register upload routes
+    from .routes.uploads import register_upload_routes
+    register_upload_routes(app, uploads_dir, product_images_dir, categories_images_dir)
     
-    @app.route('/api/uploads/categories/<filename>', methods=['GET'])
-    def serve_category_image(filename):
-        secure_name = werkzeug.utils.secure_filename(filename)
-        app.logger.debug(f"Serving category image: {secure_name} from {categories_images_dir}")
-        return send_from_directory(categories_images_dir, secure_name)
-    
-    # Guest cart helper function
-    def get_or_create_guest_cart():
-        try:
-            from .models.models import Cart
-        except ImportError:
-            try:
-                from models.models import Cart
-            except ImportError:
-                class Cart:
-                    def __init__(self, guest_id=None):
-                        self.guest_id = guest_id
-                        self.is_active = True
-                return Cart(guest_id=str(uuid.uuid4()))
-        
-        guest_cart_id = request.cookies.get('guest_cart_id')
-        if guest_cart_id:
-            cart = Cart.query.filter_by(guest_id=guest_cart_id, is_active=True).first()
-            if cart:
-                return cart
-        
-        guest_id = str(uuid.uuid4())
-        cart = Cart(guest_id=guest_id, is_active=True)
-        try:
-            db.session.add(cart)
-            db.session.commit()
-        except Exception as e:
-            app.logger.error(f"Error creating guest cart: {str(e)}")
-        
-        return cart
-    
-    # JWT Optional decorator
-    def jwt_optional(fn):
-        @wraps(fn)
-        def wrapper(*args, **kwargs):
-            try:
-                verify_jwt_in_request(optional=True)
-                user_id = get_jwt_identity()
-                if user_id:
-                    g.user_id = user_id
-                    g.is_authenticated = True
-                else:
-                    g.is_authenticated = False
-                    g.guest_cart = get_or_create_guest_cart()
-            except Exception as e:
-                app.logger.error(f"JWT error: {str(e)}")
-                g.is_authenticated = False
-                g.guest_cart = get_or_create_guest_cart()
-            
-            return fn(*args, **kwargs)
-        return wrapper
-    
-    app.jwt_optional = jwt_optional
+    # Create and register JWT optional decorator
+    from .utils.decorators import jwt_optional
+    app.jwt_optional = jwt_optional(app, guest_cart_func)
     
     
     # Import and register blueprints with clean error handling
