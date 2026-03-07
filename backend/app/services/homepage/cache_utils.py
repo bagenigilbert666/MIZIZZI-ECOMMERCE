@@ -5,7 +5,7 @@ from typing import Tuple, Dict, Any
 logger = logging.getLogger(__name__)
 
 # Homepage cache configuration
-HOMEPAGE_CACHE_TTL = 60  # 1 minute for main cache
+HOMEPAGE_CACHE_TTL = 180  # 3 minutes for main cache (increased for better cache efficiency)
 SECTIONS_CACHE_TTL = {
     "categories": 300,  # 5 minutes
     "carousel": 600,    # 10 minutes

@@ -12,7 +12,7 @@ CACHE_KEY = "mizizzi:homepage:flash_sale"
 CACHE_TTL = 60  # 1 minute - flash sales update frequently
 
 
-async def get_homepage_flash_sale(limit: int = 20) -> List[Dict[str, Any]]:
+def get_homepage_flash_sale(limit: int = 20) -> List[Dict[str, Any]]:
     """
     Fetch flash sale products for homepage with Redis caching.
     Uses dedicated database index for fast queries.

@@ -1,7 +1,7 @@
 """Homepage Aggregator Service - Orchestrates parallel loading of all homepage sections."""
-import asyncio
 import logging
 from typing import Dict, Any, Tuple, List
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from app.utils.redis_cache import product_cache
 
 # Import all homepage loaders
@@ -29,8 +29,11 @@ from .cache_utils import (
 
 logger = logging.getLogger(__name__)
 
+# Thread pool for parallel section loading (CPU count * 2 for I/O bound operations)
+_thread_pool = ThreadPoolExecutor(max_workers=16, thread_name_prefix="homepage_loader_")
 
-async def get_homepage_data(
+
+def get_homepage_data(
     categories_limit: int = 20,
     flash_sale_limit: int = 20,
     luxury_limit: int = 12,
@@ -42,11 +45,11 @@ async def get_homepage_data(
     all_products_page: int = 1,
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """
-    Aggregator for all homepage data - loads all sections in parallel.
+    Aggregator for all homepage data - loads all sections in parallel using ThreadPoolExecutor.
     
     Architecture:
-    - Each section is a separate, focused loader
-    - All sections load in parallel for maximum performance
+    - Each section is a separate, focused loader (100% synchronous)
+    - All sections load in parallel using thread pool for true I/O parallelism
     - Individual section failures don't affect others
     - Each section has its own Redis cache layer
     - Top-level cache wraps entire response with dynamic key based on parameters
@@ -105,51 +108,56 @@ async def get_homepage_data(
             "feature_cards",
         ]
         
-        # Load all sections in parallel
-        results = await asyncio.gather(
-            get_homepage_categories(categories_limit),
-            get_homepage_carousel(),
-            get_homepage_flash_sale(flash_sale_limit),
-            get_homepage_luxury(luxury_limit),
-            get_homepage_new_arrivals(new_arrivals_limit),
-            get_homepage_top_picks(top_picks_limit),
-            get_homepage_trending(trending_limit),
-            get_homepage_daily_finds(daily_finds_limit),
-            get_homepage_all_products(all_products_limit, all_products_page),
-            get_homepage_contact_cta_slides(),
-            get_homepage_premium_experiences(),
-            get_homepage_product_showcase(),
-            get_homepage_feature_cards(),
-            return_exceptions=True,  # Don't let one error block others
-        )
+        # Submit all section loaders to thread pool
+        futures = []
+        futures.append((_thread_pool.submit(get_homepage_categories, categories_limit), "categories"))
+        futures.append((_thread_pool.submit(get_homepage_carousel), "carousel"))
+        futures.append((_thread_pool.submit(get_homepage_flash_sale, flash_sale_limit), "flash_sale"))
+        futures.append((_thread_pool.submit(get_homepage_luxury, luxury_limit), "luxury"))
+        futures.append((_thread_pool.submit(get_homepage_new_arrivals, new_arrivals_limit), "new_arrivals"))
+        futures.append((_thread_pool.submit(get_homepage_top_picks, top_picks_limit), "top_picks"))
+        futures.append((_thread_pool.submit(get_homepage_trending, trending_limit), "trending"))
+        futures.append((_thread_pool.submit(get_homepage_daily_finds, daily_finds_limit), "daily_finds"))
+        futures.append((_thread_pool.submit(get_homepage_all_products, all_products_limit, all_products_page), "all_products"))
+        futures.append((_thread_pool.submit(get_homepage_contact_cta_slides), "contact_cta_slides"))
+        futures.append((_thread_pool.submit(get_homepage_premium_experiences), "premium_experiences"))
+        futures.append((_thread_pool.submit(get_homepage_product_showcase), "product_showcase"))
+        futures.append((_thread_pool.submit(get_homepage_feature_cards), "feature_cards"))
         
-        # Track partial failures with named sections
+        # Collect results as they complete
+        results = {}
         partial_failures: List[str] = []
         
-        # Map results to response
-        homepage_data = {
-            "categories": results[0] if not isinstance(results[0], Exception) else [],
-            "carousel_items": results[1] if not isinstance(results[1], Exception) else [],
-            "flash_sale_products": results[2] if not isinstance(results[2], Exception) else [],
-            "luxury_products": results[3] if not isinstance(results[3], Exception) else [],
-            "new_arrivals": results[4] if not isinstance(results[4], Exception) else [],
-            "top_picks": results[5] if not isinstance(results[5], Exception) else [],
-            "trending_products": results[6] if not isinstance(results[6], Exception) else [],
-            "daily_finds": results[7] if not isinstance(results[7], Exception) else [],
-            "all_products": (results[8] if not isinstance(results[8], Exception) else {"products": [], "has_more": False, "total": 0, "page": 1}),
-            "contact_cta_slides": results[9] if not isinstance(results[9], Exception) else [],
-            "premium_experiences": results[10] if not isinstance(results[10], Exception) else [],
-            "product_showcase": results[11] if not isinstance(results[11], Exception) else [],
-            "feature_cards": results[12] if not isinstance(results[12], Exception) else [],
-        }
+        for future, section_name in futures:
+            try:
+                result = future.result(timeout=30)  # 30 second timeout per section
+                results[section_name] = result
+            except Exception as e:
+                is_critical = section_name in CRITICAL_SECTIONS
+                logger.error(f"[Homepage Aggregator] Section '{section_name}' error: {e} (critical: {is_critical})")
+                partial_failures.append(section_name)
+                # Set empty result for failed sections
+                if section_name == "all_products":
+                    results[section_name] = {"products": [], "has_more": False, "total": 0, "page": 1}
+                else:
+                    results[section_name] = []
         
-        # Log and track any errors
-        for i, result in enumerate(results):
-            if isinstance(result, Exception):
-                section = section_names[i]
-                partial_failures.append(section)
-                is_critical = section in CRITICAL_SECTIONS
-                logger.error(f"[Homepage Aggregator] Section '{section}' error: {result} (critical: {is_critical})")
+        # Build response from results
+        homepage_data = {
+            "categories": results.get("categories", []),
+            "carousel_items": results.get("carousel", []),
+            "flash_sale_products": results.get("flash_sale", []),
+            "luxury_products": results.get("luxury", []),
+            "new_arrivals": results.get("new_arrivals", []),
+            "top_picks": results.get("top_picks", []),
+            "trending_products": results.get("trending", []),
+            "daily_finds": results.get("daily_finds", []),
+            "all_products": results.get("all_products", {"products": [], "has_more": False, "total": 0, "page": 1}),
+            "contact_cta_slides": results.get("contact_cta_slides", []),
+            "premium_experiences": results.get("premium_experiences", []),
+            "product_showcase": results.get("product_showcase", []),
+            "feature_cards": results.get("feature_cards", []),
+        }
         
         # Cache decision: Only cache if critical sections are healthy
         has_critical_failures = any(section in CRITICAL_SECTIONS for section in partial_failures)

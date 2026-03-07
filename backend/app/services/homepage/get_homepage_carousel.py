@@ -11,7 +11,7 @@ CACHE_KEY = "mizizzi:homepage:carousel"
 CACHE_TTL = 600  # 10 minutes
 
 
-async def get_homepage_carousel() -> List[Dict[str, Any]]:
+def get_homepage_carousel() -> List[Dict[str, Any]]:
     """
     Fetch carousel items for homepage with Redis caching.
     Only returns active carousel items ordered by position.

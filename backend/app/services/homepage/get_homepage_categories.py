@@ -11,7 +11,7 @@ CACHE_KEY = "mizizzi:homepage:categories"
 CACHE_TTL = 300  # 5 minutes
 
 
-async def get_homepage_categories(limit: int = 20) -> List[Dict[str, Any]]:
+def get_homepage_categories(limit: int = 20) -> List[Dict[str, Any]]:
     """
     Fetch categories for homepage with Redis caching.
     

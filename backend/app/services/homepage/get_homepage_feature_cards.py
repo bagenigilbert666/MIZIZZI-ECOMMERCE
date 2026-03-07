@@ -41,7 +41,7 @@ DEFAULT_FEATURE_CARDS = [
 ]
 
 
-async def get_homepage_feature_cards() -> List[Dict[str, Any]]:
+def get_homepage_feature_cards() -> List[Dict[str, Any]]:
     """
     Fetch feature cards for homepage display.
     

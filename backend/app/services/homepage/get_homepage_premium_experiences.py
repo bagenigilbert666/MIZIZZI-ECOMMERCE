@@ -11,7 +11,7 @@ PREMIUM_EXPERIENCES_CACHE_KEY = "mizizzi:homepage:premium_experiences"
 PREMIUM_EXPERIENCES_CACHE_TTL = 600  # 10 minutes
 
 
-async def get_homepage_premium_experiences() -> List[Dict[str, Any]]:
+def get_homepage_premium_experiences() -> List[Dict[str, Any]]:
     """
     Fetch premium experience panels for homepage display.
     

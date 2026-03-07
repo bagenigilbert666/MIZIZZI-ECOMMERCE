@@ -2,7 +2,6 @@
 import logging
 from flask import Blueprint, jsonify, request
 from flask_cors import cross_origin
-import asyncio
 
 from app.services.homepage.aggregator import get_homepage_data
 from app.services.homepage.cache_utils import validate_pagination_params
@@ -93,19 +92,17 @@ def get_homepage():
             f"daily={daily_finds_limit}, all={all_products_limit}, page={all_products_page}"
         )
         
-        # Run async aggregator with ALL 9 parameters (needed for correct cache key)
-        homepage_data, metadata = asyncio.run(
-            get_homepage_data(
-                categories_limit=categories_limit,
-                flash_sale_limit=flash_sale_limit,
-                luxury_limit=luxury_limit,
-                new_arrivals_limit=new_arrivals_limit,
-                top_picks_limit=top_picks_limit,
-                trending_limit=trending_limit,
-                daily_finds_limit=daily_finds_limit,
-                all_products_limit=all_products_limit,
-                all_products_page=all_products_page,
-            )
+        # Call sync aggregator directly with ALL 9 parameters
+        homepage_data, metadata = get_homepage_data(
+            categories_limit=categories_limit,
+            flash_sale_limit=flash_sale_limit,
+            luxury_limit=luxury_limit,
+            new_arrivals_limit=new_arrivals_limit,
+            top_picks_limit=top_picks_limit,
+            trending_limit=trending_limit,
+            daily_finds_limit=daily_finds_limit,
+            all_products_limit=all_products_limit,
+            all_products_page=all_products_page,
         )
         
         # Build response with metadata from aggregator (not re-reading cache)

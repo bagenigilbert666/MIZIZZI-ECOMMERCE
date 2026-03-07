@@ -18,7 +18,7 @@ FEATURED_CACHE_CONFIG = {
 }
 
 
-async def get_featured_products(section: str, limit: int = 20) -> List[Dict[str, Any]]:
+def get_featured_products(section: str, limit: int = 20) -> List[Dict[str, Any]]:
     """
     Generic loader for featured product sections with caching.
     Each section uses a dedicated database index for optimal performance.
@@ -75,26 +75,26 @@ async def get_featured_products(section: str, limit: int = 20) -> List[Dict[str,
 
 
 # Convenience functions for each section
-async def get_homepage_luxury(limit: int = 12) -> List[Dict[str, Any]]:
+def get_homepage_luxury(limit: int = 12) -> List[Dict[str, Any]]:
     """Load luxury deal products for homepage."""
-    return await get_featured_products("luxury", limit)
+    return get_featured_products("luxury", limit)
 
 
-async def get_homepage_new_arrivals(limit: int = 20) -> List[Dict[str, Any]]:
+def get_homepage_new_arrivals(limit: int = 20) -> List[Dict[str, Any]]:
     """Load new arrival products for homepage."""
-    return await get_featured_products("new_arrivals", limit)
+    return get_featured_products("new_arrivals", limit)
 
 
-async def get_homepage_top_picks(limit: int = 20) -> List[Dict[str, Any]]:
+def get_homepage_top_picks(limit: int = 20) -> List[Dict[str, Any]]:
     """Load top pick products for homepage."""
-    return await get_featured_products("top_picks", limit)
+    return get_featured_products("top_picks", limit)
 
 
-async def get_homepage_trending(limit: int = 20) -> List[Dict[str, Any]]:
+def get_homepage_trending(limit: int = 20) -> List[Dict[str, Any]]:
     """Load trending products for homepage."""
-    return await get_featured_products("trending", limit)
+    return get_featured_products("trending", limit)
 
 
-async def get_homepage_daily_finds(limit: int = 20) -> List[Dict[str, Any]]:
+def get_homepage_daily_finds(limit: int = 20) -> List[Dict[str, Any]]:
     """Load daily find products for homepage."""
-    return await get_featured_products("daily_finds", limit)
+    return get_featured_products("daily_finds", limit)
