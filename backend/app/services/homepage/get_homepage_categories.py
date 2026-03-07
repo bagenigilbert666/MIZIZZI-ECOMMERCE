@@ -14,12 +14,14 @@ CACHE_TTL = 300  # 5 minutes
 def get_homepage_categories(limit: int = 20) -> List[Dict[str, Any]]:
     """
     Fetch categories for homepage with Redis caching.
+    OPTIMIZATION: Uses column-specific query to load only 5 needed fields (no full model).
+    This avoids loading large binary image_data, banner_data, and relationships.
     
     Args:
         limit: Maximum number of categories to return
         
     Returns:
-        List of category dictionaries with id, name, slug, image
+        List of category dictionaries with id, name, slug, image, description
     """
     try:
         # Try to get from Redis cache
@@ -29,19 +31,30 @@ def get_homepage_categories(limit: int = 20) -> List[Dict[str, Any]]:
                 logger.debug("[Homepage] Categories loaded from cache")
                 return cached
         
-        # Query database
-        categories = db.session.query(Category).limit(limit).all()
+        # OPTIMIZATION: Query only 5 needed columns, not full model
+        # This avoids loading image_data (LargeBinary), banner_data, and subcategories relationship
+        # Explicit filter for active categories for future index support
+        categories = db.session.query(
+            Category.id,
+            Category.name,
+            Category.slug,
+            Category.image_url,
+            Category.description
+        ).filter(Category.is_active == True)\
+         .order_by(Category.sort_order.asc(), Category.created_at.desc())\
+         .limit(limit)\
+         .all()
         
-        # Serialize
+        # Serialize from tuples directly
         result = [
             {
-                "id": c.id,
-                "name": c.name,
-                "slug": c.slug,
-                "image": c.image_url,
-                "description": c.description or ""
+                "id": row[0],
+                "name": row[1],
+                "slug": row[2],
+                "image": row[3],
+                "description": row[4] or ""
             }
-            for c in categories
+            for row in categories
         ]
         
         # Cache result

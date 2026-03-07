@@ -616,7 +616,7 @@ class Category(db.Model):
         'Category',
         backref=db.backref('parent', remote_side=[id]),
         cascade="all, delete-orphan",
-        lazy='joined'
+        lazy='select'
     )
     products = db.relationship('Product', back_populates='category', lazy=True, cascade="all, delete-orphan")
 
