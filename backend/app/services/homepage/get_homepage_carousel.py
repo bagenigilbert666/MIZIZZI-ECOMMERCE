@@ -2,7 +2,6 @@
 import logging
 import time
 from typing import List, Dict, Any
-from app.models.carousel_model import CarouselBanner
 from app.configuration.extensions import db
 from app.utils.redis_cache import product_cache
 
@@ -18,6 +17,9 @@ def get_homepage_carousel() -> List[Dict[str, Any]]:
     OPTIMIZATION: Column-specific query with index-based tuple access.
     Only returns active homepage carousel items ordered by sort_order.
     
+    CIRCULAR IMPORT FIX: CarouselBanner imported inside function (lazy import)
+    This avoids circular import issue when blueprint is loaded during app init.
+    
     Target: <50ms cold, <1ms warm (cached)
     """
     try:
@@ -27,6 +29,9 @@ def get_homepage_carousel() -> List[Dict[str, Any]]:
             if cached:
                 logger.debug("[Homepage] Carousel loaded from cache")
                 return cached
+        
+        # LAZY IMPORT: Import model inside function to avoid circular imports
+        from app.models.carousel_model import CarouselBanner
         
         # Precise timing: SQL query execution
         query_start = time.perf_counter()
