@@ -1,18 +1,12 @@
 """
-Bootstrap initialization module for heavy database and hook setup.
-Ensures single execution per process to avoid duplicate initialization during debug reload.
+Bootstrap initialization module for database and hook setup.
+
+This module ensures critical initialization tasks (db.create_all, admin tables, hooks)
+run exactly once per process, preventing duplicate work during Werkzeug debug reloader restarts.
 """
 
-import os
 import logging
-from datetime import datetime
-from sqlalchemy.exc import OperationalError as SAOperationalError
-
-# Try to import psycopg2 error for database handling
-try:
-    from psycopg2 import OperationalError as PsycopgOperationalError
-except (ImportError, ModuleNotFoundError):
-    PsycopgOperationalError = None
+from sqlalchemy.exc import OperationalError as SQLOperationalError
 
 logger = logging.getLogger(__name__)
 
@@ -21,217 +15,131 @@ _bootstrap_complete = False
 _order_hooks_registered = set()
 
 
-def _can_connect_to_db(app, timeout_seconds=3):
-    """
-    Return True if a DB connection can be established using the app's SQLAlchemy engine.
-    This is a lightweight check to avoid raising during app startup when the database is not yet available.
-    """
+def _can_connect_to_db(app):
+    """Check if database connection can be established."""
     try:
         from app.configuration.extensions import db
         with app.app_context():
-            # Use SQLAlchemy engine connect; this will raise if DB unreachable
             conn = db.engine.connect()
             conn.close()
         return True
-    except Exception as e:
-        app.logger.warning(f"Database connectivity check failed: {str(e)}")
+    except (SQLOperationalError, Exception):
         return False
 
 
 def initialize_database(app):
-    """Initialize database tables with guarded execution."""
+    """Initialize database tables if connection available."""
     from app.configuration.extensions import db
     
-    with app.app_context():
-        if _can_connect_to_db(app):
-            try:
-                db.create_all()
-                app.logger.info("Database tables created successfully")
-            except Exception as e:
-                app.logger.error(f"Error creating database tables: {str(e)}")
-        else:
-            app.logger.warning(
-                "Database is not reachable - skipping db.create_all().\n"
-                "If you intend the app to manage DB schema at startup, ensure DATABASE_URL/SQLALCHEMY_DATABASE_URI is set\n"
-                "and the database is reachable from this host. Otherwise this is expected (DB provision happens separately)."
-            )
+    if not _can_connect_to_db(app):
+        app.logger.debug("Database not reachable - skipping table creation")
+        return
+    
+    try:
+        with app.app_context():
+            db.create_all()
+        app.logger.info("[Bootstrap] Database tables created")
+    except Exception as e:
+        app.logger.error(f"[Bootstrap] Failed to create DB tables: {e}")
 
 
 def initialize_admin_tables(app):
-    """Initialize all admin-related tables."""
+    """Initialize admin-related database tables."""
     with app.app_context():
-        # Admin auth tables
-        try:
-            from app.routes.admin.admin_auth import init_admin_auth_tables
-            init_admin_auth_tables()
-            app.logger.info("Admin authentication tables initialized successfully")
-        except ImportError:
-            app.logger.warning("Admin authentication tables initialization skipped - module not found")
-        except Exception as e:
-            app.logger.error(f"Error initializing admin auth tables: {str(e)}")
-
-        # Admin Google auth tables
-        try:
-            from app.routes.admin.admin_google_auth import init_admin_google_auth_tables
-            init_admin_google_auth_tables()
-            app.logger.info("Admin Google authentication tables initialized successfully")
-        except ImportError:
-            app.logger.warning("Admin Google authentication tables initialization skipped - module not found")
-        except Exception as e:
-            app.logger.error(f"Error initializing admin Google auth tables: {str(e)}")
-
-        # Admin email tables
-        try:
-            from app.routes.admin.admin_email_routes import init_admin_email_tables
-            init_admin_email_tables()
-            app.logger.info("Admin email tables initialized successfully")
-        except ImportError:
-            app.logger.warning("Admin email tables initialization skipped - module not found")
-        except Exception as e:
-            app.logger.error(f"Error initializing admin email tables: {str(e)}")
+        # Mapping of (import_path, function_name, log_name)
+        admin_inits = [
+            ('app.routes.admin.admin_auth', 'init_admin_auth_tables', 'Admin Auth'),
+            ('app.routes.admin.admin_google_auth', 'init_admin_google_auth_tables', 'Admin Google Auth'),
+            ('app.routes.admin.admin_email_routes', 'init_admin_email_tables', 'Admin Email'),
+        ]
+        
+        for module_path, func_name, label in admin_inits:
+            try:
+                module = __import__(module_path, fromlist=[func_name])
+                if hasattr(module, func_name):
+                    getattr(module, func_name)()
+                    app.logger.debug(f"[Bootstrap] {label} tables initialized")
+            except ImportError:
+                pass
+            except Exception as e:
+                app.logger.error(f"[Bootstrap] Failed to init {label}: {e}")
 
 
 def initialize_feature_tables(app):
-    """Initialize all feature-specific tables."""
+    """Initialize feature-specific database tables."""
     with app.app_context():
-        # Footer tables
-        try:
-            from app.routes.footer.footer_routes import init_footer_tables
-            init_footer_tables(app)
-            app.logger.info("Footer tables initialized successfully")
-        except ImportError:
-            app.logger.warning("Footer tables initialization skipped - module not found")
-        except Exception as e:
-            app.logger.error(f"Error initializing footer tables: {str(e)}")
-
-        # Side panel model
-        try:
-            from app.models.side_panel_model import SidePanel
-            app.logger.info("Side panel model imported successfully")
-        except ImportError:
-            app.logger.warning("Side panel model not found - side panel system will not be available")
-        except Exception as e:
-            app.logger.error(f"Error importing side panel model: {str(e)}")
-
-        # Contact CTA tables
-        try:
-            from app.routes.contact_cta.contact_cta_routes import init_contact_cta_tables
-            init_contact_cta_tables()
-            app.logger.info("Contact CTA tables initialized successfully")
-        except ImportError:
-            app.logger.warning("Contact CTA tables initialization skipped - module not found")
-        except Exception as e:
-            app.logger.error(f"Error initializing contact CTA tables: {str(e)}")
-
-        # Featured routes tables
-        try:
-            from app.routes.products.featured_routes import init_featured_routes_tables
-            init_featured_routes_tables()
-            app.logger.info("Featured routes tables initialized successfully")
-        except ImportError:
-            app.logger.warning("Featured routes tables initialization skipped - module not found")
-        except Exception as e:
-            app.logger.error(f"Error initializing featured routes tables: {str(e)}")
-
-        # Meilisearch tables
-        try:
-            from app.routes.meilisearch.meilisearch_routes import init_meilisearch_tables
-            init_meilisearch_tables()
-            app.logger.info("Meilisearch tables initialized successfully")
-        except ImportError:
-            app.logger.warning("Meilisearch tables initialization skipped - module not found")
-        except Exception as e:
-            app.logger.error(f"Error initializing Meilisearch tables: {str(e)}")
-
-        # Flash sale tables
-        try:
-            from app.routes.flash_sale.flash_sale_routes import init_flash_sale_tables
-            init_flash_sale_tables()
-            app.logger.info("Flash sale tables initialized successfully")
-        except ImportError:
-            app.logger.warning("Flash sale tables initialization skipped - module not found")
-        except Exception as e:
-            app.logger.error(f"Error initializing flash sale tables: {str(e)}")
+        feature_inits = [
+            ('app.routes.footer.footer_routes', 'init_footer_tables', 'Footer', True),
+            ('app.models.side_panel_model', 'SidePanel', 'Side Panel', False),
+            ('app.routes.contact_cta.contact_cta_routes', 'init_contact_cta_tables', 'Contact CTA', True),
+            ('app.routes.products.featured_routes', 'init_featured_routes_tables', 'Featured Routes', True),
+            ('app.routes.meilisearch.meilisearch_routes', 'init_meilisearch_tables', 'Meilisearch', True),
+            ('app.routes.flash_sale.flash_sale_routes', 'init_flash_sale_tables', 'Flash Sale', True),
+        ]
+        
+        for module_path, attr_name, label, is_callable in feature_inits:
+            try:
+                module = __import__(module_path, fromlist=[attr_name])
+                if hasattr(module, attr_name):
+                    attr = getattr(module, attr_name)
+                    if is_callable:
+                        attr()
+                    app.logger.debug(f"[Bootstrap] {label} initialized")
+            except ImportError:
+                pass
+            except Exception as e:
+                app.logger.error(f"[Bootstrap] Failed to init {label}: {e}")
 
 
 def setup_order_completion_hooks(app):
     """Setup order completion hooks with idempotency guard."""
     global _order_hooks_registered
     
-    # Use app id as key to track per-app hook registration
     app_id = id(app)
-    
     if app_id in _order_hooks_registered:
-        app.logger.debug("Order completion hooks already registered for this app instance")
         return
     
     try:
-        order_completion_handler = None
-        import_paths = [
-            'app.routes.order.order_completion_handler',
-            '.routes.order.order_completion_handler',
-            'routes.order.order_completion_handler'
-        ]
-        
-        for import_path in import_paths:
+        module = None
+        for path in ['app.routes.order.order_completion_handler', 'routes.order.order_completion_handler']:
             try:
-                module = __import__(import_path, fromlist=['setup_order_completion_hooks'])
+                module = __import__(path, fromlist=['setup_order_completion_hooks'])
                 if hasattr(module, 'setup_order_completion_hooks'):
-                    order_completion_handler = module
                     break
             except ImportError:
                 continue
         
-        if order_completion_handler:
-            order_completion_handler.setup_order_completion_hooks(app)
+        if module:
+            module.setup_order_completion_hooks(app)
             _order_hooks_registered.add(app_id)
-            app.logger.info("Order completion hooks set up successfully")
-        else:
-            app.logger.warning("Order completion handler not found - hooks will not be registered")
-            
+            app.logger.debug("[Bootstrap] Order completion hooks registered")
     except Exception as e:
-        app.logger.error(f"Error setting up order completion hooks: {str(e)}")
+        app.logger.error(f"[Bootstrap] Failed to setup order hooks: {e}")
 
 
 def run_bootstrap(app):
     """
-    Run all bootstrap initialization tasks exactly once per process.
+    Run bootstrap initialization exactly once per process.
     
-    This function:
-    1. Initializes database tables
-    2. Initializes admin tables
-    3. Initializes feature-specific tables
-    4. Sets up order completion hooks
-    
-    The guard ensures this runs only once per process, preventing duplicate work
-    during Werkzeug debug reloader restarts.
+    Initializes:
+    - Database tables
+    - Admin tables
+    - Feature tables
+    - Order completion hooks
     """
     global _bootstrap_complete
     
-    # Only run bootstrap once per process
     if _bootstrap_complete:
-        app.logger.debug("Bootstrap already completed for this process")
         return
     
     try:
-        app.logger.info("Starting bootstrap initialization...")
-        
-        # Initialize database
+        app.logger.info("[Bootstrap] Starting initialization")
         initialize_database(app)
-        
-        # Initialize admin tables (depends on db connection)
         initialize_admin_tables(app)
-        
-        # Initialize feature tables (depends on db connection)
         initialize_feature_tables(app)
-        
-        # Setup order hooks
         setup_order_completion_hooks(app)
-        
         _bootstrap_complete = True
-        app.logger.info("Bootstrap initialization completed successfully")
-        
+        app.logger.info("[Bootstrap] Completed successfully")
     except Exception as e:
-        app.logger.error(f"Bootstrap initialization failed: {str(e)}")
-        # Don't mark as complete if there was an error - allow retry
+        app.logger.error(f"[Bootstrap] Failed: {e}")
         raise

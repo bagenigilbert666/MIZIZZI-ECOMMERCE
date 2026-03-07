@@ -1,16 +1,18 @@
 """
-Clean blueprint import registry.
-Single source of truth for all route blueprints.
+Blueprint registry - Single source of truth for all route blueprints.
+
+Each entry defines: (module_path, blueprint_name, url_prefix)
+All modules use standard app.routes.* import pattern.
 """
 
 # Each entry is (module_path, blueprint_name, url_prefix)
 # Module path uses standard app.routes.* pattern only
 BLUEPRINT_ROUTES = [
-    # User routes
-    ('app.routes.cart.cart_routes', 'cart_routes', '/api/cart'),
+    # Core routes
     ('app.routes.user.user', 'validation_routes', None),
+    ('app.routes.cart.cart_routes', 'cart_routes', '/api/cart'),
     
-    # Admin core routes
+    # Admin routes
     ('app.routes.admin.admin', 'admin_routes', '/api/admin'),
     ('app.routes.admin.admin_auth', 'admin_auth_routes', '/api/admin/auth'),
     ('app.routes.admin.admin_google_auth', 'admin_google_auth_routes', '/api/admin/auth/google'),
@@ -21,84 +23,65 @@ BLUEPRINT_ROUTES = [
     ('app.routes.admin.admin_category_routes', 'admin_category_routes', '/api/admin/categories'),
     ('app.routes.admin.admin_shop_categories_routes', 'admin_shop_categories_routes', '/api/admin/shop-categories'),
     
-    # Order routes
+    # Orders & Inventory
     ('app.routes.order.order_routes', 'order_routes', '/api/orders'),
     ('app.routes.order.admin_order_routes', 'admin_order_routes', '/api/admin/orders'),
+    ('app.routes.inventory.user_inventory_routes', 'user_inventory_routes', '/api/inventory/user'),
+    ('app.routes.inventory.admin_inventory_routes', 'admin_inventory_routes', '/api/inventory/admin'),
     
-    # Product routes
+    # Products
     ('app.routes.products.products_routes', 'products_routes', '/api/products'),
     ('app.routes.products.admin_products_routes', 'admin_products_routes', '/api/admin/products'),
-    ('app.routes.products.featured_routes', 'featured_routes', '/api/featured'),
+    ('app.routes.products.featured_routes', 'featured_routes', '/api/products/featured'),
     ('app.routes.products.product_images_batch', 'product_images_batch_bp', '/api/products/images'),
     
-    # Category routes
+    # Categories & Brands
     ('app.routes.categories.categories_routes', 'categories_routes', '/api/categories'),
-    
-    # Address routes
-    ('app.routes.address.user_address_routes', 'user_address_routes', '/api/address'),
-    ('app.routes.address.admin_address_routes', 'admin_address_routes', '/api/admin/address'),
-    
-    # Inventory routes
-    ('app.routes.inventory.user_inventory_routes', 'user_inventory_routes', '/api/inventory'),
-    ('app.routes.inventory.admin_inventory_routes', 'admin_inventory_routes', '/api/admin/inventory'),
-    
-    # Brand routes
     ('app.routes.brands.user_brand_routes', 'user_brand_routes', '/api/brands'),
     ('app.routes.brands.admin_brand_routes', 'admin_brand_routes', '/api/admin/brands'),
     
-    # Review routes
-    ('app.routes.reviews.user_review_routes', 'user_review_routes', '/api/reviews'),
-    ('app.routes.reviews.admin_review_routes', 'admin_review_routes', '/api/admin/reviews'),
+    # Address
+    ('app.routes.address.user_address_routes', 'user_address_routes', '/api/addresses/user'),
+    ('app.routes.address.admin_address_routes', 'admin_address_routes', '/api/admin/addresses'),
     
-    # Wishlist routes
-    ('app.routes.wishlist.user_wishlist_routes', 'user_wishlist_routes', '/api/wishlist'),
+    # Reviews & Wishlist
+    ('app.routes.reviews.user_review_routes', 'user_review_routes', '/api/reviews/user'),
+    ('app.routes.reviews.admin_review_routes', 'admin_review_routes', '/api/admin/reviews'),
+    ('app.routes.wishlist.user_wishlist_routes', 'user_wishlist_routes', '/api/wishlist/user'),
     ('app.routes.wishlist.admin_wishlist_routes', 'admin_wishlist_routes', '/api/admin/wishlist'),
     
-    # Payment routes
+    # Payments & Promotions
     ('app.routes.payments.pesapal_routes', 'pesapal_routes', '/api/payments/pesapal'),
-    
-    # Coupon routes
     ('app.routes.coupon.coupon_routes', 'coupon_routes', '/api/coupons'),
+    ('app.routes.flash_sale.flash_sale_routes', 'flash_sale_routes', '/api/flash-sale'),
     
-    # Notification routes
+    # Notifications
     ('app.routes.notifications.notification_routes', 'notification_routes', '/api/notifications'),
     
-    # Content/UI routes
+    # UI/Content
     ('app.routes.carousel.carousel_routes', 'carousel_routes', '/api/carousel'),
     ('app.routes.theme.theme_routes', 'theme_routes', '/api/theme'),
     ('app.routes.footer.footer_routes', 'footer_routes', '/api/footer'),
-    ('app.routes.panels.side_panel_routes', 'side_panel_routes', '/api/side-panel'),
+    ('app.routes.panels.side_panel_routes', 'side_panel_routes', '/api/panels'),
     ('app.routes.topbar.topbar_routes', 'topbar_routes', '/api/topbar'),
     ('app.routes.contact_cta.contact_cta_routes', 'contact_cta_routes', '/api/contact-cta'),
     
-    # Search routes
+    # Search
     ('app.routes.meilisearch.meilisearch_routes', 'meilisearch_routes', '/api/search'),
     ('app.routes.meilisearch.admin_meilisearch_routes', 'admin_meilisearch_routes', '/api/admin/search'),
     
-    # Flash sale routes
-    ('app.routes.flash_sale.flash_sale_routes', 'flash_sale_routes', '/api/flash-sale'),
-    
-    # Homepage routes (at the end to catch root)
+    # Homepage (must be last)
     ('app.routes.homepage.homepage_routes', 'homepage_routes', '/'),
 ]
 
 
 def get_blueprint_registry():
-    """Get the blueprint registry."""
+    """Return the complete blueprint registry."""
     return BLUEPRINT_ROUTES
 
 
 def try_import_blueprint(module_path, blueprint_name):
-    """
-    Try to import a blueprint from the given module path.
-    
-    Args:
-        module_path: Full module path (e.g., 'app.routes.cart.cart_routes')
-        blueprint_name: Name of the blueprint variable in the module
-    
-    Returns:
-        The blueprint object if found, None otherwise
-    """
+    """Import a blueprint safely, returning None if not found."""
     try:
         module = __import__(module_path, fromlist=[blueprint_name])
         return getattr(module, blueprint_name, None)
