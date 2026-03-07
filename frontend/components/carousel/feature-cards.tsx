@@ -123,7 +123,7 @@ export const FeatureCards = React.memo(({ cards: serverCards }: FeatureCardsProp
               onHoverEnd={() => setHoveredIndex(null)}
             >
               <Link
-                href={card.href}
+                href={card.href || '/products'}
                 className="feature-card block h-[100px] p-3 rounded-xl border border-gray-100/80 bg-gradient-to-br from-white via-white to-gray-50/50 shadow-sm hover:shadow-xl hover:shadow-cherry-500/10 hover:border-cherry-200/60 transition-all duration-500 group relative overflow-hidden"
               >
                 <motion.div
