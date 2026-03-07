@@ -6,7 +6,7 @@ from app.utils.redis_cache import product_cache
 logger = logging.getLogger(__name__)
 
 FEATURE_CARDS_CACHE_KEY = "mizizzi:homepage:feature_cards"
-FEATURE_CARDS_CACHE_TTL = 3600  # 1 hour - stable static content, long TTL to maximize reuse
+FEATURE_CARDS_CACHE_TTL = 900  # 15 minutes
 
 # Hardcoded feature cards (can be extended to load from database if needed)
 DEFAULT_FEATURE_CARDS = [

@@ -1,5 +1,5 @@
 """
-Homepage Aggregator - Safe Synchronous Batch Loader with Optimized Redis Access
+Homepage Aggregator - Safe Synchronous Batch Loader
 
 DESIGN PHILOSOPHY:
 - Synchronous execution in Flask request context (no threading)
@@ -17,25 +17,17 @@ Why Synchronous (Not Async/Threads)?
 4. Database queries are already optimized (indexes, Redis caching)
 5. Sequential execution with proper caching is fast enough (most hits <10ms)
 
-REDIS BATCH OPTIMIZATION (New):
-- MGET all 13 section caches in single round trip instead of 13 individual RTTs
-- This reduces Redis latency on cache misses from ~24 RTTs to ~2-3 RTTs
-- DB loading still sequential (no threading/async) - safe and correct
-- Pipeline for writes also reduces RTTs
-
 Performance is achieved through:
 - Redis caching at section level (each has individual TTL)
-- Batched Redis reads (MGET) and writes (pipeline) to minimize RTTs
 - Database indexes on commonly queried columns
-- Top-level cache (600s) prevents redundant aggregation
+- Top-level cache (180s) prevents redundant aggregation
 - Pagination + limits prevent large result sets
 
-Result: Safe, correct, maintainable code that works reliably in Flask with optimized Redis access.
+Result: Safe, correct, maintainable code that works reliably in Flask.
 """
 
 import logging
 import time
-import json
 from typing import Dict, Any, Tuple
 
 from app.services.homepage.get_homepage_categories import get_homepage_categories
@@ -56,11 +48,8 @@ from app.services.homepage.get_homepage_feature_cards import get_homepage_featur
 from app.services.homepage.cache_utils import (
     get_empty_homepage_data,
     build_homepage_cache_key,
-    batch_get_homepage_sections,
-    batch_set_homepage_sections,
     HOMEPAGE_CACHE_TTL,
 )
-from app.cache.redis_client import redis_client
 from app.utils.redis_cache import product_cache
 
 logger = logging.getLogger(__name__)
@@ -125,7 +114,7 @@ def get_homepage_data(
     cache_key: str = None,
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """
-    SAFE SYNCHRONOUS AGGREGATOR WITH BATCHED REDIS ACCESS: Loads all 13 homepage sections.
+    SAFE SYNCHRONOUS AGGREGATOR: Loads all 13 homepage sections sequentially.
     
     SAFEGUARD #2: CACHE KEY FROM CALLER
     ====================================
@@ -137,14 +126,6 @@ def get_homepage_data(
     - Only caches top-level response if ALL sections succeed
     - Accurate failure tracking in partial_failures list
     - Never logs "all succeeded" if any section failed
-    
-    OPTIMIZED REDIS ACCESS (New):
-    - BATCH READ: MGET all 13 section caches in single round trip (~1 RTT instead of 13)
-    - IDENTIFY MISSES: Only load missing sections from DB
-    - BATCH WRITE: Pipeline all writes in single round trip
-    - DB LOADING: Remains strictly sequential (no threads/async for safety)
-    
-    This reduces Redis RTTs from ~24 on miss to ~2-3, while keeping DB access safe.
     
     SEQUENTIAL LOADING (Why not threads/async):
     - Flask request context not thread-safe
@@ -170,202 +151,87 @@ def get_homepage_data(
     # Format: {section_name: (success: bool, error_msg: str)}
     section_results = {}
     
-    # BATCH REDIS READ: Fetch ALL section caches with single MGET (not 13 individual RTTs)
-    # This is safe because:
-    # 1. Happens in single Flask request thread (no context switching)
-    # 2. MGET is atomic - returns all-or-nothing
-    # 3. Uses existing redis_client (same one as loader functions)
-    # 4. Identical behavior to 13 individual gets, just 13x fewer RTTs
-    logger.info("[Homepage] Starting aggregation with batch Redis optimization")
-    
-    redis_start = time.time()
-    batch_cache_results = {}
-    
-    if redis_client:
-        # Build section limits dict for batch operation
-        section_limits = {
-            "categories": categories_limit,
-            "carousel_items": 0,  # No limit
-            "flash_sale_products": flash_sale_limit,
-            "luxury_products": luxury_limit,
-            "new_arrivals": new_arrivals_limit,
-            "top_picks": top_picks_limit,
-            "trending_products": trending_limit,
-            "daily_finds": daily_finds_limit,
-            "contact_cta_slides": 0,  # No limit
-            "premium_experiences": 0,  # No limit
-            "product_showcase": 0,  # No limit
-            "feature_cards": 0,  # No limit
-            "all_products": all_products_limit,
-            "all_products_page": all_products_page,
-        }
-        
-        # MGET: Single round trip to fetch all cached sections
-        batch_cache_results = batch_get_homepage_sections(redis_client, section_limits)
-        redis_ms = (time.time() - redis_start) * 1000
-        logger.debug(f"[Homepage] Batch MGET took {redis_ms:.1f}ms, got {len([v for v in batch_cache_results.values() if v])} hits")
-    
     # SAFE SYNCHRONOUS LOADING: Sequential calls with aggregator-side wrappers
-    # Each loader is called once, exceptions caught here at aggregator level
-    logger.info("[Homepage] Starting section aggregation (synchronous sequential load)")
+    # Each loader is called once, catches exceptions happen here at aggregator level
+    logger.info("[Homepage] Starting aggregation (synchronous sequential load)")
     
     # Load all 13 sections with explicit failure tracking
-    # IMPORTANT: Check batch cache first - if hit, skip loader entirely
-    
-    # Categories
-    if "categories" in batch_cache_results and batch_cache_results["categories"]:
-        categories = batch_cache_results["categories"]
-        section_results["categories"] = (True, "")
-        logger.debug("[Homepage] Categories from cache")
-    else:
-        categories, success, error = load_section_safe(
-            "categories", get_homepage_categories, categories_limit
-        )
-        section_results["categories"] = (success, error)
+    categories, success, error = load_section_safe(
+        "categories", get_homepage_categories, categories_limit
+    )
+    section_results["categories"] = (success, error)
     homepage_data["categories"] = categories
     
-    # Carousel
-    if "carousel_items" in batch_cache_results and batch_cache_results["carousel_items"]:
-        carousel_items = batch_cache_results["carousel_items"]
-        section_results["carousel_items"] = (True, "")
-        logger.debug("[Homepage] Carousel from cache")
-    else:
-        carousel_items, success, error = load_section_safe(
-            "carousel_items", get_homepage_carousel
-        )
-        section_results["carousel_items"] = (success, error)
+    carousel_items, success, error = load_section_safe(
+        "carousel_items", get_homepage_carousel
+    )
+    section_results["carousel_items"] = (success, error)
     homepage_data["carousel_items"] = carousel_items
     
-    # Flash Sale
-    if "flash_sale_products" in batch_cache_results and batch_cache_results["flash_sale_products"]:
-        flash_sale = batch_cache_results["flash_sale_products"]
-        section_results["flash_sale_products"] = (True, "")
-        logger.debug("[Homepage] Flash sale from cache")
-    else:
-        flash_sale, success, error = load_section_safe(
-            "flash_sale_products", get_homepage_flash_sale, flash_sale_limit
-        )
-        section_results["flash_sale_products"] = (success, error)
+    flash_sale, success, error = load_section_safe(
+        "flash_sale_products", get_homepage_flash_sale, flash_sale_limit
+    )
+    section_results["flash_sale_products"] = (success, error)
     homepage_data["flash_sale_products"] = flash_sale
     
-    # Luxury
-    if "luxury_products" in batch_cache_results and batch_cache_results["luxury_products"]:
-        luxury = batch_cache_results["luxury_products"]
-        section_results["luxury_products"] = (True, "")
-        logger.debug("[Homepage] Luxury from cache")
-    else:
-        luxury, success, error = load_section_safe(
-            "luxury_products", get_homepage_luxury, luxury_limit
-        )
-        section_results["luxury_products"] = (success, error)
+    luxury, success, error = load_section_safe(
+        "luxury_products", get_homepage_luxury, luxury_limit
+    )
+    section_results["luxury_products"] = (success, error)
     homepage_data["luxury_products"] = luxury
     
-    # New Arrivals
-    if "new_arrivals" in batch_cache_results and batch_cache_results["new_arrivals"]:
-        new_arrivals = batch_cache_results["new_arrivals"]
-        section_results["new_arrivals"] = (True, "")
-        logger.debug("[Homepage] New arrivals from cache")
-    else:
-        new_arrivals, success, error = load_section_safe(
-            "new_arrivals", get_homepage_new_arrivals, new_arrivals_limit
-        )
-        section_results["new_arrivals"] = (success, error)
+    new_arrivals, success, error = load_section_safe(
+        "new_arrivals", get_homepage_new_arrivals, new_arrivals_limit
+    )
+    section_results["new_arrivals"] = (success, error)
     homepage_data["new_arrivals"] = new_arrivals
     
-    # Top Picks
-    if "top_picks" in batch_cache_results and batch_cache_results["top_picks"]:
-        top_picks = batch_cache_results["top_picks"]
-        section_results["top_picks"] = (True, "")
-        logger.debug("[Homepage] Top picks from cache")
-    else:
-        top_picks, success, error = load_section_safe(
-            "top_picks", get_homepage_top_picks, top_picks_limit
-        )
-        section_results["top_picks"] = (success, error)
+    top_picks, success, error = load_section_safe(
+        "top_picks", get_homepage_top_picks, top_picks_limit
+    )
+    section_results["top_picks"] = (success, error)
     homepage_data["top_picks"] = top_picks
     
-    # Trending
-    if "trending_products" in batch_cache_results and batch_cache_results["trending_products"]:
-        trending = batch_cache_results["trending_products"]
-        section_results["trending_products"] = (True, "")
-        logger.debug("[Homepage] Trending from cache")
-    else:
-        trending, success, error = load_section_safe(
-            "trending_products", get_homepage_trending, trending_limit
-        )
-        section_results["trending_products"] = (success, error)
+    trending, success, error = load_section_safe(
+        "trending_products", get_homepage_trending, trending_limit
+    )
+    section_results["trending_products"] = (success, error)
     homepage_data["trending_products"] = trending
     
-    # Daily Finds
-    if "daily_finds" in batch_cache_results and batch_cache_results["daily_finds"]:
-        daily_finds = batch_cache_results["daily_finds"]
-        section_results["daily_finds"] = (True, "")
-        logger.debug("[Homepage] Daily finds from cache")
-    else:
-        daily_finds, success, error = load_section_safe(
-            "daily_finds", get_homepage_daily_finds, daily_finds_limit
-        )
-        section_results["daily_finds"] = (success, error)
+    daily_finds, success, error = load_section_safe(
+        "daily_finds", get_homepage_daily_finds, daily_finds_limit
+    )
+    section_results["daily_finds"] = (success, error)
     homepage_data["daily_finds"] = daily_finds
     
-    # Contact CTA
-    if "contact_cta_slides" in batch_cache_results and batch_cache_results["contact_cta_slides"]:
-        contact_cta = batch_cache_results["contact_cta_slides"]
-        section_results["contact_cta_slides"] = (True, "")
-        logger.debug("[Homepage] Contact CTA from cache")
-    else:
-        contact_cta, success, error = load_section_safe(
-            "contact_cta_slides", get_homepage_contact_cta_slides
-        )
-        section_results["contact_cta_slides"] = (success, error)
+    contact_cta, success, error = load_section_safe(
+        "contact_cta_slides", get_homepage_contact_cta_slides
+    )
+    section_results["contact_cta_slides"] = (success, error)
     homepage_data["contact_cta_slides"] = contact_cta
     
-    # Premium Experiences
-    if "premium_experiences" in batch_cache_results and batch_cache_results["premium_experiences"]:
-        premium_exp = batch_cache_results["premium_experiences"]
-        section_results["premium_experiences"] = (True, "")
-        logger.debug("[Homepage] Premium experiences from cache")
-    else:
-        premium_exp, success, error = load_section_safe(
-            "premium_experiences", get_homepage_premium_experiences
-        )
-        section_results["premium_experiences"] = (success, error)
+    premium_exp, success, error = load_section_safe(
+        "premium_experiences", get_homepage_premium_experiences
+    )
+    section_results["premium_experiences"] = (success, error)
     homepage_data["premium_experiences"] = premium_exp
     
-    # Product Showcase
-    if "product_showcase" in batch_cache_results and batch_cache_results["product_showcase"]:
-        product_showcase = batch_cache_results["product_showcase"]
-        section_results["product_showcase"] = (True, "")
-        logger.debug("[Homepage] Product showcase from cache")
-    else:
-        product_showcase, success, error = load_section_safe(
-            "product_showcase", get_homepage_product_showcase
-        )
-        section_results["product_showcase"] = (success, error)
+    product_showcase, success, error = load_section_safe(
+        "product_showcase", get_homepage_product_showcase
+    )
+    section_results["product_showcase"] = (success, error)
     homepage_data["product_showcase"] = product_showcase
     
-    # Feature Cards
-    if "feature_cards" in batch_cache_results and batch_cache_results["feature_cards"]:
-        feature_cards = batch_cache_results["feature_cards"]
-        section_results["feature_cards"] = (True, "")
-        logger.debug("[Homepage] Feature cards from cache")
-    else:
-        feature_cards, success, error = load_section_safe(
-            "feature_cards", get_homepage_feature_cards
-        )
-        section_results["feature_cards"] = (success, error)
+    feature_cards, success, error = load_section_safe(
+        "feature_cards", get_homepage_feature_cards
+    )
+    section_results["feature_cards"] = (success, error)
     homepage_data["feature_cards"] = feature_cards
     
-    # All Products
-    if "all_products" in batch_cache_results and batch_cache_results["all_products"]:
-        all_products = batch_cache_results["all_products"]
-        section_results["all_products"] = (True, "")
-        logger.debug("[Homepage] All products from cache")
-    else:
-        all_products, success, error = load_section_safe(
-            "all_products", get_homepage_all_products, all_products_limit, all_products_page
-        )
-        section_results["all_products"] = (success, error)
+    all_products, success, error = load_section_safe(
+        "all_products", get_homepage_all_products, all_products_limit, all_products_page
+    )
+    section_results["all_products"] = (success, error)
     homepage_data["all_products"] = all_products
     
     # FAILURE TRACKING: Determine if ANY section failed
