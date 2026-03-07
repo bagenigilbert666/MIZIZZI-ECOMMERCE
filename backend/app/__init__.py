@@ -1015,11 +1015,11 @@ def create_app(config_name=None, enable_socketio=True):
         app.register_blueprint(final_blueprints['footer_routes'], url_prefix='/api/footer')
         app.register_blueprint(final_blueprints['side_panel_routes'], url_prefix='/api/panels')
         app.register_blueprint(final_blueprints['topbar_routes'], url_prefix='/api/topbar')
-    app.register_blueprint(final_blueprints['contact_cta_routes'], url_prefix='/api/contact-cta')
-    app.register_blueprint(final_blueprints['featured_routes'], url_prefix='/api/products/featured')
-    app.register_blueprint(final_blueprints['homepage_routes'])
+        app.register_blueprint(final_blueprints['contact_cta_routes'], url_prefix='/api/contact-cta')
+        app.register_blueprint(final_blueprints['featured_routes'], url_prefix='/api/products/featured')
+        app.register_blueprint(final_blueprints['homepage_routes'])
 
-    app.register_blueprint(final_blueprints['meilisearch_routes'], url_prefix='/api/meilisearch')
+        app.register_blueprint(final_blueprints['meilisearch_routes'], url_prefix='/api/meilisearch')
         app.register_blueprint(final_blueprints['admin_meilisearch_routes'], url_prefix='/api/admin/meilisearch')
         app.logger.info("✅ Meilisearch routes registered successfully")
 
