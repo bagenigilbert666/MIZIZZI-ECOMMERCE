@@ -13,6 +13,7 @@ CACHE_TTL = 120  # 2 minutes
 
 
 async def get_homepage_all_products(limit: int = 12, page: int = 1) -> Dict[str, Any]:
+
     """
     Fetch paginated all products for homepage with Redis caching.
     
