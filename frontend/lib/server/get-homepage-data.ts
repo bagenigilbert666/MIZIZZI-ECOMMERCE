@@ -36,12 +36,16 @@ function getHomepageDataFallback() {
   return {
     categories: [],
     carousel_items: [],
+    contact_cta_slides: [],
+    daily_finds: [],
+    feature_cards: [],
     flash_sale_products: [],
     luxury_products: [],
     new_arrivals: [],
+    premium_experiences: [],
+    product_showcase: [],
     top_picks: [],
     trending_products: [],
-    daily_finds: [],
     all_products: {
       products: [],
       has_more: false,
