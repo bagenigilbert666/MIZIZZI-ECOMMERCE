@@ -17,6 +17,9 @@ from .get_homepage_featured import (
 )
 from .get_homepage_all_products import get_homepage_all_products
 from .get_homepage_contact_cta_slides import get_homepage_contact_cta_slides
+from .get_homepage_premium_experiences import get_homepage_premium_experiences
+from .get_homepage_product_showcase import get_homepage_product_showcase
+from .get_homepage_feature_cards import get_homepage_feature_cards
 from .cache_utils import build_homepage_cache_key, HOMEPAGE_CACHE_TTL
 
 logger = logging.getLogger(__name__)
@@ -53,11 +56,15 @@ async def get_homepage_data(
         - metadata: Dictionary with cache_hit (bool), cache_key (str), partial_failures (list)
     """
     try:
-        # Build dynamic cache key based on all parameters
+        # Build dynamic cache key based on ALL parameters
         cache_key = build_homepage_cache_key(
             categories_limit,
             flash_sale_limit,
             luxury_limit,
+            new_arrivals_limit,
+            top_picks_limit,
+            trending_limit,
+            daily_finds_limit,
             all_products_limit,
             all_products_page,
         )
@@ -78,7 +85,7 @@ async def get_homepage_data(
         
         logger.debug(f"[Homepage Aggregator] Loading all homepage sections in parallel with key: {cache_key}...")
         
-        # Load all sections in parallel
+        # Load all 13 sections in parallel
         results = await asyncio.gather(
             get_homepage_categories(categories_limit),
             get_homepage_carousel(),
@@ -90,10 +97,13 @@ async def get_homepage_data(
             get_homepage_daily_finds(daily_finds_limit),
             get_homepage_all_products(all_products_limit, all_products_page),
             get_homepage_contact_cta_slides(),
+            get_homepage_premium_experiences(),
+            get_homepage_product_showcase(),
+            get_homepage_feature_cards(),
             return_exceptions=True,  # Don't let one error block others
         )
         
-        # Track partial failures
+        # Track partial failures with named sections
         partial_failures: List[str] = []
         section_names = [
             "categories",
@@ -106,6 +116,9 @@ async def get_homepage_data(
             "daily_finds",
             "all_products",
             "contact_cta_slides",
+            "premium_experiences",
+            "product_showcase",
+            "feature_cards",
         ]
         
         # Map results to response
@@ -120,20 +133,29 @@ async def get_homepage_data(
             "daily_finds": results[7] if not isinstance(results[7], Exception) else [],
             "all_products": (results[8] if not isinstance(results[8], Exception) else {"products": [], "has_more": False, "total": 0, "page": 1}),
             "contact_cta_slides": results[9] if not isinstance(results[9], Exception) else [],
+            "premium_experiences": results[10] if not isinstance(results[10], Exception) else [],
+            "product_showcase": results[11] if not isinstance(results[11], Exception) else [],
+            "feature_cards": results[12] if not isinstance(results[12], Exception) else [],
         }
         
         # Log and track any errors
+        critical_sections = {"categories", "carousel"}  # Sections that are critical for homepage
         for i, result in enumerate(results):
             if isinstance(result, Exception):
                 section = section_names[i]
                 partial_failures.append(section)
-                logger.error(f"[Homepage Aggregator] Section '{section}' error: {result}")
+                is_critical = section in critical_sections
+                logger.error(f"[Homepage Aggregator] Section '{section}' error: {result} (critical: {is_critical})")
         
-        # Cache the complete response
+        # Cache the complete response (even with partial failures, but could check for critical failures)
         if product_cache:
             product_cache.set(cache_key, homepage_data, HOMEPAGE_CACHE_TTL)
         
-        logger.debug(f"[Homepage Aggregator] All sections loaded successfully (cache_key: {cache_key})")
+        # Log appropriately based on success/failure
+        if not partial_failures:
+            logger.debug(f"[Homepage Aggregator] All 13 sections loaded successfully (cache_key: {cache_key})")
+        else:
+            logger.warning(f"[Homepage Aggregator] Loaded with partial failures: {partial_failures} (cache_key: {cache_key})")
         
         metadata = {
             "cache_hit": cache_hit,
@@ -146,10 +168,26 @@ async def get_homepage_data(
         
     except Exception as e:
         logger.error(f"[Homepage Aggregator] Critical error: {e}")
+        # Attempt to preserve cache key even on failure
+        try:
+            failed_cache_key = build_homepage_cache_key(
+                categories_limit,
+                flash_sale_limit,
+                luxury_limit,
+                new_arrivals_limit,
+                top_picks_limit,
+                trending_limit,
+                daily_finds_limit,
+                all_products_limit,
+                all_products_page,
+            )
+        except:
+            failed_cache_key = ""
+        
         # Return empty structure instead of failing
         metadata = {
             "cache_hit": False,
-            "cache_key": "",
+            "cache_key": failed_cache_key,
             "partial_failures": ["all_sections"]
         }
         return {
@@ -163,4 +201,7 @@ async def get_homepage_data(
             "daily_finds": [],
             "all_products": {"products": [], "has_more": False, "total": 0, "page": 1},
             "contact_cta_slides": [],
+            "premium_experiences": [],
+            "product_showcase": [],
+            "feature_cards": [],
         }, metadata
