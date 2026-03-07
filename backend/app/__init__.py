@@ -8,7 +8,22 @@ import logging
 from datetime import datetime, timezone, timedelta
 from flask import Flask, jsonify, request, send_from_directory, g, abort
 from flask_migrate import Migrate
-from flask_cors import CORS
+try:
+    from flask_cors import CORS
+except Exception:
+    # Defensive fallback: if Flask-CORS is not installed, provide a no-op
+    # CORS class so the package can still be imported. This avoids hard
+    # import-time failures and allows the application factory to run in
+    # degraded environments (tests, scripts) without the package.
+    class CORS:  # pragma: no cover - fallback for missing dependency
+        def __init__(self, *args, **kwargs):
+            pass
+    # Use logging.warning here because the module-level `logger` is defined
+    # later after other imports. This avoids referencing an undefined name
+    # during early import-time handling.
+    import logging as _logging
+    _logging.warning("Flask-CORS not available; using no-op CORS fallback."
+                     " Install 'flask-cors' to enable CORS support.")
 from flask_jwt_extended import JWTManager, get_jwt_identity, create_access_token, jwt_required, verify_jwt_in_request
 import uuid
 import werkzeug.utils
