@@ -1,10 +1,17 @@
-"""Homepage Batch API Route - Single endpoint for all homepage data."""
+"""Homepage Batch API Route - Single endpoint for all homepage data.
+
+Correct Cache-Control header strategy:
+- HOMEPAGE_CACHE_TTL in cache_utils.py = 180 seconds (3 minutes)
+- Cache-Control header must match: max-age=180
+- Prevents misalignment between server cache and proxy/browser cache
+- If you change HOMEPAGE_CACHE_TTL, update this header too!
+"""
 import logging
 from flask import Blueprint, jsonify, request
 from flask_cors import cross_origin
 
 from app.services.homepage.aggregator import get_homepage_data
-from app.services.homepage.cache_utils import validate_pagination_params
+from app.services.homepage.cache_utils import validate_pagination_params, get_empty_homepage_data
 from app.utils.redis_cache import product_cache
 
 logger = logging.getLogger(__name__)
@@ -105,61 +112,57 @@ def get_homepage():
             all_products_page=all_products_page,
         )
         
-        # Build response with metadata from aggregator (not re-reading cache)
+        # Build response with metadata from aggregator
         response_data = {
             "status": "success",
             "data": homepage_data,
             "meta": {
-                "cache_hit": metadata["cache_hit"],
+                "all_succeeded": metadata["all_succeeded"],
                 "cache_key": metadata["cache_key"],
+                "cached": metadata["cached"],
                 "partial_failures": metadata["partial_failures"],
+                "aggregation_time_ms": metadata["aggregation_time_ms"],
             }
         }
         
         # Create Flask response
         response = jsonify(response_data)
         
-        # Add cache headers based on aggregator metadata (accurate, not re-read)
-        response.headers['X-Cache'] = 'HIT' if metadata["cache_hit"] else 'MISS'
-        response.headers['X-Cache-Key'] = metadata["cache_key"]
-        response.headers['Cache-Control'] = 'public, max-age=60'
+        # Set Cache-Control header to match ACTUAL top-level cache TTL (180s, not 60s)
+        # The aggregator uses HOMEPAGE_CACHE_TTL = 180 seconds
+        # This header must match that TTL for correct cache behavior in proxies/browsers
+        response.headers['Cache-Control'] = 'public, max-age=180'
+        response.headers['X-Cache'] = 'HIT' if metadata["cached"] else 'MISS'
+        response.headers['X-Cache-Key'] = metadata["cache_key"] or "no-cache"
         response.headers['X-Content-Type-Options'] = 'nosniff'
+        response.headers['X-Aggregation-Time-Ms'] = str(metadata["aggregation_time_ms"])
         
         # Add partial failures header if any sections failed
         if metadata["partial_failures"]:
-            response.headers['X-Partial-Failures'] = ','.join(metadata["partial_failures"])
+            failed_sections = ",".join([f["section"] for f in metadata["partial_failures"]])
+            response.headers['X-Partial-Failures'] = failed_sections
         
         logger.debug(
             f"[Homepage Route] Response prepared successfully "
-            f"(cache: {metadata['cache_hit']}, failures: {len(metadata['partial_failures'])})"
+            f"(cache: {metadata['cached']}, all_succeeded: {metadata['all_succeeded']}, "
+            f"failures: {len(metadata['partial_failures'])})"
         )
         return response, 200
         
         
     except Exception as e:
         logger.error(f"[Homepage Route] Error: {e}")
+        # Use shared empty fallback helper for consistent response shape
         return jsonify({
             "status": "error",
             "message": "Failed to load homepage data",
-            "data": {
-                "categories": [],
-                "carousel_items": [],
-                "flash_sale_products": [],
-                "luxury_products": [],
-                "new_arrivals": [],
-                "top_picks": [],
-                "trending_products": [],
-                "daily_finds": [],
-                "all_products": {"products": [], "has_more": False, "total": 0, "page": 1},
-                "contact_cta_slides": [],
-                "premium_experiences": [],
-                "product_showcase": [],
-                "feature_cards": [],
-            },
+            "data": get_empty_homepage_data(),
             "meta": {
-                "cache_hit": False,
+                "all_succeeded": False,
                 "cache_key": "",
-                "partial_failures": ["all_sections"],
+                "cached": False,
+                "partial_failures": [{"section": "all_sections", "error": str(e)}],
+                "aggregation_time_ms": 0,
             }
         }), 500
 

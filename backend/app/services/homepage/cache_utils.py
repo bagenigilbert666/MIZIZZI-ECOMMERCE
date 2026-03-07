@@ -32,11 +32,14 @@ def get_empty_homepage_data() -> Dict[str, Any]:
     """
     Returns the empty/fallback homepage data structure.
     
-    Used when sections fail to load or as fallback for errors.
-    Centralized here to avoid mistakes if new sections are added.
+    CENTRALIZED FALLBACK: Used as single source of truth when sections fail to load.
+    Ensures response shape is always consistent across all failure paths.
+    
+    If new sections are added to homepage response, add them here.
+    This prevents typos and ensures every failure mode returns valid data.
     
     Returns:
-        Dictionary with all 13 homepage sections as empty
+        Dictionary with all 13 homepage sections initialized as empty
     """
     return {
         "categories": [],
@@ -47,11 +50,16 @@ def get_empty_homepage_data() -> Dict[str, Any]:
         "top_picks": [],
         "trending_products": [],
         "daily_finds": [],
-        "all_products": {"products": [], "has_more": False, "total": 0, "page": 1},
         "contact_cta_slides": [],
         "premium_experiences": [],
         "product_showcase": [],
         "feature_cards": [],
+        "all_products": {
+            "products": [],
+            "has_more": False,
+            "total": 0,
+            "page": 1
+        },
     }
 
 
