@@ -214,24 +214,18 @@ HOMEPAGE_SECTIONS_FOR_BATCH = {
 
 def batch_get_homepage_sections(redis_client, section_limits: dict = None) -> dict:
     """
-    BATCH REDIS READ: Fetch ALL homepage section caches with single MGET operation.
+    BATCH REDIS READ: Fetch ALL homepage section caches with individual get() calls.
     
     SAFETY GUARANTEES:
     - Single Flask request thread, no async/threading
-    - MGET is atomic - returns all-or-nothing (no partial reads)
+    - Returns immediately - either hits or proceed to DB
     - Uses existing redis_client from app.cache.redis_client
     - No context switching or connection pool issues
-    
-    Why MGET is safe here:
-    1. MGET happens in single Flask request context (no thread pool exhaustion)
-    2. Returns immediately - either hit (all 13 sections) or miss (proceed to DB)
-    3. No stateful operations - just read 13 keys in one round trip
-    4. Identical to calling get() 13 times individually, but 13x fewer RTTs
     
     CACHE BEHAVIOR PRESERVED:
     - Cache keys unchanged - still use same Redis key patterns
     - Cache TTLs unchanged - each section keeps its original TTL
-    - Cache hits/misses identical - just batched into fewer RTTs
+    - Cache hits/misses identical to individual gets
     - Exactly backward compatible with existing loader functions
     
     Args:
@@ -244,6 +238,7 @@ def batch_get_homepage_sections(redis_client, section_limits: dict = None) -> di
         Example: {"categories": [...], "carousel_items": [...], "flash_sale_products": None, ...}
     """
     if not redis_client or not section_limits:
+        logger.debug("[Batch] Skipping batch get - redis_client or section_limits missing")
         return {}
     
     try:
@@ -271,37 +266,35 @@ def batch_get_homepage_sections(redis_client, section_limits: dict = None) -> di
             key = build_section_cache_key(section_key_name, *args) if args else build_section_cache_key(section_key_name)
             cache_keys.append(key)
         
-        # SINGLE REDIS ROUND TRIP: MGET all section cache keys at once
-        # Returns list of values in same order as keys
-        logger.debug(f"[Batch] MGET {len(cache_keys)} section cache keys")
+        # Fetch all section caches with individual get() calls
+        # This is safe and reliable - no tuple unpacking issues
+        logger.debug(f"[Batch] Fetching {len(cache_keys)} section cache keys")
         
-        # Use redis_client.mget if available, else fall back to individual gets
-        if hasattr(redis_client, 'mget'):
-            # Modern redis client with MGET support
-            values = redis_client.mget(*cache_keys) if cache_keys else []
-        else:
-            # Fallback: still batch but using individual commands
-            # (Same RTT reduction might not apply, but code remains correct)
-            values = [redis_client.get(key) for key in cache_keys]
-        
-        # Map values back to section names
         result = {}
-        for section_name, value in zip(section_order, values or []):
-            if value is not None:
-                # Deserialize JSON if string
-                import json
-                try:
-                    result[section_name] = json.loads(value) if isinstance(value, str) else value
-                except (json.JSONDecodeError, TypeError):
+        hits = 0
+        
+        for section_name, key in zip(section_order, cache_keys):
+            try:
+                value = redis_client.get(key)
+                if value is not None:
+                    # Deserialize JSON if string
+                    try:
+                        result[section_name] = json.loads(value) if isinstance(value, str) else value
+                        hits += 1
+                    except (json.JSONDecodeError, TypeError) as e:
+                        logger.warning(f"[Batch] Failed to deserialize {section_name}: {e}")
+                        result[section_name] = None
+                else:
                     result[section_name] = None
-            else:
+            except Exception as e:
+                logger.warning(f"[Batch] Failed to get {section_name} from cache: {e}")
                 result[section_name] = None
         
-        logger.debug(f"[Batch] MGET returned {len([v for v in result.values() if v is not None])} hits")
+        logger.debug(f"[Batch] Fetched {len(cache_keys)} keys, got {hits} hits")
         return result
         
     except Exception as e:
-        logger.error(f"[Batch] MGET failed: {e}, falling back to individual gets")
+        logger.error(f"[Batch] Cache fetch failed: {e}", exc_info=True)
         return {}
 
 
