@@ -7,6 +7,7 @@ All modules use standard app.routes.* import pattern.
 
 # Each entry is (module_path, blueprint_name, url_prefix)
 # Module path uses standard app.routes.* pattern only
+# Note: Routes that don't exist yet are commented out with TODO markers
 BLUEPRINT_ROUTES = [
     # Core routes
     ('app.routes.user.user', 'validation_routes', None),
@@ -21,7 +22,8 @@ BLUEPRINT_ROUTES = [
     ('app.routes.admin.admin_cart_routes', 'admin_cart_routes', '/api/admin/cart'),
     ('app.routes.admin.admin_cloudinary_routes', 'admin_cloudinary_routes', '/api/admin/cloudinary'),
     ('app.routes.admin.admin_category_routes', 'admin_category_routes', '/api/admin/categories'),
-    ('app.routes.admin.admin_shop_categories_routes', 'admin_shop_categories_routes', '/api/admin/shop-categories'),
+    # TODO: Create admin_shop_categories_routes
+    # ('app.routes.admin.admin_shop_categories_routes', 'admin_shop_categories_routes', '/api/admin/shop-categories'),
     
     # Orders & Inventory
     ('app.routes.order.order_routes', 'order_routes', '/api/orders'),
@@ -68,10 +70,12 @@ BLUEPRINT_ROUTES = [
     
     # Search
     ('app.routes.meilisearch.meilisearch_routes', 'meilisearch_routes', '/api/search'),
-    ('app.routes.meilisearch.admin_meilisearch_routes', 'admin_meilisearch_routes', '/api/admin/search'),
+    # TODO: Create admin_meilisearch_routes
+    # ('app.routes.meilisearch.admin_meilisearch_routes', 'admin_meilisearch_routes', '/api/admin/search'),
     
-    # Homepage (must be last)
-    ('app.routes.homepage.homepage_routes', 'homepage_routes', '/'),
+    # Homepage
+    # TODO: Create homepage_routes
+    # ('app.routes.homepage.homepage_routes', 'homepage_routes', '/'),
 ]
 
 

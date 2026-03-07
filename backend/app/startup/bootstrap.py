@@ -68,27 +68,29 @@ def initialize_admin_tables(app):
 def initialize_feature_tables(app):
     """Initialize feature-specific database tables."""
     with app.app_context():
+        # Feature inits: (import_path, attr_name, label, is_callable, needs_app_arg)
         feature_inits = [
-            ('app.routes.footer.footer_routes', 'init_footer_tables', 'Footer', True),
-            ('app.models.side_panel_model', 'SidePanel', 'Side Panel', False),
-            ('app.routes.contact_cta.contact_cta_routes', 'init_contact_cta_tables', 'Contact CTA', True),
-            ('app.routes.products.featured_routes', 'init_featured_routes_tables', 'Featured Routes', True),
-            ('app.routes.meilisearch.meilisearch_routes', 'init_meilisearch_tables', 'Meilisearch', True),
-            ('app.routes.flash_sale.flash_sale_routes', 'init_flash_sale_tables', 'Flash Sale', True),
+            ('app.routes.footer.footer_routes', 'init_footer_tables', 'Footer', True, True),
+            ('app.models.side_panel_model', 'SidePanel', 'Side Panel', False, False),
+            ('app.routes.contact_cta.contact_cta_routes', 'init_contact_cta_tables', 'Contact CTA', True, False),
+            ('app.routes.products.featured_routes', 'init_featured_routes_tables', 'Featured Routes', True, False),
+            ('app.routes.meilisearch.meilisearch_routes', 'init_meilisearch_tables', 'Meilisearch', True, False),
+            ('app.routes.flash_sale.flash_sale_routes', 'init_flash_sale_tables', 'Flash Sale', True, False),
         ]
         
-        for module_path, attr_name, label, is_callable in feature_inits:
+        for module_path, attr_name, label, is_callable, needs_app_arg in feature_inits:
             try:
                 module = __import__(module_path, fromlist=[attr_name])
                 if hasattr(module, attr_name):
                     attr = getattr(module, attr_name)
                     if is_callable:
-                        attr()
+                        # Call with app argument if needed
+                        attr(app) if needs_app_arg else attr()
                     app.logger.debug(f"[Bootstrap] {label} initialized")
             except ImportError:
                 pass
             except Exception as e:
-                app.logger.error(f"[Bootstrap] Failed to init {label}: {e}")
+                app.logger.debug(f"[Bootstrap] Failed to init {label}: {e}")
 
 
 def setup_order_completion_hooks(app):
