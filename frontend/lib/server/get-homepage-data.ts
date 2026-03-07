@@ -3,7 +3,11 @@
  */
 import { cache } from "react"
 
+// Priority: NEXT_PUBLIC_API_URL (Render) > NEXT_PUBLIC_API_BASE_URL > localhost fallback
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:5000"
+
+// Debug log to verify correct URL is being used
+console.log("[v0] Homepage API URL:", API_BASE_URL)
 
 /**
  * Get all homepage data in a single batch request.
