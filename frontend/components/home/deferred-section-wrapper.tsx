@@ -1,6 +1,4 @@
-import { Suspense } from 'react'
 import { DeferredSections } from '@/components/home/deferred-sections'
-import { DeferredSectionsPlaceholder } from '@/components/home/section-placeholders'
 import type { Product } from '@/types'
 
 interface DeferredSectionWrapperProps {
@@ -15,13 +13,14 @@ interface DeferredSectionWrapperProps {
 }
 
 /**
- * Server component that wraps deferred sections with Suspense boundary.
- * Allows deferred sections to render progressively without blocking critical content.
- *
- * Architecture:
- * - Suspense fallback shows fixed-height placeholders (prevents CLS)
- * - DeferredSections uses dynamic imports + client-side rendering
- * - Data comes from existing API response (no second fetch)
+ * Renders deferred sections without any placeholders.
+ * Uses dynamic imports + client-side rendering for code splitting.
+ * 
+ * Jumia-like behavior:
+ * - Critical sections render immediately with real data
+ * - Deferred sections load silently in background
+ * - No skeleton UI, shimmer effects, or placeholder cards
+ * - Only real Mizizzi data is shown when each section is ready
  */
 export function DeferredSectionWrapper({
   flashSaleProducts,
@@ -34,17 +33,15 @@ export function DeferredSectionWrapper({
   allProductsHasMore,
 }: DeferredSectionWrapperProps) {
   return (
-    <Suspense fallback={<DeferredSectionsPlaceholder />}>
-      <DeferredSections
-        flashSaleProducts={flashSaleProducts}
-        luxuryProducts={luxuryProducts}
-        newArrivals={newArrivals}
-        topPicks={topPicks}
-        trendingProducts={trendingProducts}
-        dailyFinds={dailyFinds}
-        allProducts={allProducts}
-        allProductsHasMore={allProductsHasMore}
-      />
-    </Suspense>
+    <DeferredSections
+      flashSaleProducts={flashSaleProducts}
+      luxuryProducts={luxuryProducts}
+      newArrivals={newArrivals}
+      topPicks={topPicks}
+      trendingProducts={trendingProducts}
+      dailyFinds={dailyFinds}
+      allProducts={allProducts}
+      allProductsHasMore={allProductsHasMore}
+    />
   )
 }
