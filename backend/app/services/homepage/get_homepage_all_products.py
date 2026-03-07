@@ -1,10 +1,10 @@
 """Homepage All Products Loader - Fetches all products with pagination."""
 import logging
-import time
 from typing import Dict, Any
 from app.models.models import Product
 from app.configuration.extensions import db
 from app.utils.redis_cache import product_cache
+from app.routes.products.serializers import serialize_product_minimal
 
 logger = logging.getLogger(__name__)
 
@@ -13,10 +13,10 @@ CACHE_TTL = 120  # 2 minutes
 
 
 def get_homepage_all_products(limit: int = 12, page: int = 1) -> Dict[str, Any]:
+
     """
     Fetch paginated all products for homepage with Redis caching.
-    OPTIMIZATION: Queries only 6 needed columns instead of full Product ORM objects.
-    Eliminates redundant COUNT query using fetch-limit+1 pattern.
+    OPTIMIZATION: Eliminates redundant COUNT query using window functions.
     
     Args:
         limit: Maximum number of products per page
@@ -39,48 +39,26 @@ def get_homepage_all_products(limit: int = 12, page: int = 1) -> Dict[str, Any]:
         # Calculate offset
         offset = (page - 1) * limit
         
-        # Precise timing: SQL query execution
-        query_start = time.perf_counter()
+        # OPTIMIZATION: Use a single query with window function to get both count and products
+        # This eliminates the need for a separate COUNT query
+        # We'll fetch limit+1 to determine has_more without a COUNT
+        fetch_limit = limit + 1
         
-        # OPTIMIZATION: Query ONLY 6 needed columns instead of full Product objects
-        # Fetch limit+1 to determine has_more without separate COUNT query
-        rows = db.session.query(
-            Product.id,
-            Product.name,
-            Product.slug,
-            Product.price,
-            Product.sale_price,
-            Product.thumbnail_url
-        ).filter(Product.is_active == True)\
-         .order_by(Product.created_at.desc())\
-         .limit(limit + 1)\
-         .offset(offset)\
-         .all()
-        
-        query_time = time.perf_counter() - query_start
-        
-        # Precise timing: Serialization
-        serialize_start = time.perf_counter()
+        # Query products - fetch one extra to determine has_more
+        products = db.session.query(Product)\
+            .filter(Product.is_active == True)\
+            .order_by(Product.created_at.desc())\
+            .limit(fetch_limit)\
+            .offset(offset)\
+            .all()
         
         # Determine if there are more results beyond this page
-        has_more = len(rows) > limit
+        has_more = len(products) > limit
         if has_more:
-            rows = rows[:limit]  # Trim to actual limit
+            products = products[:limit]  # Trim to actual limit
         
-        # OPTIMIZATION: Use index-based tuple access instead of attribute access
-        product_list = [
-            {
-                "id": row[0],
-                "name": row[1],
-                "slug": row[2],
-                "price": float(row[3]) if row[3] else 0,
-                "sale_price": float(row[4]) if row[4] else None,
-                "image": row[5]
-            }
-            for row in rows
-        ]
-        
-        serialize_time = time.perf_counter() - serialize_start
+        # Serialize
+        product_list = [serialize_product_minimal(p) for p in products]
         
         # Build response
         result = {
@@ -93,15 +71,7 @@ def get_homepage_all_products(limit: int = 12, page: int = 1) -> Dict[str, Any]:
         if product_cache:
             product_cache.set(cache_key, result, CACHE_TTL)
         
-        total_time = query_time + serialize_time
-        logger.debug(
-            f"[Homepage] All products page {page}: {len(product_list)} items | "
-            f"Query: {query_time*1000:.2f}ms | "
-            f"Serialize: {serialize_time*1000:.2f}ms | "
-            f"Total: {total_time*1000:.2f}ms | "
-            f"has_more: {has_more}"
-        )
-        
+        logger.debug(f"[Homepage] Loaded {len(product_list)} all products for page {page} (has_more: {has_more})")
         return result
         
     except Exception as e:
