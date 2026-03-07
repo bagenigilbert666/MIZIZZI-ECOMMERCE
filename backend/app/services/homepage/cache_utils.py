@@ -1,6 +1,6 @@
 """Homepage Cache Utilities - Centralized cache key generation and management."""
 import logging
-from typing import Tuple
+from typing import Tuple, Dict, Any
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +23,36 @@ MIN_LIMIT = 5
 MAX_LIMIT = 100
 MIN_PAGE = 1
 MAX_PAGE = 1000
+
+# Critical sections - if these fail, don't cache the top-level response
+CRITICAL_SECTIONS = {"categories", "carousel"}
+
+
+def get_empty_homepage_data() -> Dict[str, Any]:
+    """
+    Returns the empty/fallback homepage data structure.
+    
+    Used when sections fail to load or as fallback for errors.
+    Centralized here to avoid mistakes if new sections are added.
+    
+    Returns:
+        Dictionary with all 13 homepage sections as empty
+    """
+    return {
+        "categories": [],
+        "carousel_items": [],
+        "flash_sale_products": [],
+        "luxury_products": [],
+        "new_arrivals": [],
+        "top_picks": [],
+        "trending_products": [],
+        "daily_finds": [],
+        "all_products": {"products": [], "has_more": False, "total": 0, "page": 1},
+        "contact_cta_slides": [],
+        "premium_experiences": [],
+        "product_showcase": [],
+        "feature_cards": [],
+    }
 
 
 def validate_pagination_params(
