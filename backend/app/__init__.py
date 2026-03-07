@@ -62,32 +62,9 @@ def setup_app_environment():
     logger.info(f"Python path updated with app paths")
     return app_dir
 
-# Setup environment when module is imported
-setup_app_environment()
-
-# Add minimal Meilisearch import stubs to avoid repeated import errors during startup
-try:
-    # Try normal import first
-    from app.models.meilisearch_models import MeilisearchModel  # type: ignore
-except Exception:
-    import types
-    mod_name = 'app.models.meilisearch_model'
-    if mod_name not in sys.modules:
-        stub = types.ModuleType(mod_name)
-        class MeilisearchModel:
-            """Fallback stub when real MeilisearchModel is not available."""
-            pass
-        stub.MeilisearchModel = MeilisearchModel
-        sys.modules[mod_name] = stub
-        logger.warning(
-            "MeilisearchModel not found — a lightweight stub was inserted to avoid import errors. "
-            "Please add/verify app/models/meilisearch_model.py to provide a real implementation."
-        )
-
-# also provide a plural module alias some code expects
-if 'app.models.meilisearch_models' not in sys.modules:
-    import types as _types
-    sys.modules['app.models.meilisearch_models'] = _types.ModuleType('app.models.meilisearch_models')
+# Note: setup_app_environment() is called inside create_app() instead of at module import time
+# to avoid repeated execution under Werkzeug debug reloader.
+# Meilisearch stubs are also lazily initialized inside create_app().
 
 # Import extensions and config
 try:
@@ -183,6 +160,28 @@ def create_app(config_name=None, enable_socketio=True):
     Returns:
         The configured Flask application
     """
+    # Setup environment paths inside create_app() to avoid repeated execution under debug reloader
+    setup_app_environment()
+    
+    # Initialize Meilisearch stubs if not already available
+    try:
+        from app.models.meilisearch_models import MeilisearchModel  # type: ignore
+    except Exception:
+        import types
+        mod_name = 'app.models.meilisearch_model'
+        if mod_name not in sys.modules:
+            stub = types.ModuleType(mod_name)
+            class MeilisearchModel:
+                """Fallback stub when real MeilisearchModel is not available."""
+                pass
+            stub.MeilisearchModel = MeilisearchModel
+            sys.modules[mod_name] = stub
+            logger.debug("MeilisearchModel stub initialized")
+        
+        if 'app.models.meilisearch_models' not in sys.modules:
+            import types as _types
+            sys.modules['app.models.meilisearch_models'] = _types.ModuleType('app.models.meilisearch_models')
+    
     if config_name is None:
         config_name = os.environ.get('FLASK_CONFIG', 'default')
     
@@ -1434,179 +1433,14 @@ def create_app(config_name=None, enable_socketio=True):
         app.logger.error(f"Error registering blueprints: {str(e)}")
     
     # Create database tables and initialize admin auth tables
-    def can_connect_to_db(app, timeout_seconds=3):
-        """
-        Return True if a DB connection can be established using the app's SQLAlchemy engine.
-        This is a lightweight check to avoid raising during app startup when the database is not yet available.
-        """
-        try:
-            with app.app_context():
-                # Use SQLAlchemy engine connect; this will raise if DB unreachable
-                conn = db.engine.connect()
-                conn.close()
-            return True
-        except Exception as e:
-            app.logger.warning(f"Database connectivity check failed: {str(e)}")
-            return False
-
+    # Run bootstrap initialization (DB creation, admin tables, hooks)
+    # This is guarded to run only once per process
     try:
-        with app.app_context():
-            if can_connect_to_db(app):
-                try:
-                    db.create_all()
-
-                    try:
-                        from .routes.admin.admin_auth import init_admin_auth_tables
-                        init_admin_auth_tables()
-                        app.logger.info("Admin authentication tables initialized successfully")
-                    except ImportError:
-                        try:
-                            from routes.admin.admin_auth import init_admin_auth_tables
-                            init_admin_auth_tables()
-                            app.logger.info("Admin authentication tables initialized successfully")
-                        except ImportError:
-                            app.logger.warning("Admin authentication tables initialization skipped - module not found")
-
-                    try:
-                        from .routes.admin.admin_google_auth import init_admin_google_auth_tables
-                        init_admin_google_auth_tables()
-                        app.logger.info("Admin Google authentication tables initialized successfully")
-                    except ImportError:
-                        try:
-                            from routes.admin.admin_google_auth import init_admin_google_auth_tables
-                            init_admin_google_auth_tables()
-                            app.logger.info("Admin Google authentication tables initialized successfully")
-                        except ImportError:
-                            app.logger.warning("Admin Google authentication tables initialization skipped - module not found")
-
-                    try:
-                        from .routes.admin.admin_email_routes import init_admin_email_tables
-                        init_admin_email_tables()
-                        app.logger.info("Admin email tables initialized successfully")
-                    except ImportError:
-                        try:
-                            from routes.admin.admin_email_routes import init_admin_email_tables
-                            init_admin_email_tables()
-                            app.logger.info("Admin email tables initialized successfully")
-                        except ImportError:
-                            app.logger.warning("Admin email tables initialization skipped - module not found")
-
-                    try:
-                        from .routes.footer.footer_routes import init_footer_tables
-                        init_footer_tables(app)
-                        app.logger.info("Footer tables initialized successfully")
-                    except ImportError:
-                        try:
-                            from routes.footer.footer_routes import init_footer_tables
-                            init_footer_tables(app)
-                            app.logger.info("Footer tables initialized successfully")
-                        except ImportError:
-                            app.logger.warning("Footer tables initialization skipped - module not found")
-
-                    try:
-                        from .models.side_panel_model import SidePanel
-                        app.logger.info("Side panel model imported successfully")
-                    except ImportError:
-                        try:
-                            from models.side_panel_model import SidePanel
-                            app.logger.info("Side panel model imported successfully")
-                        except ImportError:
-                            app.logger.warning("Side panel model not found - side panel system will not be available")
-
-                    try:
-                        from .routes.contact_cta.contact_cta_routes import init_contact_cta_tables
-                        init_contact_cta_tables()
-                        app.logger.info("Contact CTA tables initialized successfully")
-                    except ImportError:
-                        try:
-                            from routes.contact_cta.contact_cta_routes import init_contact_cta_tables
-                            init_contact_cta_tables()
-                            app.logger.info("Contact CTA tables initialized successfully")
-                        except ImportError:
-                            app.logger.warning("Contact CTA tables initialization skipped - module not found")
-
-                    try:
-                        from .routes.products.featured_routes import init_featured_routes_tables
-                        init_featured_routes_tables()
-                        app.logger.info("Featured routes tables initialized successfully")
-                    except ImportError:
-                        app.logger.warning("Featured routes tables initialization skipped - module not found")
-                        
-                    try:
-                        from .routes.meilisearch.meilisearch_routes import init_meilisearch_tables
-                        init_meilisearch_tables()
-                        app.logger.info("Meilisearch tables initialized successfully")
-                    except ImportError:
-                        app.logger.warning("Meilisearch tables initialization skipped - module not found")
-
-                    # Initialize flash sale tables
-                    try:
-                        from .routes.flash_sale.flash_sale_routes import init_flash_sale_tables
-                        init_flash_sale_tables()
-                        app.logger.info("Flash sale tables initialized successfully")
-                    except ImportError:
-                        app.logger.warning("Flash sale tables initialization skipped - module not found")
-
-                    app.logger.info("Database tables created successfully")
-                except Exception as e:
-                    app.logger.error(f"Error creating database tables or initializing admin tables: {str(e)}")
-            else:
-                app.logger.warning(
-                    "Database is not reachable - skipping db.create_all() and admin table initializations.\n"
-                    "If you intend the app to manage DB schema at startup, ensure DATABASE_URL/SQLALCHEMY_DATABASE_URI is set\n"
-                    "and the database is reachable from this host. Otherwise this is expected (DB provision happens separately)."
-                )
+        from app.startup.bootstrap import run_bootstrap
+        run_bootstrap(app)
     except Exception as e:
-        app.logger.error(f"Unexpected error during DB initialization check: {str(e)}")
-    
-    # Set up order completion hooks
-    try:
-        order_completion_handler = None
-        import_paths = [
-            'app.routes.order.order_completion_handler',
-            '.routes.order.order_completion_handler',
-            'routes.order.order_completion_handler'
-        ]
-        
-        for import_path in import_paths:
-            try:
-                module = __import__(import_path, fromlist=['setup_order_completion_hooks'])
-                if hasattr(module, 'setup_order_completion_hooks'):
-                    order_completion_handler = module
-                    break
-            except ImportError:
-                continue
-        
-        if order_completion_handler:
-            order_completion_handler.setup_order_completion_hooks(app)
-            app.logger.info("Order completion hooks set up successfully")
-        else:
-            app.logger.warning("Order completion handler not found - creating basic inventory sync endpoint")
-            
-            @app.route('/api/admin/inventory/sync', methods=['POST'])
-            @jwt_required()
-            def sync_inventory_fallback():
-                try:
-                    return jsonify({
-                        "success": True,
-                        "message": "Inventory sync endpoint active (fallback mode)",
-                        "timestamp": datetime.now().isoformat()
-                    }), 200
-                except Exception as e:
-                    app.logger.error(f"Error in fallback inventory sync: {str(e)}")
-                    return jsonify({"error": str(e)}), 500
-                    
-    except Exception as e:
-        app.logger.error(f"Error setting up order completion hooks: {str(e)}")
-        
-        @app.route('/api/admin/inventory/sync', methods=['POST'])
-        @jwt_required()
-        def sync_inventory_error_fallback():
-            return jsonify({
-                "success": False,
-                "error": "Order completion handler not available",
-                "message": "Please check order completion handler configuration"
-            }), 500
+        app.logger.error(f"Bootstrap initialization failed: {str(e)}")
+        # Don't fail the whole app, but log the error
     
     # Dashboard health check endpoint
     @app.route('/api/admin/dashboard/health', methods=['GET', 'OPTIONS'])
