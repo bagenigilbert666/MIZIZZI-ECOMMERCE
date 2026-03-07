@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import redis, { getCachedData, setCachedData, CACHE_CONFIG } from '@/lib/redis'
 import { productService } from '@/services/product'
 
 export const runtime = 'nodejs'
@@ -19,30 +18,7 @@ export async function GET(
       )
     }
 
-    // Generate cache key for single product
-    const cacheKey = `${CACHE_CONFIG.PRODUCT_DETAIL.key}:${id}`
-    console.log('[v0] Product API - Cache key:', cacheKey)
-
-    // Try to get from Redis cache
-    const cachedProduct = await getCachedData(cacheKey)
-    if (cachedProduct) {
-      return NextResponse.json(
-        {
-          data: cachedProduct,
-          source: 'redis-cache',
-          timestamp: new Date().toISOString(),
-        },
-        {
-          headers: {
-            'Cache-Control': 'public, max-age=900',
-            'X-Cache-Source': 'redis',
-          },
-        }
-      )
-    }
-
-    // If not in cache, fetch from product service
-    console.log('[v0] Fetching product', id, 'from service...')
+    console.log('[v0] Fetching product:', id)
     const product = await productService.getProduct(id)
 
     if (!product) {
@@ -51,9 +27,6 @@ export async function GET(
         { status: 404 }
       )
     }
-
-    // Store in Redis cache
-    await setCachedData(cacheKey, product, CACHE_CONFIG.PRODUCT_DETAIL.ttl)
 
     return NextResponse.json(
       {
@@ -64,7 +37,6 @@ export async function GET(
       {
         headers: {
           'Cache-Control': 'public, max-age=900',
-          'X-Cache-Source': 'api',
         },
       }
     )
