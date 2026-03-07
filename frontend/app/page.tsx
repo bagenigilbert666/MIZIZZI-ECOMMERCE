@@ -34,18 +34,18 @@ export default async function Home() {
   // Map API response to HomeContent props (unchanged interface)
   return (
     <HomeContent
-      categories={data.categories}
-      carouselItems={data.carousel_items}
+      categories={data.categories || []}
+      carouselItems={data.carousel_items || []}
       premiumExperiences={data.premium_experiences || []}
       productShowcase={data.product_showcase || []}
       contactCTASlides={data.contact_cta_slides || []}
       featureCards={data.feature_cards || []}
-      flashSaleProducts={data.flash_sale_products}
-      luxuryProducts={data.luxury_products}
-      newArrivals={data.new_arrivals}
-      topPicks={data.top_picks}
-      trendingProducts={data.trending_products}
-      dailyFinds={data.daily_finds}
+      flashSaleProducts={data.flash_sale_products || []}
+      luxuryProducts={data.luxury_products || []}
+      newArrivals={data.new_arrivals || []}
+      topPicks={data.top_picks || []}
+      trendingProducts={data.trending_products || []}
+      dailyFinds={data.daily_finds || []}
       allProducts={data.all_products?.products || []}
       allProductsHasMore={data.all_products?.has_more || false}
     />

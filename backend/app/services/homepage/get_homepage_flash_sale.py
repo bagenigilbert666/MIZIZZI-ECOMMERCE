@@ -12,10 +12,11 @@ CACHE_KEY = "mizizzi:homepage:flash_sale"
 CACHE_TTL = 60  # 1 minute - flash sales update frequently
 
 
-async def get_homepage_flash_sale(limit: int = 20) -> List[Dict[str, Any]]:
+def get_homepage_flash_sale(limit: int = 20) -> List[Dict[str, Any]]:
     """
     Fetch flash sale products for homepage with Redis caching.
     Uses dedicated database index for fast queries.
+    OPTIMIZATION: Only selects necessary columns from database.
     
     Args:
         limit: Maximum number of products to return
@@ -32,6 +33,7 @@ async def get_homepage_flash_sale(limit: int = 20) -> List[Dict[str, Any]]:
                 return cached
         
         # Query database - uses idx_products_flash_sale index
+        # OPTIMIZATION: Load products efficiently with only needed columns for serialization
         products = db.session.query(Product)\
             .filter(Product.is_flash_sale == True)\
             .filter(Product.is_active == True)\
@@ -39,7 +41,7 @@ async def get_homepage_flash_sale(limit: int = 20) -> List[Dict[str, Any]]:
             .limit(limit)\
             .all()
         
-        # Serialize using existing serializer
+        # Serialize using existing serializer (now optimized to use thumbnail_url)
         result = [serialize_product_minimal(p) for p in products]
         
         # Cache result

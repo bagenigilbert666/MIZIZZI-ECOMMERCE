@@ -11,7 +11,7 @@ PRODUCT_SHOWCASE_CACHE_KEY = "mizizzi:homepage:product_showcase"
 PRODUCT_SHOWCASE_CACHE_TTL = 600  # 10 minutes
 
 
-async def get_homepage_product_showcase() -> List[Dict[str, Any]]:
+def get_homepage_product_showcase() -> List[Dict[str, Any]]:
     """
     Fetch product showcase panels for homepage display.
     

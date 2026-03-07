@@ -28,9 +28,7 @@ cors = CORS()
 migrate = Migrate()
 limiter = Limiter(
     key_func=get_remote_address,
-    default_limits=["1000 per hour"],  # Default: 1000 requests per hour per IP
-    storage_uri="memory://",  # Use in-memory storage
-    in_memory_fallback_enabled=True  # Fallback if storage unavailable
+    default_limits=["1000 per hour"]  # Default: 1000 requests per hour per IP
 )
 
 def ensure_db_bound(app):
@@ -169,14 +167,8 @@ def init_extensions(app):
     # Rate limiting
     try:
         limiter_storage = app.config.get('RATELIMIT_STORAGE_URI', app.config.get('REDIS_URL', 'memory://'))
-        limiter.init_app(
-            app,
-            key_func=get_remote_address,
-            default_limits=[app.config.get('RATELIMIT_DEFAULT', '1000 per hour')],
-            storage_uri=limiter_storage,
-            in_memory_fallback_enabled=app.config.get('RATELIMIT_IN_MEMORY_FALLBACK_ENABLED', True)
-        )
-        logger.info(f"Rate limiter initialized with default: {app.config.get('RATELIMIT_DEFAULT', '1000 per hour')} using storage: {limiter_storage}")
+        limiter.init_app(app)
+        logger.info(f"Rate limiter initialized with default: {app.config.get('RATELIMIT_DEFAULT', '1000 per hour')}")
     except Exception as e:
         logger.error(f"Error initializing rate limiter: {e}")
         # Continue anyway, limiter may already be initialized

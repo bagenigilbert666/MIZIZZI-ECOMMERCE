@@ -11,7 +11,7 @@ CACHE_KEY = "mizizzi:homepage:contact_cta_slides"
 CACHE_TTL = 600  # 10 minutes
 
 
-async def get_homepage_contact_cta_slides() -> List[Dict[str, Any]]:
+def get_homepage_contact_cta_slides() -> List[Dict[str, Any]]:
     """
     Fetch contact CTA slides for homepage with Redis caching.
     
