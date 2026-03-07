@@ -11,7 +11,11 @@ from flask import Blueprint, jsonify, request
 from flask_cors import cross_origin
 
 from app.services.homepage.aggregator import get_homepage_data
-from app.services.homepage.cache_utils import validate_pagination_params, get_empty_homepage_data
+from app.services.homepage.cache_utils import (
+    validate_pagination_params,
+    get_empty_homepage_data,
+    build_homepage_cache_key,
+)
 from app.utils.redis_cache import product_cache
 
 logger = logging.getLogger(__name__)
@@ -99,18 +103,59 @@ def get_homepage():
             f"daily={daily_finds_limit}, all={all_products_limit}, page={all_products_page}"
         )
         
-        # Call sync aggregator directly with ALL 9 parameters
-        homepage_data, metadata = get_homepage_data(
-            categories_limit=categories_limit,
-            flash_sale_limit=flash_sale_limit,
-            luxury_limit=luxury_limit,
-            new_arrivals_limit=new_arrivals_limit,
-            top_picks_limit=top_picks_limit,
-            trending_limit=trending_limit,
-            daily_finds_limit=daily_finds_limit,
-            all_products_limit=all_products_limit,
-            all_products_page=all_products_page,
+        # SAFEGUARD #3: TOP-LEVEL CACHE FAST-PATH
+        # Compute cache key FIRST using same function as aggregator
+        # Check Redis BEFORE calling aggregator - skip aggregation entirely on hit
+        cache_key = build_homepage_cache_key(
+            categories_limit, flash_sale_limit, luxury_limit, new_arrivals_limit,
+            top_picks_limit, trending_limit, daily_finds_limit, all_products_limit,
+            all_products_page
         )
+        
+        # Check for cache hit BEFORE aggregation
+        cache_hit = False
+        cached_data = None
+        
+        if product_cache:
+            try:
+                cached_data = product_cache.get(cache_key)
+                if cached_data is not None:
+                    cache_hit = True
+                    logger.info(
+                        f"[Homepage Route] Cache HIT for key: {cache_key} "
+                        f"(aggregation SKIPPED)"
+                    )
+            except Exception as e:
+                logger.warning(f"[Homepage Route] Cache read error: {e}")
+                cached_data = None
+        
+        # Use cached data if available, otherwise run aggregation
+        if cache_hit and cached_data:
+            homepage_data = cached_data
+            # Build minimal metadata for cached response
+            metadata = {
+                "all_succeeded": True,
+                "cache_key": cache_key,
+                "cache_written": False,
+                "partial_failures": [],
+                "aggregation_time_ms": 0,
+            }
+            logger.debug(f"[Homepage Route] Using cached response")
+        else:
+            # Cache miss or read error - run aggregation with cache_key
+            logger.debug(f"[Homepage Route] Cache MISS - running aggregation")
+            homepage_data, metadata = get_homepage_data(
+                categories_limit=categories_limit,
+                flash_sale_limit=flash_sale_limit,
+                luxury_limit=luxury_limit,
+                new_arrivals_limit=new_arrivals_limit,
+                top_picks_limit=top_picks_limit,
+                trending_limit=trending_limit,
+                daily_finds_limit=daily_finds_limit,
+                all_products_limit=all_products_limit,
+                all_products_page=all_products_page,
+                cache_key=cache_key,
+            )
         
         # Build response with metadata from aggregator
         response_data = {
@@ -119,7 +164,7 @@ def get_homepage():
             "meta": {
                 "all_succeeded": metadata["all_succeeded"],
                 "cache_key": metadata["cache_key"],
-                "cached": metadata["cached"],
+                "cache_written": metadata.get("cache_written", False),
                 "partial_failures": metadata["partial_failures"],
                 "aggregation_time_ms": metadata["aggregation_time_ms"],
             }
@@ -132,7 +177,18 @@ def get_homepage():
         # The aggregator uses HOMEPAGE_CACHE_TTL = 180 seconds
         # This header must match that TTL for correct cache behavior in proxies/browsers
         response.headers['Cache-Control'] = 'public, max-age=180'
-        response.headers['X-Cache'] = 'HIT' if metadata["cached"] else 'MISS'
+        
+        # STANDARDIZE X-Cache Header:
+        # HIT → served from Redis top-level cache (fast-path, aggregation skipped)
+        # MISS → rebuilt homepage and cached (aggregation completed, all succeeded)
+        # BYPASS → rebuilt homepage but not cached (failures detected)
+        if cache_hit:
+            response.headers['X-Cache'] = 'HIT'
+        elif metadata["all_succeeded"] and metadata.get("cache_written", False):
+            response.headers['X-Cache'] = 'MISS'
+        else:
+            response.headers['X-Cache'] = 'BYPASS'
+        
         response.headers['X-Cache-Key'] = metadata["cache_key"] or "no-cache"
         response.headers['X-Content-Type-Options'] = 'nosniff'
         response.headers['X-Aggregation-Time-Ms'] = str(metadata["aggregation_time_ms"])
@@ -144,7 +200,7 @@ def get_homepage():
         
         logger.debug(
             f"[Homepage Route] Response prepared successfully "
-            f"(cache: {metadata['cached']}, all_succeeded: {metadata['all_succeeded']}, "
+            f"(X-Cache: {response.headers.get('X-Cache')}, all_succeeded: {metadata['all_succeeded']}, "
             f"failures: {len(metadata['partial_failures'])})"
         )
         return response, 200
@@ -160,7 +216,7 @@ def get_homepage():
             "meta": {
                 "all_succeeded": False,
                 "cache_key": "",
-                "cached": False,
+                "cache_written": False,
                 "partial_failures": [{"section": "all_sections", "error": str(e)}],
                 "aggregation_time_ms": 0,
             }

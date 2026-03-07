@@ -119,7 +119,16 @@ def build_homepage_cache_key(
     """
     Generate a UNIQUE cache key based on ALL 9 homepage pagination parameters.
     
-    CRITICAL: Every parameter that changes output must be included in the key.
+    SAFEGUARD #1: KEY IDENTITY
+    ===========================
+    This function MUST be called by both:
+    1. Homepage route (to check cache before aggregation)
+    2. Aggregator (to cache response after loading all sections)
+    
+    If they don't use the same function, cache keys will mismatch and cache hits
+    will be impossible or wrong cached data will be returned.
+    
+    Every parameter that changes output must be included in the key.
     This prevents cache poisoning where different requests return wrong cached results.
     
     Without including all params, different requests with different limits

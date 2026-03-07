@@ -111,9 +111,15 @@ def get_homepage_data(
     daily_finds_limit: int = 20,
     all_products_limit: int = 12,
     all_products_page: int = 1,
+    cache_key: str = None,
 ) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """
     SAFE SYNCHRONOUS AGGREGATOR: Loads all 13 homepage sections sequentially.
+    
+    SAFEGUARD #2: CACHE KEY FROM CALLER
+    ====================================
+    The cache_key is computed by the caller (route) and passed here.
+    This ensures route and aggregator use IDENTICAL keys built from the same function.
     
     CORRECTNESS FIRST:
     - Uses aggregator-side wrappers to catch and track failures
@@ -129,6 +135,7 @@ def get_homepage_data(
     
     Args:
         All 9 pagination parameters that affect output
+        cache_key: Pre-computed cache key from caller (MUST match build_homepage_cache_key)
         
     Returns:
         Tuple of (homepage_data, metadata):
@@ -259,34 +266,34 @@ def get_homepage_data(
     # CACHE ONLY ON COMPLETE SUCCESS
     # If ANY section failed, DO NOT cache the response
     # This prevents serving broken responses from cache
-    cache_key = None
-    cached = False
+    cache_written = False
     
-    if all_succeeded and product_cache:
-        cache_key = build_homepage_cache_key(
-            categories_limit, flash_sale_limit, luxury_limit, new_arrivals_limit,
-            top_picks_limit, trending_limit, daily_finds_limit, all_products_limit,
-            all_products_page
-        )
-        
+    if all_succeeded and product_cache and cache_key:
         # SAFE CACHE WRITE: Wrap in try/except so cache errors don't break response
         try:
             product_cache.set(cache_key, homepage_data, HOMEPAGE_CACHE_TTL)
-            cached = True
+            cache_written = True
             logger.debug(f"[Homepage] Response cached with key: {cache_key}")
         except Exception as e:
             # Cache write failed - log it but don't break the response
             logger.error(f"[Homepage] Failed to cache response: {e}")
-            cached = False
+            cache_written = False
+    elif not all_succeeded:
+        logger.info(f"[Homepage] Not caching response - failures detected: {failed_sections}")
+    elif not cache_key:
+        logger.warning("[Homepage] Cache key not provided - response not cached")
     
     # BUILD RESPONSE METADATA
+    # Distinguish between:
+    # - cache_written: Response was just written to Redis cache after aggregation
+    # - cache_key: The Redis key used (passed from caller)
     metadata = {
         "all_succeeded": all_succeeded,
         "partial_failures": partial_failures,
         "sections_loaded": len([s for s, (success, _) in section_results.items() if success]),
         "sections_failed": len(failed_sections),
         "cache_key": cache_key,
-        "cached": cached,
+        "cache_written": cache_written,
         "aggregation_time_ms": round(elapsed_time, 1),
     }
     
