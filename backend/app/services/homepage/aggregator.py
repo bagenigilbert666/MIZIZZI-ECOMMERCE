@@ -1,7 +1,7 @@
 """Homepage Aggregator Service - Orchestrates parallel loading of all homepage sections."""
 import asyncio
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Tuple, List
 from app.utils.redis_cache import product_cache
 
 # Import all homepage loaders
@@ -16,12 +16,18 @@ from .get_homepage_featured import (
     get_homepage_daily_finds,
 )
 from .get_homepage_all_products import get_homepage_all_products
+from .get_homepage_contact_cta_slides import get_homepage_contact_cta_slides
+from .get_homepage_premium_experiences import get_homepage_premium_experiences
+from .get_homepage_product_showcase import get_homepage_product_showcase
+from .get_homepage_feature_cards import get_homepage_feature_cards
+from .cache_utils import (
+    build_homepage_cache_key, 
+    HOMEPAGE_CACHE_TTL,
+    CRITICAL_SECTIONS,
+    get_empty_homepage_data,
+)
 
 logger = logging.getLogger(__name__)
-
-# Top-level homepage cache
-HOMEPAGE_CACHE_KEY = "mizizzi:homepage:data"
-HOMEPAGE_CACHE_TTL = 60  # 1 minute
 
 
 async def get_homepage_data(
@@ -33,7 +39,8 @@ async def get_homepage_data(
     trending_limit: int = 20,
     daily_finds_limit: int = 20,
     all_products_limit: int = 12,
-) -> Dict[str, Any]:
+    all_products_page: int = 1,
+) -> Tuple[Dict[str, Any], Dict[str, Any]]:
     """
     Aggregator for all homepage data - loads all sections in parallel.
     
@@ -42,23 +49,61 @@ async def get_homepage_data(
     - All sections load in parallel for maximum performance
     - Individual section failures don't affect others
     - Each section has its own Redis cache layer
-    - Top-level cache wraps entire response
+    - Top-level cache wraps entire response with dynamic key based on parameters
     
     Args:
         Various limits for each section
+        all_products_page: Page number for pagination (1-indexed)
         
     Returns:
-        Complete homepage data dictionary with all sections
+        Tuple of (homepage_data, metadata) where:
+        - homepage_data: Complete homepage data dictionary with all sections
+        - metadata: Dictionary with cache_hit (bool), cache_key (str), partial_failures (list)
     """
     try:
+        # Build dynamic cache key based on ALL parameters
+        cache_key = build_homepage_cache_key(
+            categories_limit,
+            flash_sale_limit,
+            luxury_limit,
+            new_arrivals_limit,
+            top_picks_limit,
+            trending_limit,
+            daily_finds_limit,
+            all_products_limit,
+            all_products_page,
+        )
+        
         # Check top-level cache first
         if product_cache:
-            cached = product_cache.get(HOMEPAGE_CACHE_KEY)
+            cached = product_cache.get(cache_key)
             if cached:
-                logger.debug("[Homepage Aggregator] Full homepage data loaded from cache")
-                return cached
+                logger.debug(f"[Homepage Aggregator] Full homepage data loaded from cache (key: {cache_key})")
+                metadata = {
+                    "cache_hit": True,
+                    "cache_key": cache_key,
+                    "partial_failures": []
+                }
+                return cached, metadata
         
-        logger.debug("[Homepage Aggregator] Loading all homepage sections in parallel...")
+        logger.debug(f"[Homepage Aggregator] Loading all homepage sections in parallel with key: {cache_key}...")
+        
+        # Define section names for logging and tracking failures
+        section_names = [
+            "categories",
+            "carousel",
+            "flash_sale",
+            "luxury",
+            "new_arrivals",
+            "top_picks",
+            "trending",
+            "daily_finds",
+            "all_products",
+            "contact_cta_slides",
+            "premium_experiences",
+            "product_showcase",
+            "feature_cards",
+        ]
         
         # Load all sections in parallel
         results = await asyncio.gather(
@@ -70,9 +115,16 @@ async def get_homepage_data(
             get_homepage_top_picks(top_picks_limit),
             get_homepage_trending(trending_limit),
             get_homepage_daily_finds(daily_finds_limit),
-            get_homepage_all_products(all_products_limit),
+            get_homepage_all_products(all_products_limit, all_products_page),
+            get_homepage_contact_cta_slides(),
+            get_homepage_premium_experiences(),
+            get_homepage_product_showcase(),
+            get_homepage_feature_cards(),
             return_exceptions=True,  # Don't let one error block others
         )
+        
+        # Track partial failures with named sections
+        partial_failures: List[str] = []
         
         # Map results to response
         homepage_data = {
@@ -85,31 +137,73 @@ async def get_homepage_data(
             "trending_products": results[6] if not isinstance(results[6], Exception) else [],
             "daily_finds": results[7] if not isinstance(results[7], Exception) else [],
             "all_products": (results[8] if not isinstance(results[8], Exception) else {"products": [], "has_more": False, "total": 0, "page": 1}),
+            "contact_cta_slides": results[9] if not isinstance(results[9], Exception) else [],
+            "premium_experiences": results[10] if not isinstance(results[10], Exception) else [],
+            "product_showcase": results[11] if not isinstance(results[11], Exception) else [],
+            "feature_cards": results[12] if not isinstance(results[12], Exception) else [],
         }
         
-        # Log any errors
+        # Log and track any errors
         for i, result in enumerate(results):
             if isinstance(result, Exception):
-                logger.error(f"[Homepage Aggregator] Section {i} error: {result}")
+                section = section_names[i]
+                partial_failures.append(section)
+                is_critical = section in CRITICAL_SECTIONS
+                logger.error(f"[Homepage Aggregator] Section '{section}' error: {result} (critical: {is_critical})")
         
-        # Cache the complete response
-        if product_cache:
-            product_cache.set(HOMEPAGE_CACHE_KEY, homepage_data, HOMEPAGE_CACHE_TTL)
+        # Cache decision: Only cache if critical sections are healthy
+        has_critical_failures = any(section in CRITICAL_SECTIONS for section in partial_failures)
         
-        logger.debug("[Homepage Aggregator] All sections loaded successfully")
-        return homepage_data
+        if product_cache and not has_critical_failures:
+            product_cache.set(cache_key, homepage_data, HOMEPAGE_CACHE_TTL)
+            cache_status = "cached"
+        elif has_critical_failures:
+            logger.warning(
+                f"[Homepage Aggregator] Skipping top-level cache because critical sections failed: "
+                f"{partial_failures} (cache_key: {cache_key})"
+            )
+            cache_status = "not_cached (critical failures)"
+        else:
+            cache_status = "cache unavailable"
+        
+        # Log appropriately based on success/failure
+        total_sections = len(section_names)
+        if not partial_failures:
+            logger.debug(f"[Homepage Aggregator] All {total_sections} sections loaded successfully ({cache_status}, cache_key: {cache_key})")
+        else:
+            logger.warning(f"[Homepage Aggregator] Loaded with {len(partial_failures)}/{total_sections} failures: {partial_failures} ({cache_status}, cache_key: {cache_key})")
+        
+        metadata = {
+            "cache_hit": False,
+            "cache_key": cache_key,
+            "partial_failures": partial_failures
+        }
+        
+        return homepage_data, metadata
+        
         
     except Exception as e:
         logger.error(f"[Homepage Aggregator] Critical error: {e}")
+        # Attempt to preserve cache key even on failure
+        try:
+            failed_cache_key = build_homepage_cache_key(
+                categories_limit,
+                flash_sale_limit,
+                luxury_limit,
+                new_arrivals_limit,
+                top_picks_limit,
+                trending_limit,
+                daily_finds_limit,
+                all_products_limit,
+                all_products_page,
+            )
+        except Exception:
+            failed_cache_key = ""
+        
         # Return empty structure instead of failing
-        return {
-            "categories": [],
-            "carousel_items": [],
-            "flash_sale_products": [],
-            "luxury_products": [],
-            "new_arrivals": [],
-            "top_picks": [],
-            "trending_products": [],
-            "daily_finds": [],
-            "all_products": {"products": [], "has_more": False, "total": 0, "page": 1},
+        metadata = {
+            "cache_hit": False,
+            "cache_key": failed_cache_key,
+            "partial_failures": ["all_sections"]
         }
+        return get_empty_homepage_data(), metadata
