@@ -525,44 +525,10 @@ def create_app(config_name=None, enable_socketio=True):
     from flask import Blueprint
     
     # Create fallback blueprints for routes
-    # Register all blueprints from registry
-    from app.routes.blueprint_registry import BLUEPRINT_ROUTES
-    
-    registered_count = 0
-    failed_blueprints = []
-    
-    for module_path, blueprint_name, url_prefix in BLUEPRINT_ROUTES:
-        try:
-            module = __import__(module_path, fromlist=[blueprint_name])
-            blueprint = getattr(module, blueprint_name, None)
-            
-            if blueprint is None:
-                # Try to find any Blueprint in the module
-                for attr_name in dir(module):
-                    attr = getattr(module, attr_name)
-                    if isinstance(attr, _Blueprint):
-                        blueprint = attr
-                        break
-            
-            if blueprint:
-                app.register_blueprint(blueprint, url_prefix=url_prefix)
-                registered_count += 1
-            else:
-                failed_blueprints.append((blueprint_name, module_path))
-                app.logger.warning(f"⚠️ {blueprint_name} not found in {module_path}")
-        except Exception as e:
-            failed_blueprints.append((blueprint_name, module_path))
-            app.logger.debug(f"Failed to import {blueprint_name} from {module_path}: {e}")
-    
-    # Log clean startup summary
-    app.logger.info("=" * 60)
-    app.logger.info("🚀 MIZIZZI E-COMMERCE PLATFORM - STARTUP COMPLETE")
-    app.logger.info("=" * 60)
-    app.logger.info(f"📦 BLUEPRINT REGISTRATION: {registered_count} registered")
-    if failed_blueprints:
-        app.logger.warning(f"⚠️ {len(failed_blueprints)} blueprints failed to load")
-        for name, path in failed_blueprints:
-            app.logger.debug(f"  - {name}: {path}")
+    # Register all blueprints
+    from app.startup.blueprint_loader import register_blueprints, log_startup_summary
+    registered_count, failed_blueprints = register_blueprints(app)
+    log_startup_summary(app, registered_count, failed_blueprints)
     
     # Run bootstrap initialization (DB creation, admin tables, hooks)
     # This is guarded to run only once per process
