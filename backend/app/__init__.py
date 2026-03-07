@@ -121,9 +121,15 @@ except ImportError:
             SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key')
             SQLALCHEMY_DATABASE_URI = get_database_url()
             SQLALCHEMY_TRACK_MODIFICATIONS = False
+            # Optimized for remote Neon PostgreSQL with connection pooling
             SQLALCHEMY_ENGINE_OPTIONS = {
-                'pool_pre_ping': True,
-                'pool_recycle': 300,
+                'pool_size': 15,                  # Persistent connections in pool
+                'max_overflow': 10,               # Extra connections when pool full
+                'pool_pre_ping': True,            # Test connections before use
+                'pool_recycle': 300,              # Recycle connections after 5 minutes
+                'connect_args': {
+                    'connect_timeout': 10,        # Connection timeout 10s
+                }
             }
             JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY', 'jwt-secret-key')
             JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=1)
