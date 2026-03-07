@@ -94,11 +94,13 @@ def load_section_safe(
     try:
         logger.debug(f"[Homepage] Loading section: {section_name}")
         data = loader_func(*args, **kwargs)
+        
+        # Success: loader executed without exception
         logger.debug(f"[Homepage] Section loaded successfully: {section_name}")
         return (data, True, "")
         
     except Exception as e:
-        # Log the error with full context
+        # Log the error with full context - exceptions are failures
         error_msg = f"{type(e).__name__}: {str(e)}"
         logger.error(f"[Homepage] Failed to load {section_name}: {error_msg}")
         

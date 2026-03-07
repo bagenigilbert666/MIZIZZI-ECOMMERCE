@@ -280,13 +280,25 @@ def batch_get_homepage_sections(redis_client, section_limits: dict = None) -> di
             # Modern redis client with MGET support
             values = redis_client.mget(*cache_keys) if cache_keys else []
         else:
-            # Fallback: still batch but using individual commands
-            # (Same RTT reduction might not apply, but code remains correct)
-            values = [redis_client.get(key) for key in cache_keys]
+            # Fallback: use individual gets (Upstash REST client doesn't have mget)
+            # Get each key individually to avoid "tuple index out of range" error
+            values = []
+            for key in cache_keys:
+                try:
+                    val = redis_client.get(key)
+                    values.append(val)
+                except Exception as e:
+                    logger.debug(f"[Batch] Failed to get key {key}: {e}")
+                    values.append(None)
+        
+        # Ensure values list matches cache_keys length (in case of missing values)
+        # Pad with None if needed to maintain order
+        while len(values) < len(cache_keys):
+            values.append(None)
         
         # Map values back to section names
         result = {}
-        for section_name, value in zip(section_order, values or []):
+        for section_name, value in zip(section_order, values):
             if value is not None:
                 # Deserialize JSON if string
                 import json
@@ -297,7 +309,8 @@ def batch_get_homepage_sections(redis_client, section_limits: dict = None) -> di
             else:
                 result[section_name] = None
         
-        logger.debug(f"[Batch] MGET returned {len([v for v in result.values() if v is not None])} hits")
+        hit_count = len([v for v in result.values() if v is not None])
+        logger.debug(f"[Batch] Fetched {len(cache_keys)} keys, {hit_count} hits")
         return result
         
     except Exception as e:
