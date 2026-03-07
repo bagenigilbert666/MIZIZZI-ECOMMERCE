@@ -263,8 +263,14 @@ def batch_get_homepage_sections(redis_client, section_limits: dict = None) -> di
                     args = (section_limits.get("all_products_limit", 12), 
                            section_limits.get("all_products_page", 1))
                 else:
-                    # Other limited sections use just the limit
-                    args = (limit,) if limit != default_args[0] else default_args
+                    # Other limited sections use just the limit. Some sections
+                    # have empty default_args (e.g. carousel) so guard access
+                    # to default_args[0] to avoid IndexError.
+                    if default_args and len(default_args) >= 1:
+                        args = (limit,) if limit != default_args[0] else default_args
+                    else:
+                        # No default args defined; use provided limit
+                        args = (limit,)
             else:
                 args = default_args
             
