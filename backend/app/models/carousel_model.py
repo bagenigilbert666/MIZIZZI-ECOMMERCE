@@ -1,57 +1,75 @@
-"""
-Carousel Model for Mizizzi E-Commerce
-Stores carousel/banner items for homepage display
-"""
-
+"""Homepage Carousel Loader - Fetches carousel items for homepage."""
+import logging
+import time
+from typing import List, Dict, Any
+from app.models.carousel_model import CarouselBanner
 from app.configuration.extensions import db
-from datetime import datetime, timezone
+from app.utils.redis_cache import product_cache
+
+logger = logging.getLogger(__name__)
+
+CACHE_KEY = "mizizzi:homepage:carousel"
+CACHE_TTL = 600  # 10 minutes
 
 
-class CarouselBanner(db.Model):
-    """Model for carousel banner images displayed on homepage and other pages."""
-    __tablename__ = 'carousel_banners'
+def get_homepage_carousel() -> List[Dict[str, Any]]:
+    try:
+        if product_cache:
+            cached = product_cache.get(CACHE_KEY)
+            if cached:
+                logger.debug("[Homepage] Carousel loaded from cache")
+                return cached
 
-    id = db.Column(db.Integer, primary_key=True)
-    
-    # Banner content
-    title = db.Column(db.String(255), nullable=False)
-    description = db.Column(db.Text, nullable=True)
-    image_url = db.Column(db.String(500), nullable=False)
-    
-    # Button/link settings
-    button_text = db.Column(db.String(100), nullable=True)
-    link_url = db.Column(db.String(500), nullable=True)
-    
-    # Display settings
-    position = db.Column(db.String(50), default='homepage')  # 'homepage', 'landing', etc.
-    sort_order = db.Column(db.Integer, default=0, index=True)
-    is_active = db.Column(db.Boolean, default=True, index=True)
-    
-    # Timestamps
-    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), nullable=False)
-    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc), nullable=False)
-    created_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
-    updated_by = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
+        query_start = time.perf_counter()
 
-    # Relationships
-    creator = db.relationship('User', foreign_keys=[created_by], backref='created_carousels')
-    updater = db.relationship('User', foreign_keys=[updated_by], backref='updated_carousels')
+        rows = (
+            db.session.query(
+                CarouselBanner.id,
+                CarouselBanner.title,
+                CarouselBanner.description,
+                CarouselBanner.image_url,
+                CarouselBanner.button_text,
+                CarouselBanner.link_url,
+                CarouselBanner.sort_order,
+            )
+            .filter(
+                CarouselBanner.is_active.is_(True),
+                CarouselBanner.position == "homepage",
+            )
+            .order_by(CarouselBanner.sort_order.asc())
+            .all()
+        )
 
-    def __repr__(self):
-        return f"<CarouselBanner {self.id} - {self.title}>"
+        query_ms = (time.perf_counter() - query_start) * 1000
 
-    def to_dict(self):
-        """Convert carousel banner to dictionary for API responses."""
-        return {
-            'id': self.id,
-            'title': self.title,
-            'description': self.description,
-            'image_url': self.image_url,
-            'button_text': self.button_text,
-            'button_url': self.link_url,
-            'position': self.position,
-            'sort_order': self.sort_order,
-            'is_active': self.is_active,
-            'created_at': self.created_at.isoformat() if self.created_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
-        }
+        serialize_start = time.perf_counter()
+
+        result = [
+            {
+                "id": row.id,
+                "title": row.title or "",
+                "description": row.description or "",
+                "image_url": row.image_url or "",
+                "button_text": row.button_text or "",
+                "button_url": row.link_url or "",
+                "position": row.sort_order or 0,
+            }
+            for row in rows
+        ]
+
+        serialize_ms = (time.perf_counter() - serialize_start) * 1000
+        total_ms = query_ms + serialize_ms
+
+        if product_cache:
+            product_cache.set(CACHE_KEY, result, CACHE_TTL)
+
+        logger.debug(
+            f"[Homepage] Carousel: {len(result)} items | "
+            f"Query: {query_ms:.2f}ms | Serialize: {serialize_ms:.2f}ms | Total: {total_ms:.2f}ms"
+        )
+
+        return result
+
+    except Exception as e:
+        logger.error(f"[Homepage] Error loading carousel: {e}")
+        return []

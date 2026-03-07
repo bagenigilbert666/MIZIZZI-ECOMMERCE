@@ -74,11 +74,9 @@ except ImportError as e:
     logger.warning(f"Could not import meilisearch_models: {e}")
 
 try:
-    from .carousel_model import CarouselBanner
-    logger.debug("✅ Successfully imported CarouselBanner from carousel_model.py")
+    from .carousel_model import *
 except ImportError as e:
     logger.warning(f"Could not import carousel_model: {e}")
-    CarouselBanner = None
 
 try:
     from .contact_cta_model import *
@@ -128,7 +126,6 @@ __all__ = [
     'ProductVariant',
     'ProductImage',
     'ProductEmbedding',
-    'CarouselBanner',
     'MeilisearchModel',
     'MeilisearchSyncLog',
     'MeilisearchProductSync',
