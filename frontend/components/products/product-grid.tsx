@@ -26,6 +26,48 @@ const LogoPlaceholder = () => (
   </div>
 )
 
+const getProductImageUrl = (product: Product): string => {
+  // Priority 0: Check direct image field (from homepage API)
+  if ((product as any).image && typeof (product as any).image === "string" && (product as any).image.length > 0) {
+    const imageUrl = (product as any).image
+    if (imageUrl.startsWith("http") || imageUrl.startsWith("/")) {
+      return imageUrl
+    }
+  }
+
+  // Priority 1: Check thumbnail_url
+  if (product.thumbnail_url && typeof product.thumbnail_url === "string" && product.thumbnail_url.length > 0) {
+    if (product.thumbnail_url.startsWith("http") || product.thumbnail_url.startsWith("/")) {
+      return product.thumbnail_url
+    }
+  }
+
+  // Priority 2: Check image_urls array
+  if (product.image_urls && Array.isArray(product.image_urls) && product.image_urls.length > 0) {
+    const firstUrl = product.image_urls[0]
+    if (typeof firstUrl === "string" && firstUrl.length > 0) {
+      if (firstUrl.startsWith("http") || firstUrl.startsWith("/")) {
+        return firstUrl
+      }
+    }
+  }
+
+  // Priority 3: Check images array
+  if (product.images && Array.isArray(product.images) && product.images.length > 0) {
+    const primaryImage = product.images.find((img: any) => img.is_primary)
+    const imageToUse = primaryImage || product.images[0]
+    if (imageToUse && imageToUse.url) {
+      if (typeof imageToUse.url === "string" && imageToUse.url.length > 0) {
+        if (imageToUse.url.startsWith("http") || imageToUse.url.startsWith("/")) {
+          return imageToUse.url
+        }
+      }
+    }
+  }
+
+  return ""
+}
+
 const StarRating = ({ rating = 4, reviewCount = 0 }: { rating?: number; reviewCount?: number }) => {
   return (
     <div className="flex items-center gap-0.5 sm:gap-1">
@@ -77,8 +119,7 @@ const ProductCard = memo(
       setShowPlaceholder(true)
     }, [productId])
 
-    const imageUrl =
-      (product.image_urls && product.image_urls[0]) || product.thumbnail_url || "/diverse-fashion-display.png"
+    const imageUrl = getProductImageUrl(product) || "/diverse-fashion-display.png"
 
     const rating = product.rating || 3 + Math.random() * 2
     const reviewCount = product.review_count || Math.floor(Math.random() * 5000) + 100

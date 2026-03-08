@@ -224,6 +224,69 @@ def serialize_product_minimal(product):
         return None
 
 
+def serialize_product_with_images(product):
+    """
+    Serialization for homepage products with proper image support.
+    Returns essential fields plus complete image data for frontend display.
+    
+    Args:
+        product: Product instance
+    
+    Returns:
+        Dictionary with product data including full image support
+    """
+    try:
+        # Get images - prefer eager-loaded images, fallback to product methods
+        image_urls = []
+        if hasattr(product, 'images') and product.images:
+            # Use pre-loaded images (N+1 prevention)
+            sorted_images = sorted(
+                product.images, 
+                key=lambda img: (not img.is_primary, img.sort_order or 999)
+            )
+            image_urls = [img.url for img in sorted_images if img.url]
+        
+        if not image_urls:
+            image_urls = product.get_image_urls() if hasattr(product, 'get_image_urls') else []
+        
+        # Ensure thumbnail_url is set
+        thumbnail_url = image_urls[0] if image_urls else product.thumbnail_url
+        
+        # Calculate discount percentage
+        discount_percentage = 0
+        if product.sale_price:
+            discount_percentage = product.discount_percentage or int(
+                ((product.price - product.sale_price) / product.price) * 100
+            )
+        
+        return {
+            'id': product.id,
+            'name': product.name,
+            'slug': product.slug,
+            'price': float(product.price) if product.price else 0,
+            'sale_price': float(product.sale_price) if product.sale_price else None,
+            'discount_percentage': discount_percentage,
+            'image': thumbnail_url,  # Keep for backward compatibility
+            'image_urls': image_urls,  # New field for full image array
+            'thumbnail_url': thumbnail_url,  # Explicit thumbnail
+            'stock': product.stock,
+            'rating': product.rating,
+            # Feature flags for UI badges
+            'is_featured': product.is_featured,
+            'is_new': product.is_new,
+            'is_sale': product.is_sale,
+            'is_flash_sale': product.is_flash_sale,
+            'is_luxury_deal': product.is_luxury_deal,
+            'is_trending': product.is_trending,
+            'is_top_pick': product.is_top_pick,
+            'is_daily_find': product.is_daily_find,
+            'is_new_arrival': product.is_new_arrival,
+        }
+    except Exception as e:
+        current_app.logger.error(f"Error in serialize_product_with_images: {e}")
+        return None
+
+
 def serialize_variant(variant):
     """Serialize a product variant to dictionary format."""
     return {

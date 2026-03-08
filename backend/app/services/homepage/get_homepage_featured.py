@@ -4,7 +4,7 @@ from typing import List, Dict, Any
 from app.models.models import Product
 from app.configuration.extensions import db
 from app.utils.redis_cache import product_cache
-from app.routes.products.serializers import serialize_product_minimal
+from app.routes.products.serializers import serialize_product_with_images
 from sqlalchemy.orm import joinedload
 
 logger = logging.getLogger(__name__)
@@ -54,17 +54,17 @@ def get_featured_products(section: str, limit: int = 20) -> List[Dict[str, Any]]
             return []
         
         # OPTIMIZATION: Use eager loading to prevent N+1 queries on relationships
-        # For minimal serialization, we don't need relationships, but it's good practice
-        # Query database - each uses its dedicated index
+        # Query database with eager-loaded images for proper image support
         products = db.session.query(Product)\
+            .options(joinedload(Product.images))\
             .filter(filter_attr == True)\
             .filter(Product.is_active == True)\
             .order_by(Product.created_at.desc())\
             .limit(limit)\
             .all()
         
-        # Serialize - now no N+1 on relationships since we use thumbnail_url directly
-        result = [serialize_product_minimal(p) for p in products]
+        # Serialize with full image support
+        result = [serialize_product_with_images(p) for p in products]
         
         # Cache result
         if product_cache:

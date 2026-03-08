@@ -4,7 +4,8 @@ from typing import List, Dict, Any
 from app.models.models import Product
 from app.configuration.extensions import db
 from app.utils.redis_cache import product_cache
-from app.routes.products.serializers import serialize_product_minimal
+from app.routes.products.serializers import serialize_product_with_images
+from sqlalchemy.orm import joinedload
 
 logger = logging.getLogger(__name__)
 
@@ -32,17 +33,18 @@ def get_homepage_flash_sale(limit: int = 20) -> List[Dict[str, Any]]:
                 logger.debug("[Homepage] Flash sale loaded from cache")
                 return cached
         
-        # Query database - uses idx_products_flash_sale index
-        # OPTIMIZATION: Load products efficiently with only needed columns for serialization
+        # Query database - uses idx_products_flash_sale index with eager loading for images
+        # OPTIMIZATION: Load products efficiently with image relationships
         products = db.session.query(Product)\
+            .options(joinedload(Product.images))\
             .filter(Product.is_flash_sale == True)\
             .filter(Product.is_active == True)\
             .order_by(Product.discount_percentage.desc())\
             .limit(limit)\
             .all()
         
-        # Serialize using existing serializer (now optimized to use thumbnail_url)
-        result = [serialize_product_minimal(p) for p in products]
+        # Serialize with full image support
+        result = [serialize_product_with_images(p) for p in products]
         
         # Cache result
         if product_cache:
