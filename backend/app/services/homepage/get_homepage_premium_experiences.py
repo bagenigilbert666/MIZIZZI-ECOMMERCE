@@ -36,7 +36,7 @@ def get_homepage_premium_experiences() -> List[Dict[str, Any]]:
         logger.debug("[Premium Experiences] Querying database...")
         
         # Query active premium experience panels sorted by position
-        panels = SidePanel.query.filter(
+        panels = db.session.query(SidePanel).filter(
             SidePanel.panel_type == 'premium_experience',
             SidePanel.is_active == True
         ).order_by(SidePanel.sort_order.asc()).all()
