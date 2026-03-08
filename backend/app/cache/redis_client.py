@@ -90,8 +90,9 @@ class UpstashRedisClient:
     """
     
     # Different timeouts for reads vs writes
-    REDIS_TIMEOUT_READ = 0.5   # 500ms - fail fast on cache miss
-    REDIS_TIMEOUT_WRITE = 2.0  # 2 seconds - allow time for large JSON
+    # REST API is slower than local Redis, so we use more generous timeouts
+    REDIS_TIMEOUT_READ = 3.0   # 3 seconds - REST API requires more time than TCP
+    REDIS_TIMEOUT_WRITE = 5.0  # 5 seconds - allow time for large JSON serialization over HTTP
     
     def __init__(self, url: str, token: str):
         """
@@ -163,7 +164,11 @@ class UpstashRedisClient:
         except requests.exceptions.Timeout:
             # Log timeout but don't crash - caller will do database fallback
             operation = "write" if (len(args) > 0 and args[0].upper() in ('SET', 'DEL')) else "read"
-            logger.warning(f"Redis {operation} timeout - falling back to database")
+            timeout_val = self.REDIS_TIMEOUT_WRITE if operation == "write" else self.REDIS_TIMEOUT_READ
+            logger.warning(
+                f"Redis {operation} timeout ({timeout_val}s) - falling back to database. "
+                f"Consider increasing REDIS_TIMEOUT_{operation.upper()} if this persists."
+            )
             return None
         except requests.exceptions.RequestException as e:
             # Network errors, connection refused, etc.
