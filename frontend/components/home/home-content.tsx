@@ -1,5 +1,3 @@
-'use client'
-
 import { CriticalSections } from '@/components/home/critical-sections'
 import { DeferredSectionWrapper } from '@/components/home/deferred-section-wrapper'
 import type { Product } from '@/types'
@@ -89,38 +87,6 @@ export function HomeContent({
         allProducts={allProducts}
         allProductsHasMore={allProductsHasMore}
       />
-
-      <style jsx global>{`
-        .page-root {
-          touch-action: pan-y;
-          -webkit-overflow-scrolling: touch;
-          scroll-behavior: smooth;
-        }
-
-        .arrow-animate {
-          display: inline-block;
-          will-change: transform;
-          animation: arrowMove 1.5s ease-in-out infinite;
-        }
-
-        @keyframes arrowMove {
-          0% {
-            transform: translateX(0);
-          }
-          50% {
-            transform: translateX(4px);
-          }
-          100% {
-            transform: translateX(0);
-          }
-        }
-
-        .page-root .carousel,
-        .page-root .category-grid,
-        .page-root .ProductGrid {
-          will-change: transform, opacity;
-        }
-      `}</style>
     </div>
   )
 }
