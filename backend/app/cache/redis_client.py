@@ -140,12 +140,13 @@ class UpstashRedisClient:
             return result
             
         except requests.exceptions.Timeout:
-            # Log timeout at DEBUG level (expected when Redis not configured)
-            logger.debug(f"Redis timeout during startup - in-memory fallback active")
+            # Log timeout but don't crash - caller will do database fallback
+            operation = "write" if (len(args) > 0 and args[0].upper() in ('SET', 'DEL')) else "read"
+            logger.warning(f"Redis {operation} timeout - falling back to database")
             return None
         except requests.exceptions.RequestException as e:
-            # Network errors - log at DEBUG level during init, WARNING during runtime
-            logger.debug(f"Redis connection unavailable: {type(e).__name__}")
+            # Network errors, connection refused, etc.
+            logger.warning(f"Redis HTTP request failed: {type(e).__name__} - falling back")
             return None
         except Exception as e:
             # Catch-all for any other errors
@@ -222,11 +223,10 @@ def create_upstash_client():
     url, token = get_upstash_credentials()
     
     if not url or not token:
-        # Log once at DEBUG level - credentials not configured is expected in localhost/dev
-        logger.debug(
-            "Upstash Redis credentials not configured. "
-            "Redis is disabled. Using in-memory cache fallback. "
-            "To enable: set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN."
+        logger.warning(
+            "Upstash Redis credentials not found. "
+            "Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN "
+            "environment variables. Using in-memory fallback."
         )
         _is_connected = False
         return None
@@ -235,25 +235,19 @@ def create_upstash_client():
         # Create the HTTP-based client
         client = UpstashRedisClient(url=url, token=token)
         
-        # Test connection with ping (with timeout protection)
-        try:
-            is_healthy = client.ping()
-            if is_healthy:
-                logger.info(f"✅ Upstash Redis connected successfully")
-                _redis_client = client
-                _is_connected = True
-                return client
-            else:
-                logger.warning("⚠️  Upstash Redis ping returned False, using in-memory fallback")
-                _is_connected = False
-                return None
-        except Exception as ping_error:
-            logger.warning(f"⚠️  Upstash Redis ping failed ({type(ping_error).__name__}), using in-memory fallback")
+        # Test connection with ping
+        if client.ping():
+            logger.info(f"Upstash Redis connected successfully to {url}")
+            _redis_client = client
+            _is_connected = True
+            return client
+        else:
+            logger.warning("Upstash Redis ping failed, using fallback")
             _is_connected = False
             return None
             
     except Exception as e:
-        logger.warning(f"⚠️  Failed to initialize Upstash Redis: {e}, using in-memory fallback")
+        logger.error(f"Failed to create Upstash Redis client: {e}")
         _is_connected = False
         return None
 
