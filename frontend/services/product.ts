@@ -772,15 +772,21 @@ export const productService = {
    */
   async getFeaturedProducts(): Promise<Product[]> {
     try {
-      const url = `${API_BASE_URL}/api/products/featured`
-      const response = await api.get(url)
+      console.log("[v0] Fetching featured products using /api/products with filter")
+      const response = await api.get(`${API_BASE_URL}/api/products`, {
+        params: {
+          is_featured: true,
+          per_page: 10000
+        }
+      })
       const items = Array.isArray(response.data) ? response.data : response.data.items || response.data.products || []
+      console.log("[v0] Featured products fetched, count:", items.length)
       return Array.isArray(items) ? items : []
     } catch (e: any) {
       if (e.response?.status === 404) {
         return []
       }
-      console.error("Error fetching featured products:", e)
+      console.error("[v0] Error fetching featured products:", e.message)
       return []
     }
   },
@@ -791,15 +797,21 @@ export const productService = {
    */
   async getNewProducts(): Promise<Product[]> {
     try {
-      const url = `${API_BASE_URL}/api/products/new`
-      const response = await api.get(url)
+      console.log("[v0] Fetching new products using /api/products with filter")
+      const response = await api.get(`${API_BASE_URL}/api/products`, {
+        params: {
+          is_new: true,
+          per_page: 10000
+        }
+      })
       const items = Array.isArray(response.data) ? response.data : response.data.items || response.data.products || []
+      console.log("[v0] New products fetched, count:", items.length)
       return Array.isArray(items) ? items : []
     } catch (e: any) {
       if (e.response?.status === 404) {
         return []
       }
-      console.error("Error fetching new products:", e)
+      console.error("[v0] Error fetching new products:", e.message)
       return []
     }
   },
@@ -810,15 +822,21 @@ export const productService = {
    */
   async getSaleProducts(): Promise<Product[]> {
     try {
-      const url = `${API_BASE_URL}/api/products/sale`
-      const response = await api.get(url)
+      console.log("[v0] Fetching sale products using /api/products with filter")
+      const response = await api.get(`${API_BASE_URL}/api/products`, {
+        params: {
+          is_sale: true,
+          per_page: 10000
+        }
+      })
       const items = Array.isArray(response.data) ? response.data : response.data.items || response.data.products || []
+      console.log("[v0] Sale products fetched, count:", items.length)
       return Array.isArray(items) ? items : []
     } catch (e: any) {
       if (e.response?.status === 404) {
         return []
       }
-      console.error("Error fetching sale products:", e)
+      console.error("[v0] Error fetching sale products:", e.message)
       return []
     }
   },
