@@ -427,9 +427,10 @@ export function AdminAuthProvider({ children }: { children: React.ReactNode }) {
 
       // More specific error messages for network issues
       if (error.name === "TypeError" && error.message === "Failed to fetch") {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
         return {
           success: false,
-          error: "Cannot connect to server. Please ensure the backend is running on port 5000.",
+          error: `Cannot connect to backend at ${apiUrl}. Please ensure the backend is running and accessible.`,
         }
       }
 
