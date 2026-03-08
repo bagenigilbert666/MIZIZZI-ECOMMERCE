@@ -254,6 +254,23 @@ def get_homepage_data(
             f"(took {elapsed_time:.1f}ms)"
         )
     
+    # SAFE FILTER: Remove null values from product arrays
+    # This prevents serialized products with errors from appearing in the response
+    homepage_data["flash_sale_products"] = [p for p in (homepage_data.get("flash_sale_products") or []) if p is not None]
+    homepage_data["luxury_products"] = [p for p in (homepage_data.get("luxury_products") or []) if p is not None]
+    homepage_data["new_arrivals"] = [p for p in (homepage_data.get("new_arrivals") or []) if p is not None]
+    homepage_data["top_picks"] = [p for p in (homepage_data.get("top_picks") or []) if p is not None]
+    homepage_data["trending_products"] = [p for p in (homepage_data.get("trending_products") or []) if p is not None]
+    homepage_data["daily_finds"] = [p for p in (homepage_data.get("daily_finds") or []) if p is not None]
+    
+    # Filter all_products if it's a list
+    if isinstance(homepage_data.get("all_products"), list):
+        homepage_data["all_products"] = [p for p in homepage_data.get("all_products", []) if p is not None]
+    elif isinstance(homepage_data.get("all_products"), dict):
+        # For paginated responses with products key
+        if "products" in homepage_data["all_products"]:
+            homepage_data["all_products"]["products"] = [p for p in homepage_data["all_products"].get("products", []) if p is not None]
+    
     # Build partial_failures list with error details
     partial_failures = []
     for section_name, (success, error_msg) in section_results.items():

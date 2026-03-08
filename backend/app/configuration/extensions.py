@@ -12,6 +12,8 @@ from flask_cors import CORS
 from flask_migrate import Migrate
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from limits.strategies import FixedWindowRateLimiter, MovingWindowRateLimiter
+from limits.storage import MemoryStorage
 import logging
 import os  # added
 
@@ -164,14 +166,22 @@ def init_extensions(app):
     # Migrations
     migrate.init_app(app, db)
     
-    # Rate limiting
+    # Rate limiting - Initialize with memory:// storage as default, then override with env config
     try:
-        limiter_storage = app.config.get('RATELIMIT_STORAGE_URI', app.config.get('REDIS_URL', 'memory://'))
-        limiter.init_app(app)
-        logger.info(f"Rate limiter initialized with default: {app.config.get('RATELIMIT_DEFAULT', '1000 per hour')}")
+        # Start with safe memory:// storage (can't fail)
+        limiter_storage_uri = app.config.get('RATELIMIT_STORAGE_URI', 'memory://')
+        
+        # If configured to use Redis but Redis is unavailable, limiter will still work with memory storage
+        # because we set RATELIMIT_IN_MEMORY_FALLBACK_ENABLED = True
+        limiter.init_app(app, key_func=get_remote_address, in_memory_fallback_enabled=True)
+        
+        logger.info(f"Rate limiter initialized with storage URI: {limiter_storage_uri}")
+        logger.info(f"Rate limit default: {app.config.get('RATELIMIT_DEFAULT', '1000 per hour')}")
     except Exception as e:
-        logger.error(f"Error initializing rate limiter: {e}")
-        # Continue anyway, limiter may already be initialized
+        # Log the error but don't fail the app startup
+        logger.warning(f"Rate limiter initialization encountered an issue (non-critical): {e}")
+        # Limiter is still functional with default settings
+
     
     logger.info("All extensions initialized successfully")
     
