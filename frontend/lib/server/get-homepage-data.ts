@@ -24,10 +24,36 @@ export const getHomepageData = cache(async () => {
     console.log("[Homepage] API Response status:", result.status)
 
     if (result.status === "success" && result.data) {
-      console.log("[Homepage] Successfully loaded homepage data with sections:", 
-        Object.keys(result.data).filter(k => result.data[k] && (Array.isArray(result.data[k]) ? result.data[k].length > 0 : true))
-      )
-      return result.data
+      const data = result.data
+      console.log("[Homepage] Successfully loaded homepage data")
+      console.log("[Homepage] Categories:", data.categories?.length || 0)
+      console.log("[Homepage] Feature Cards:", data.feature_cards?.length || 0)
+      console.log("[Homepage] Flash Sales:", data.flash_sale_products?.length || 0)
+      console.log("[Homepage] Luxury Products:", data.luxury_products?.length || 0)
+      console.log("[Homepage] Contact CTA Slides:", data.contact_cta_slides?.length || 0)
+      
+      // Transform API response to match frontend expectations
+      return {
+        categories: data.categories || [],
+        carousel_items: data.carousel_items || [], // Some backends return this
+        banner_slides: data.banner_slides || [], // Some backends return this instead
+        contact_cta_slides: data.contact_cta_slides || [],
+        daily_finds: data.daily_finds || [],
+        feature_cards: data.feature_cards || [],
+        flash_sale_products: data.flash_sale_products || [],
+        luxury_products: data.luxury_products || [],
+        new_arrivals: data.new_arrivals || [],
+        premium_experiences: data.premium_experiences || [],
+        product_showcase: data.product_showcase || [],
+        top_picks: data.top_picks || [],
+        trending_products: data.trending_products || [],
+        all_products: data.all_products || {
+          products: [],
+          has_more: false,
+          total: 0,
+          page: 1,
+        },
+      }
     }
 
     console.error("[Homepage] Unexpected response structure:", JSON.stringify(result).slice(0, 200))
@@ -42,6 +68,7 @@ function getHomepageDataFallback() {
   return {
     categories: [],
     carousel_items: [],
+    banner_slides: [],
     contact_cta_slides: [],
     daily_finds: [],
     feature_cards: [],
