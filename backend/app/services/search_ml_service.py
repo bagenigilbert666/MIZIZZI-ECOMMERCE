@@ -18,10 +18,23 @@ from sqlalchemy import func
 # Attempt to import redis, else set redis_client to None
 try:
   import redis
-  redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
+  import os
+  
+  # Get Redis URL from environment variables (supports both REDIS_URL and Upstash URLs)
+  redis_url = os.environ.get('REDIS_URL') or os.environ.get('UPSTASH_REDIS_REST_URL')
+  
+  if redis_url and redis_url.startswith(('redis://', 'rediss://')):
+    # Use URL-based connection for Upstash or remote Redis
+    redis_client = redis.from_url(redis_url, decode_responses=True)
+  else:
+    # Fallback to localhost for local development
+    redis_client = redis.StrictRedis(host='localhost', port=6379, db=0, decode_responses=True)
+    
 except ImportError:
   redis_client = None
-except Exception:
+except Exception as e:
+  import logging
+  logging.error(f"Failed to initialize Redis client: {e}")
   redis_client = None
 
 from ..app.models.models import Product, Category, Brand, Review, Order, OrderItem, db
