@@ -46,10 +46,14 @@ export function CarouselBannerForm({ banner, onClose, onSubmit }: CarouselBanner
   }
 
   const handleImageUpload = (url: string) => {
-    setImageUrl(url)
+    // Use Cloudinary URL directly - it's already optimized for CDN delivery
+    const optimizedUrl = url || ""
+    console.log(`[v0] Image uploaded with Cloudinary URL: ${optimizedUrl}`)
+    
+    setImageUrl(optimizedUrl)
     setFormData((prev) => ({
       ...prev,
-      image_url: url,
+      image_url: optimizedUrl,
     }))
   }
 

@@ -170,7 +170,11 @@ export function ImageUploader({ onUpload, currentImage, type = "product" }: Imag
       console.log(`[v0] Image uploaded successfully: ${data.url}`)
       console.log(`[v0] Compression ratio: ${data.compression_ratio || "N/A"}`)
 
-      onUpload(data.url || data.image_url)
+      // Use Cloudinary URL directly for instant CDN delivery
+      const cloudinaryUrl = data.url || data.image_url || data.display_url || ""
+      console.log(`[v0] Using Cloudinary CDN URL: ${cloudinaryUrl}`)
+      
+      onUpload(cloudinaryUrl)
       setUploadProgress(100)
       setIsUploading(false)
     } catch (error) {

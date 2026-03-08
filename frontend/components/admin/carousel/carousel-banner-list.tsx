@@ -123,6 +123,8 @@ export function CarouselBannerList({
                       alt={banner.title}
                       fill
                       className="object-cover transition-transform duration-300 group-hover:scale-110"
+                      quality={80}
+                      sizes="(max-width: 768px) 128px, 128px"
                     />
                     {hoveredBanner === banner.id && (
                       <motion.div

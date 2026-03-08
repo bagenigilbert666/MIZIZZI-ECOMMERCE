@@ -29,6 +29,23 @@ export function CarouselPreview({ banner }: CarouselPreviewProps) {
     )
   }
 
+  // Optimize Cloudinary URL for preview
+  const getOptimizedUrl = (imageUrl: string) => {
+    if (!imageUrl || !imageUrl.includes("cloudinary.com")) return imageUrl
+    
+    try {
+      const url = new URL(imageUrl)
+      const pathParts = url.pathname.split("/")
+      const imageFileName = pathParts[pathParts.length - 1]
+      const cloudName = url.hostname.split(".")[0]
+      
+      // Optimized for preview display
+      return `https://res.cloudinary.com/${cloudName}/image/upload/w_800,h_300,c_fill,q_auto,f_auto/${imageFileName}`
+    } catch (error) {
+      return imageUrl
+    }
+  }
+
   return (
     <Card className="sticky top-4">
       <CardHeader>
@@ -52,10 +69,12 @@ export function CarouselPreview({ banner }: CarouselPreviewProps) {
           className="relative w-full h-56 rounded-lg overflow-hidden bg-muted group"
         >
           <Image
-            src={banner.image_url || "/placeholder.svg"}
+            src={getOptimizedUrl(banner.image_url) || "/placeholder.svg"}
             alt={banner.title}
             fill
             className="object-cover transition-transform duration-300 group-hover:scale-105"
+            priority={true}
+            quality={85}
           />
           {/* Overlay with gradient */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
