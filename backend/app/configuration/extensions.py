@@ -29,9 +29,9 @@ cache = Cache()
 cors = CORS()
 migrate = Migrate()
 
-# Limiter - Initialize WITHOUT any storage_uri or key_func in constructor
-# These will be set via init_app() instead
+# Limiter - key_func is REQUIRED as first positional argument
 limiter = Limiter(
+    key_func=get_remote_address,
     default_limits=["1000 per hour"]  # Default: 1000 requests per hour per IP
 )
 
