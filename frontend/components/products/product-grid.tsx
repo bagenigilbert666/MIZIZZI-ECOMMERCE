@@ -399,7 +399,7 @@ export function ProductGrid({ limit = 12, category, initialProducts = [], initia
       <div className="grid grid-cols-3 gap-[1px] bg-gray-100 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
         {products.map((product, index) => (
           <ProductCard
-            key={`${product.id}-${index}`}
+            key={product.id}
             product={product}
             index={
               newlyLoadedStartIndex !== null && index >= newlyLoadedStartIndex ? index - newlyLoadedStartIndex : index
