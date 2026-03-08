@@ -190,19 +190,24 @@ class ProductionConfig(Config):
     """Production configuration."""
     DEBUG = False
     
-    # Redis configuration - production-safe with fallback
-    # Support multiple env var names for flexibility (REDIS_URL, RATELIMIT_STORAGE_URI, CACHE_REDIS_URL)
-    # For Render + Upstash, use REDIS_URL which Render automatically sets from addon
-    _redis_url = os.environ.get('REDIS_URL') or os.environ.get('RATELIMIT_STORAGE_URI') or os.environ.get('CACHE_REDIS_URL')
+    # Redis configuration - prioritize Upstash REST API over traditional Redis
+    # On Render, REDIS_URL is traditional Redis (tcp://), which we don't support in our REST API module
+    # Instead, use Upstash REST API credentials which work on both localhost and Render
+    _upstash_url = os.environ.get('UPSTASH_REDIS_REST_URL') or os.environ.get('KV_REST_API_URL')
+    _upstash_token = os.environ.get('UPSTASH_REDIS_REST_TOKEN') or os.environ.get('KV_REST_API_TOKEN')
     
-    # If no Redis URL is configured, use memory:// fallback (better than hardcoding localhost)
-    # This allows production to work without Redis but with degraded performance
-    CACHE_TYPE = 'RedisCache' if _redis_url else 'SimpleCache'
-    CACHE_REDIS_URL = _redis_url or 'memory://'
+    # Only use Upstash if BOTH URL and token are provided
+    if _upstash_url and _upstash_token:
+        CACHE_TYPE = 'SimpleCache'  # Our module uses custom UpstashRedisClient
+        CACHE_REDIS_URL = _upstash_url
+        RATELIMIT_STORAGE_URI = 'memory://'  # Fallback for rate limiter (uses memory when Upstash is slow)
+    else:
+        # No Upstash configured - use memory-only caching and rate limiting
+        # This works on both localhost and Render but with no distributed caching
+        CACHE_TYPE = 'SimpleCache'
+        CACHE_REDIS_URL = 'memory://'
+        RATELIMIT_STORAGE_URI = 'memory://'
     
-    # Rate limiting - use same Redis URL or fallback to memory://
-    # This prevents 500 errors when Redis is unavailable
-    RATELIMIT_STORAGE_URI = _redis_url or 'memory://'
     RATELIMIT_ENABLED = True
     RATELIMIT_IN_MEMORY_FALLBACK_ENABLED = True
     
