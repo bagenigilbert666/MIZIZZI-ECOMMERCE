@@ -37,11 +37,24 @@ _is_connected = False
 def get_upstash_credentials() -> tuple[Optional[str], Optional[str]]:
     """
     Retrieve Upstash Redis credentials from environment variables.
-    Supports both Upstash native and Vercel KV naming conventions.
+    Supports multiple naming conventions:
+    - Upstash native: UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
+    - Vercel KV: KV_REST_API_URL, KV_REST_API_TOKEN
+    - Render standard: REDIS_URL
     
     Returns:
         tuple: (url, token) or (None, None) if not configured
     """
+    # Check Render's standard REDIS_URL format first
+    redis_url = os.environ.get('REDIS_URL')
+    if redis_url:
+        # Render format: redis://default:password@host:port
+        # Convert to Upstash REST API format if needed
+        logger.info(f"Using REDIS_URL from Render: {redis_url[:50]}...")
+        # For now, return as-is - the cache layer will handle the protocol
+        return redis_url, 'render'  # Token placeholder for Render
+    
+    # Check Upstash native format
     url = (
         os.environ.get('UPSTASH_REDIS_REST_URL') or 
         os.environ.get('KV_REST_API_URL')
@@ -224,9 +237,9 @@ def create_upstash_client():
     
     if not url or not token:
         logger.warning(
-            "Upstash Redis credentials not found. "
-            "Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN "
-            "environment variables. Using in-memory fallback."
+            "Redis credentials not found. "
+            "Set one of: REDIS_URL (Render), UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN (Upstash), "
+            "or KV_REST_API_URL + KV_REST_API_TOKEN (Vercel KV). Using in-memory fallback."
         )
         _is_connected = False
         return None
