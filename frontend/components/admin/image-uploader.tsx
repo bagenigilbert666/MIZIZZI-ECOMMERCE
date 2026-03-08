@@ -132,21 +132,37 @@ export function ImageUploader({ onUpload, currentImage, type = "product" }: Imag
       const compressedFile = new File([compressedBlob], file.name, { type: "image/jpeg" })
       formData.append("file", compressedFile)
 
+      // Get token from localStorage (check multiple possible keys)
+      const token = localStorage.getItem("admin_token") || 
+                   localStorage.getItem("mizizzi_token") || 
+                   localStorage.getItem("token") || 
+                   localStorage.getItem("access_token")
+
+      if (!token) {
+        alert("Authentication required. Please login again.")
+        setIsUploading(false)
+        setUploadProgress(0)
+        return
+      }
+
       let uploadEndpoint = "/api/admin/upload/image"
       if (type === "carousel") {
         uploadEndpoint = "/api/admin/upload/carousel-banner"
       }
 
+      console.log(`[v0] Uploading to ${uploadEndpoint} with token: ${token.substring(0, 10)}...`)
+
       const response = await fetch(uploadEndpoint, {
         method: "POST",
         body: formData,
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`,
+          Authorization: `Bearer ${token}`,
         },
       })
 
       if (!response.ok) {
         const errorData = await response.json()
+        console.error(`[v0] Upload error response:`, errorData)
         throw new Error(errorData.error || "Upload failed")
       }
 
