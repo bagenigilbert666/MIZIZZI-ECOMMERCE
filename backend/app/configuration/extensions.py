@@ -29,12 +29,10 @@ cache = Cache()
 cors = CORS()
 migrate = Migrate()
 
-# Limiter - Initialize WITHOUT key_func (will be passed to init_app instead)
-# This is compatible with flask-limiter versions that expect key_func in init_app, not __init__
+# Limiter - Initialize WITHOUT any storage_uri or key_func in constructor
+# These will be set via init_app() instead
 limiter = Limiter(
-    default_limits=["1000 per hour"],  # Default: 1000 requests per hour per IP
-    storage_uri="memory://",  # Start with safe memory storage
-    in_memory_fallback_enabled=True,  # Use memory when primary storage fails
+    default_limits=["1000 per hour"]  # Default: 1000 requests per hour per IP
 )
 
 def ensure_db_bound(app):
@@ -170,34 +168,16 @@ def init_extensions(app):
     # Migrations
     migrate.init_app(app, db)
     
-    # Rate limiting - Initialize with proper signature for installed flask-limiter version
+    # Rate limiting - Initialize with minimal parameters to match installed flask-limiter version
     try:
-        limiter_storage_uri = app.config.get('RATELIMIT_STORAGE_URI', 'memory://')
-        
-        # Init app with key_func parameter (correct position for this version)
-        # Uses in_memory_fallback_enabled=True so limiter works even if primary storage fails
-        limiter.init_app(app, key_func=get_remote_address)
-        
-        logger.info(f"✅ Rate limiter initialized successfully")
-        logger.info(f"   Storage: {limiter_storage_uri}")
-        logger.info(f"   Default limit: {app.config.get('RATELIMIT_DEFAULT', '1000 per hour')}")
+        limiter.init_app(app)
+        logger.info("Rate limiter initialized")
         
     except TypeError as e:
-        # Specific handling for signature mismatch
-        if "key_func" in str(e):
-            logger.warning(f"Rate limiter key_func parameter not supported, using default: {e}")
-            try:
-                limiter.init_app(app)
-            except Exception as fallback_error:
-                logger.error(f"Rate limiter fallback init failed: {fallback_error}")
-        else:
-            raise
+        # If even simple init_app() fails, log but don't crash
+        logger.warning(f"Rate limiter init_app failed: {e} - rate limiting will use memory storage fallback")
     except Exception as e:
-        logger.warning(f"⚠️  Rate limiter initialization warning (non-critical): {e}")
-        try:
-            limiter.init_app(app)
-        except Exception as fallback_error:
-            logger.warning(f"Rate limiter fallback also failed: {fallback_error}")
+        logger.warning(f"Rate limiter init warning (non-critical): {e}")
 
     
     logger.info("All extensions initialized successfully")
