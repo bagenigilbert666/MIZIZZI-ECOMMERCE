@@ -42,36 +42,43 @@ export const Carousel = memo(function Carousel({
   featureCards = [],
   productShowcase = [],
 }: CarouselProps) {
-  // Use server items or fallback to feature cards or minimal placeholder
-  // This ensures carousel always displays something
+  // Use server items or fallback to contact CTA slides
+  // Contact CTAs work well as main carousel content
   const displayItems = useMemo(() => {
+    // Priority 1: Use carousel items if available
     if (serverCarouselItems && serverCarouselItems.length > 0) {
+      console.log("[v0] Using carousel items:", serverCarouselItems.length);
       return serverCarouselItems;
     }
-    // Show feature cards as fallback if carousel is empty
-    if (featureCards && featureCards.length > 0) {
-      return featureCards.map(card => ({
-        image: card.image || "/placeholder.svg",
-        title: card.title,
-        description: card.description,
-        buttonText: card.button_text || "Learn More",
-        href: card.link_url || "/products",
-        badge: card.badge_text
-      }));
-    }
-    // Show contact CTA as last resort
+    
+    // Priority 2: Use contact CTA slides as carousel backup (they're designed for big display)
     if (contactCTASlides && contactCTASlides.length > 0) {
+      console.log("[v0] Using contact CTA slides as carousel:", contactCTASlides.length);
       return contactCTASlides.map(slide => ({
         image: slide.image || "/placeholder.svg",
-        title: slide.title,
-        description: slide.description,
-        buttonText: slide.button_text || "Contact Us",
-        href: slide.link_url || "/contact",
+        title: slide.subtitle || "Mizizzi",
+        description: slide.description || "",
+        buttonText: "Discover Now",
+        href: "/products",
       }));
     }
-    // Return empty to let component return null
+    
+    // Priority 3: Feature cards as minimal fallback (less ideal for carousel but shows something)
+    if (featureCards && featureCards.length > 0) {
+      console.log("[v0] Using feature cards as carousel fallback:", featureCards.length);
+      return featureCards.slice(0, 3).map(card => ({
+        image: "/placeholder.svg",
+        title: card.title,
+        description: card.description,
+        buttonText: "Shop Now",
+        href: card.href || "/products",
+      }));
+    }
+    
+    // Return empty - carousel will not render
+    console.warn("[v0] No carousel items, contact CTA slides, or feature cards available");
     return [];
-  }, [serverCarouselItems, featureCards, contactCTASlides]);
+  }, [serverCarouselItems, contactCTASlides, featureCards]);
 
   const { sidePanelsVisible, isDesktop } = useResponsiveLayout()
 

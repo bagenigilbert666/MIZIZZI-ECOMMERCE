@@ -71,7 +71,15 @@ const StockIndicator = ({
 }
 
 const getProductImageUrl = (product: Product): string => {
-  // First priority: Check thumbnail_url
+  // Priority 0: Check direct image field (from homepage API)
+  if ((product as any).image && typeof (product as any).image === "string" && (product as any).image.length > 0) {
+    const imageUrl = (product as any).image
+    if (imageUrl.startsWith("http") || imageUrl.startsWith("/")) {
+      return imageUrl
+    }
+  }
+
+  // Priority 1: Check thumbnail_url
   if (product.thumbnail_url && typeof product.thumbnail_url === "string" && product.thumbnail_url.length > 0) {
     if (product.thumbnail_url.startsWith("http") || product.thumbnail_url.startsWith("/")) {
       return product.thumbnail_url
@@ -82,7 +90,7 @@ const getProductImageUrl = (product: Product): string => {
     }
   }
 
-  // Second priority: Check image_urls array
+  // Priority 2: Check image_urls array
   if (product.image_urls && Array.isArray(product.image_urls) && product.image_urls.length > 0) {
     const firstUrl = product.image_urls[0]
     if (typeof firstUrl === "string" && firstUrl.length > 0) {
@@ -96,7 +104,7 @@ const getProductImageUrl = (product: Product): string => {
     }
   }
 
-  // Third priority: Check images array
+  // Priority 3: Check images array
   if (product.images && Array.isArray(product.images) && product.images.length > 0) {
     const primaryImage = product.images.find((img: any) => img.is_primary)
     const imageToUse = primaryImage || product.images[0]

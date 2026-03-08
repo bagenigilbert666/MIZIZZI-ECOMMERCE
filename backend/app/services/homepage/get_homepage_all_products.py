@@ -4,7 +4,8 @@ from typing import Dict, Any
 from app.models.models import Product
 from app.configuration.extensions import db
 from app.utils.redis_cache import product_cache
-from app.routes.products.serializers import serialize_product_minimal
+from app.routes.products.serializers import serialize_product_with_images
+from sqlalchemy.orm import joinedload
 
 logger = logging.getLogger(__name__)
 
@@ -44,8 +45,9 @@ def get_homepage_all_products(limit: int = 12, page: int = 1) -> Dict[str, Any]:
         # We'll fetch limit+1 to determine has_more without a COUNT
         fetch_limit = limit + 1
         
-        # Query products - fetch one extra to determine has_more
+        # Query products with eager loading for images - fetch one extra to determine has_more
         products = db.session.query(Product)\
+            .options(joinedload(Product.images))\
             .filter(Product.is_active == True)\
             .order_by(Product.created_at.desc())\
             .limit(fetch_limit)\
@@ -57,8 +59,8 @@ def get_homepage_all_products(limit: int = 12, page: int = 1) -> Dict[str, Any]:
         if has_more:
             products = products[:limit]  # Trim to actual limit
         
-        # Serialize
-        product_list = [serialize_product_minimal(p) for p in products]
+        # Serialize with full image support
+        product_list = [serialize_product_with_images(p) for p in products]
         
         # Build response
         result = {

@@ -53,6 +53,11 @@ const StarRating = ({ rating = 4 }: { rating?: number }) => {
 }
 
 function getProductImageUrl(product: Product): string {
+  // Priority 0: Check direct image field (from homepage API)
+  if ((product as any).image && typeof (product as any).image === "string" && (product as any).image.length > 0) {
+    return (product as any).image
+  }
+
   if (product.image_urls && product.image_urls.length > 0) {
     if (typeof product.image_urls[0] === "string" && !product.image_urls[0].startsWith("http")) {
       return cloudinaryService.generateOptimizedUrl(product.image_urls[0])
