@@ -37,11 +37,17 @@ _is_connected = False
 def get_upstash_credentials() -> tuple[Optional[str], Optional[str]]:
     """
     Retrieve Upstash Redis credentials from environment variables.
-    Supports both Upstash native and Vercel KV naming conventions.
+    Prioritizes Upstash/Vercel KV over standard Redis URL.
+    
+    Order of precedence:
+    1. UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN (Upstash native)
+    2. KV_REST_API_URL + KV_REST_API_TOKEN (Vercel integration)
+    3. Returns None if only REDIS_URL is present (that's TCP Redis, not REST API)
     
     Returns:
-        tuple: (url, token) or (None, None) if not configured
+        tuple: (url, token) or (None, None) if not configured for REST API
     """
+    # Check Upstash REST API first (this is what we need)
     url = (
         os.environ.get('UPSTASH_REDIS_REST_URL') or 
         os.environ.get('KV_REST_API_URL')
@@ -50,7 +56,22 @@ def get_upstash_credentials() -> tuple[Optional[str], Optional[str]]:
         os.environ.get('UPSTASH_REDIS_REST_TOKEN') or 
         os.environ.get('KV_REST_API_TOKEN')
     )
-    return url, token
+    
+    # If we have REST API credentials, use them
+    if url and token:
+        logger.info(f"Using Upstash REST API: {url[:50]}...")
+        return url, token
+    
+    # REDIS_URL is for traditional Redis (TCP protocol), not REST API
+    # Our module only supports REST API, so we ignore REDIS_URL
+    redis_url = os.environ.get('REDIS_URL')
+    if redis_url:
+        logger.info(
+            "REDIS_URL detected but this module requires Upstash REST API. "
+            "Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN for REST API mode."
+        )
+    
+    return None, None
 
 
 class UpstashRedisClient:
