@@ -5,6 +5,7 @@ Handles all cache invalidation operations with safety checks and rate limiting
 
 import logging
 import redis
+import os
 from typing import List, Dict, Tuple, Optional
 from datetime import datetime, timedelta
 from functools import wraps
@@ -48,11 +49,26 @@ def rate_limit_cache_operations(f):
         
         if not admin_id:
             return f(*args, **kwargs)
-
         # Try to get Redis connection for rate limiting
         try:
-            from app.configuration.extensions import redis_cache
-            if redis_cache is None:
+            # Use module-level imports (redis and os are imported at module scope)
+            
+            # Get Redis URL from environment
+            redis_url = os.environ.get('REDIS_URL') or os.environ.get('UPSTASH_REDIS_REST_URL')
+            
+            redis_conn = None
+            if redis_url and redis_url.startswith(('redis://', 'rediss://')):
+                redis_conn = redis.from_url(redis_url, decode_responses=True)
+            else:
+                # Try local Redis for development
+                try:
+                    redis_conn = redis.StrictRedis(host='localhost', port=6379, db=0, decode_responses=True)
+                    redis_conn.ping()  # Test connection
+                except:
+                    redis_conn = None
+            
+            if redis_conn is None:
+                logger.warning("Redis not available for rate limiting - operation proceeding without rate limit check")
                 return f(*args, **kwargs)
 
             # Create rate limit key
@@ -60,11 +76,11 @@ def rate_limit_cache_operations(f):
             rate_limit_key = f"cache_invalidation_rate_limit:{admin_id}"
 
             # Increment counter
-            current_count = redis_cache.incr(rate_limit_key)
+            current_count = redis_conn.incr(rate_limit_key)
             
             # Set expiration on first increment
             if current_count == 1:
-                redis_cache.expire(rate_limit_key, RATE_LIMIT_CONFIG["window_seconds"])
+                redis_conn.expire(rate_limit_key, RATE_LIMIT_CONFIG["window_seconds"])
 
             # Check if limit exceeded
             if current_count > RATE_LIMIT_CONFIG["max_requests"]:
@@ -75,6 +91,8 @@ def rate_limit_cache_operations(f):
 
             return f(*args, **kwargs)
 
+        except RateLimitError:
+            raise  # Re-raise rate limit errors
         except Exception as e:
             logger.error(f"Rate limit check failed: {str(e)}")
             # If rate limiting fails, allow the operation to proceed

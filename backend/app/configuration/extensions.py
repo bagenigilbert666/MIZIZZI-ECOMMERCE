@@ -168,16 +168,39 @@ def init_extensions(app):
     # Migrations
     migrate.init_app(app, db)
     
-    # Rate limiting - Initialize with minimal parameters to match installed flask-limiter version
+    # Rate limiting - Initialize with proper storage backend
     try:
+        # Get Redis URL from environment variables (supports both REDIS_URL and Upstash URLs)
+        redis_url = os.environ.get('REDIS_URL') or os.environ.get('UPSTASH_REDIS_REST_URL') or os.environ.get('KV_REST_API_URL')
+        
+        # Configure rate limiter storage
+        if redis_url and redis_url.startswith(('redis://', 'rediss://')):
+            # Traditional Redis (Upstash or local)
+            app.config['RATELIMIT_STORAGE_URI'] = redis_url
+            logger.info(f"Rate limiter configured to use Redis: {redis_url.split('@')[1] if '@' in redis_url else 'localhost'}")
+        else:
+            # No valid Redis URL - use memory storage fallback
+            app.config['RATELIMIT_STORAGE_URI'] = 'memory://'
+            logger.info("Rate limiter configured to use memory storage (no Redis available)")
+        
         limiter.init_app(app)
-        logger.info("Rate limiter initialized")
+        logger.info("Rate limiter initialized successfully")
         
     except TypeError as e:
-        # If even simple init_app() fails, log but don't crash
-        logger.warning(f"Rate limiter init_app failed: {e} - rate limiting will use memory storage fallback")
+        # If even simple init_app() fails, ensure we have a fallback storage
+        logger.warning(f"Rate limiter init_app failed: {e} - using memory storage fallback")
+        app.config['RATELIMIT_STORAGE_URI'] = 'memory://'
+        try:
+            limiter.init_app(app)
+        except Exception as fallback_error:
+            logger.error(f"Rate limiter fallback failed: {fallback_error}")
     except Exception as e:
-        logger.warning(f"Rate limiter init warning (non-critical): {e}")
+        logger.warning(f"Rate limiter configuration error (non-critical): {e} - using memory storage fallback")
+        app.config['RATELIMIT_STORAGE_URI'] = 'memory://'
+        try:
+            limiter.init_app(app)
+        except Exception as fallback_error:
+            logger.error(f"Rate limiter fallback failed: {fallback_error}")
 
     
     logger.info("All extensions initialized successfully")
