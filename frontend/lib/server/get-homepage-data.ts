@@ -12,7 +12,10 @@ export const getHomepageData = cache(async () => {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      next: { revalidate: 60, tags: ["homepage"] },
+      next: { 
+        revalidate: 30, // Reduced from 60 to 30 seconds for faster updates
+        tags: ["homepage", "feature-cards"] // Allow targeted invalidation
+      },
     })
 
     if (!response.ok) {

@@ -84,7 +84,7 @@ DEFAULT_FEATURE_CARDS = [
 ]
 
 
-def get_homepage_feature_cards() -> List[Dict[str, Any]]:
+def get_homepage_feature_cards(bypass_cache: bool = False) -> List[Dict[str, Any]]:
     """
     Fetch feature cards for homepage display.
     
@@ -92,7 +92,10 @@ def get_homepage_feature_cards() -> List[Dict[str, Any]]:
     2x3 grid on the homepage. Each card includes complete styling information (gradient 
     colors, hover states, badges) to render directly in the frontend.
     
-    Uses Redis caching with 15-minute TTL.
+    Uses Redis caching with 5-minute TTL for optimal balance between freshness and performance.
+    
+    Args:
+        bypass_cache: If True, skip cache and fetch fresh data (used for cache invalidation)
     
     Returns:
         List of 6 feature card dictionaries, each with icon, title, description, 
@@ -103,8 +106,8 @@ def get_homepage_feature_cards() -> List[Dict[str, Any]]:
         a database table (FeatureCard model) if dynamic management is needed.
     """
     try:
-        # Check cache first
-        if product_cache:
+        # Check cache first (unless bypassing)
+        if not bypass_cache and product_cache:
             cached = product_cache.get(FEATURE_CARDS_CACHE_KEY)
             if cached:
                 logger.debug("[Feature Cards] Loaded from cache")
@@ -116,12 +119,12 @@ def get_homepage_feature_cards() -> List[Dict[str, Any]]:
         # In future, could load from DB: FeatureCard.query.filter(...).all()
         feature_cards = DEFAULT_FEATURE_CARDS
         
-        # Cache the result
+        # Cache the result with shorter TTL (5 min instead of 15 min)
         if product_cache:
             product_cache.set(
                 FEATURE_CARDS_CACHE_KEY,
                 feature_cards,
-                FEATURE_CARDS_CACHE_TTL
+                300  # 5 minutes - faster updates
             )
         
         logger.debug(f"[Feature Cards] Loaded {len(feature_cards)} items")

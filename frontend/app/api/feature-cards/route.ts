@@ -68,24 +68,51 @@ const DEFAULT_CARDS = [
   },
 ]
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    // Try to fetch from backend API
-    const response = await fetch(`${API_BASE_URL}/api/feature-cards`, {
-      next: { revalidate: 300 }, // Cache for 5 minutes
+    // Check for cache bypass parameter (used during cache invalidation)
+    const url = new URL(request.url)
+    const bypassCache = url.searchParams.get('bypass_cache') === 'true'
+    
+    // Fetch from backend API with shorter cache for faster updates
+    // Add bypass parameter to backend if provided
+    const backendUrl = bypassCache 
+      ? `${API_BASE_URL}/api/feature-cards?bypass_cache=true`
+      : `${API_BASE_URL}/api/feature-cards`
+    
+    const response = await fetch(backendUrl, {
+      next: { 
+        revalidate: bypassCache ? 0 : 60, // No cache on bypass, 1 min otherwise
+        tags: ['feature-cards'] // Allow targeted invalidation
+      },
     })
 
     if (response.ok) {
       const data = await response.json()
       if (data && Array.isArray(data) && data.length > 0) {
-        return NextResponse.json(data)
+        return NextResponse.json(data, {
+          headers: {
+            'Cache-Control': bypassCache 
+              ? 'no-cache, no-store, max-age=0'
+              : 'public, s-maxage=60, stale-while-revalidate=120'
+          }
+        })
       }
     }
 
     // Return default cards if API fails or returns empty
-    return NextResponse.json(DEFAULT_CARDS)
+    return NextResponse.json(DEFAULT_CARDS, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60'
+      }
+    })
   } catch (error) {
-    // Return default cards on error
-    return NextResponse.json(DEFAULT_CARDS)
+    console.error('[Feature Cards API] Error:', error)
+    // Return default cards on error with short cache
+    return NextResponse.json(DEFAULT_CARDS, {
+      headers: {
+        'Cache-Control': 'public, s-maxage=30, stale-while-revalidate=60'
+      }
+    })
   }
 }

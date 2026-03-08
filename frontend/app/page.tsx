@@ -2,7 +2,7 @@ import { Suspense } from "react"
 import { getHomepageData } from "@/lib/server/get-homepage-data"
 import { HomeContent } from "@/components/home/home-content"
 
-export const revalidate = 60
+export const revalidate = 30 // Reduced from 60 to 30 seconds for faster data updates
 
 /**
  * MODULAR BATCH HOMEPAGE ARCHITECTURE
