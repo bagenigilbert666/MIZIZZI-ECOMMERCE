@@ -17,11 +17,12 @@ from sqlalchemy import func
 
 # Attempt to import redis, else set redis_client to None
 try:
-    from app.cache.redis_client import redis_client
+  import redis
+  redis_client = redis.StrictRedis(host='localhost', port=6379, db=0)
 except ImportError:
-    redis_client = None
+  redis_client = None
 except Exception:
-    redis_client = None
+  redis_client = None
 
 from ..app.models.models import Product, Category, Brand, Review, Order, OrderItem, db
 from ..app.models.search_analytics import SearchQuery, SearchClick, SearchConversion

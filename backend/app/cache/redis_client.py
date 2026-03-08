@@ -37,15 +37,11 @@ _is_connected = False
 def get_upstash_credentials() -> tuple[Optional[str], Optional[str]]:
     """
     Retrieve Upstash Redis credentials from environment variables.
-    Supports multiple naming conventions:
-    - Upstash native: UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
-    - Vercel KV: KV_REST_API_URL, KV_REST_API_TOKEN
-    - Render standard: REDIS_URL (but this is traditional Redis, not Upstash REST)
+    Supports both Upstash native and Vercel KV naming conventions.
     
     Returns:
         tuple: (url, token) or (None, None) if not configured
     """
-    # Check Upstash native format FIRST (REST API format)
     url = (
         os.environ.get('UPSTASH_REDIS_REST_URL') or 
         os.environ.get('KV_REST_API_URL')
@@ -54,30 +50,7 @@ def get_upstash_credentials() -> tuple[Optional[str], Optional[str]]:
         os.environ.get('UPSTASH_REDIS_REST_TOKEN') or 
         os.environ.get('KV_REST_API_TOKEN')
     )
-    
-    if url and token:
-        logger.info(f"Using Upstash REST API: {url[:50]}...")
-        return url, token
-    
-    # Check Render's REDIS_URL - but skip if it's localhost (not configured)
-    # Render format: redis://default:password@host:port
-    redis_url = os.environ.get('REDIS_URL')
-    if redis_url:
-        # Skip if localhost (not properly configured on Render)
-        if 'localhost' in redis_url or '127.0.0.1' in redis_url:
-            logger.warning(
-                f"REDIS_URL points to localhost (not configured on Render). "
-                "Skipping Redis. Set UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN for Upstash."
-            )
-            return None, None
-        logger.warning(
-            f"REDIS_URL detected but is not Upstash REST API format (is traditional Redis). "
-            "This module requires Upstash REST API. Skipping Redis."
-        )
-        return None, None
-    
-    # No Redis configured
-    return None, None
+    return url, token
 
 
 class UpstashRedisClient:
@@ -251,9 +224,9 @@ def create_upstash_client():
     
     if not url or not token:
         logger.warning(
-            "Redis credentials not found. "
-            "Set one of: REDIS_URL (Render), UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN (Upstash), "
-            "or KV_REST_API_URL + KV_REST_API_TOKEN (Vercel KV). Using in-memory fallback."
+            "Upstash Redis credentials not found. "
+            "Set UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN "
+            "environment variables. Using in-memory fallback."
         )
         _is_connected = False
         return None
