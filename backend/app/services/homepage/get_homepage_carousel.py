@@ -33,16 +33,20 @@ def get_homepage_carousel() -> List[Dict[str, Any]]:
             .order_by(CarouselBanner.position.asc())\
             .all()
         
-        # Serialize
+        # Serialize with full image support
         result = [
             {
                 "id": b.id,
                 "title": b.title or "",
+                "subtitle": b.title or "",  # Backup for contact CTA slides
                 "description": b.description or "",
                 "image_url": b.image_url or "",
+                "image": b.image_url or "",  # Backward compatibility
                 "button_text": b.button_text or "",
                 "button_url": b.link_url or "",
-                "position": b.position or 0
+                "link_url": b.link_url or "",
+                "position": b.position or 0,
+                "is_active": b.is_active
             }
             for b in banners
         ]
