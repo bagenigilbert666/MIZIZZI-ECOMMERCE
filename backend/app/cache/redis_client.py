@@ -40,21 +40,12 @@ def get_upstash_credentials() -> tuple[Optional[str], Optional[str]]:
     Supports multiple naming conventions:
     - Upstash native: UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
     - Vercel KV: KV_REST_API_URL, KV_REST_API_TOKEN
-    - Render standard: REDIS_URL
+    - Render standard: REDIS_URL (but this is traditional Redis, not Upstash REST)
     
     Returns:
         tuple: (url, token) or (None, None) if not configured
     """
-    # Check Render's standard REDIS_URL format first
-    redis_url = os.environ.get('REDIS_URL')
-    if redis_url:
-        # Render format: redis://default:password@host:port
-        # Convert to Upstash REST API format if needed
-        logger.info(f"Using REDIS_URL from Render: {redis_url[:50]}...")
-        # For now, return as-is - the cache layer will handle the protocol
-        return redis_url, 'render'  # Token placeholder for Render
-    
-    # Check Upstash native format
+    # Check Upstash native format FIRST (REST API format)
     url = (
         os.environ.get('UPSTASH_REDIS_REST_URL') or 
         os.environ.get('KV_REST_API_URL')
@@ -63,7 +54,30 @@ def get_upstash_credentials() -> tuple[Optional[str], Optional[str]]:
         os.environ.get('UPSTASH_REDIS_REST_TOKEN') or 
         os.environ.get('KV_REST_API_TOKEN')
     )
-    return url, token
+    
+    if url and token:
+        logger.info(f"Using Upstash REST API: {url[:50]}...")
+        return url, token
+    
+    # Check Render's REDIS_URL - but skip if it's localhost (not configured)
+    # Render format: redis://default:password@host:port
+    redis_url = os.environ.get('REDIS_URL')
+    if redis_url:
+        # Skip if localhost (not properly configured on Render)
+        if 'localhost' in redis_url or '127.0.0.1' in redis_url:
+            logger.warning(
+                f"REDIS_URL points to localhost (not configured on Render). "
+                "Skipping Redis. Set UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN for Upstash."
+            )
+            return None, None
+        logger.warning(
+            f"REDIS_URL detected but is not Upstash REST API format (is traditional Redis). "
+            "This module requires Upstash REST API. Skipping Redis."
+        )
+        return None, None
+    
+    # No Redis configured
+    return None, None
 
 
 class UpstashRedisClient:
