@@ -36,7 +36,7 @@ def get_homepage_product_showcase() -> List[Dict[str, Any]]:
         logger.debug("[Product Showcase] Querying database...")
         
         # Query active product showcase panels sorted by position
-        panels = SidePanel.query.filter(
+        panels = db.session.query(SidePanel).filter(
             SidePanel.panel_type == 'product_showcase',
             SidePanel.is_active == True
         ).order_by(SidePanel.sort_order.asc()).all()
