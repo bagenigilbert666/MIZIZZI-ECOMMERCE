@@ -129,7 +129,7 @@ except ImportError:
             JWT_ACCESS_TOKEN_EXPIRES = timedelta(hours=1)
             CORS_ORIGINS = ['http://localhost:3000', 'http://127.0.0.1:3000','https://mizizzi-shop.vercel.app']
             CACHE_TYPE = 'SimpleCache'
-            RATELIMIT_STORAGE_URI = 'memory://'  # Always use memory storage to avoid Redis dependency
+            RATELIMIT_STORAGE_URI = 'memory://'
         
         class DevelopmentConfig(Config):
             DEBUG = True
@@ -138,7 +138,7 @@ except ImportError:
             DEBUG = False
             # Use SimpleCache as fallback if Redis not available
             CACHE_TYPE = 'SimpleCache'
-            RATELIMIT_STORAGE_URI = 'memory://'  # Use in-memory storage to avoid Redis dependency
+            RATELIMIT_STORAGE_URI = os.environ.get('REDIS_URL') or 'memory://'
         
         class TestingConfig(Config):
             TESTING = True
@@ -224,9 +224,8 @@ def create_app(config_name=None, enable_socketio=True):
         try:
             if hasattr(limiter, 'init_app'):
                 limiter.init_app(app)
-                app.logger.info(f"Limiter initialized with storage URI: {app.config.get('RATELIMIT_STORAGE_URI', 'default')}")
-        except Exception as e:
-            app.logger.error(f"Limiter initialization error: {e}")
+        except Exception:
+            pass
 
     # Disable strict slashes to avoid Flask redirecting requests which breaks CORS preflight
     try:
