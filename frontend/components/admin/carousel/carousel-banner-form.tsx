@@ -101,7 +101,7 @@ export function CarouselBannerForm({ banner, onClose, onSubmit }: CarouselBanner
                   Banner Image
                   <span className="text-xs text-muted-foreground font-normal">(Required)</span>
                 </Label>
-                <ImageUploader onUpload={handleImageUpload} currentImage={imageUrl} />
+                <ImageUploader onUpload={handleImageUpload} currentImage={imageUrl} type="carousel" />
               </div>
 
               {/* Name */}

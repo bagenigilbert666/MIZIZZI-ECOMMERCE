@@ -98,6 +98,59 @@ def optimize_image(file_stream, max_width=1200, max_height=1200, quality=85):
         file_stream.seek(0)
         return file_stream
 
+def optimize_carousel_image(file_stream, max_width=1400, max_height=500, quality=75):
+    """
+    Optimize carousel banner images - more aggressive compression for web carousels
+    Maintains 1400x500 aspect ratio and targets ~300KB file size
+    """
+    try:
+        img = Image.open(file_stream)
+
+        # Convert RGBA to RGB if necessary
+        if img.mode in ('RGBA', 'LA', 'P'):
+            background = Image.new('RGB', img.size, (255, 255, 255))
+            if img.mode == 'P':
+                img = img.convert('RGBA')
+            background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
+            img = background
+
+        # Calculate dimensions maintaining aspect ratio
+        # For carousel, we want 1400x500 or proportional
+        aspect_ratio = img.width / img.height
+        target_aspect = max_width / max_height
+
+        if aspect_ratio > target_aspect:
+            # Image is wider than target
+            new_width = max_width
+            new_height = int(max_width / aspect_ratio)
+        else:
+            # Image is taller than target
+            new_height = max_height
+            new_width = int(max_height * aspect_ratio)
+
+        # Resize image
+        if new_width != img.width or new_height != img.height:
+            img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+
+        # Save with aggressive compression
+        output = io.BytesIO()
+        img.save(output, format='JPEG', quality=quality, optimize=True)
+        output.seek(0)
+
+        original_size = file_stream.seek(0, os.SEEK_END)
+        compressed_size = len(output.getvalue())
+        
+        current_app.logger.info(
+            f"Carousel image optimized: {original_size/1024:.1f}KB → {compressed_size/1024:.1f}KB "
+            f"(quality={quality}, size={new_width}x{new_height})"
+        )
+
+        return output
+    except Exception as e:
+        current_app.logger.error(f"Error optimizing carousel image: {str(e)}")
+        file_stream.seek(0)
+        return file_stream
+
 @admin_upload_routes.route('/upload/image', methods=['POST', 'OPTIONS'])
 @cross_origin()
 @jwt_required()
@@ -365,6 +418,104 @@ def delete_image():
         current_app.logger.error(f"Error deleting image: {str(e)}")
         return jsonify({
             'error': 'Failed to delete image',
+            'details': str(e)
+        }), 500
+
+@admin_upload_routes.route('/upload/carousel-banner', methods=['POST', 'OPTIONS'])
+@cross_origin()
+@jwt_required()
+def upload_carousel_banner():
+    """Upload a carousel banner image with aggressive compression (1400x500, ~300KB target)"""
+    if request.method == 'OPTIONS':
+        response = jsonify({'status': 'ok'})
+        response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
+        response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+        response.headers.add('Access-Control-Allow-Credentials', 'true')
+        return response
+
+    # Check admin permissions
+    auth_check = admin_required()
+    if auth_check:
+        return auth_check
+
+    try:
+        current_app.logger.info(f"Carousel upload request files: {list(request.files.keys())}")
+
+        # Check if file is present
+        file = None
+        for field_name in ['file', 'image', 'banner_image']:
+            if field_name in request.files:
+                file = request.files[field_name]
+                current_app.logger.info(f"Found carousel file in field: {field_name}")
+                break
+
+        if not file or file.filename == '':
+            return jsonify({'error': 'No carousel banner image provided'}), 400
+
+        # Validate file type
+        if not allowed_file(file.filename):
+            return jsonify({'error': 'Invalid file type. Only PNG, JPG, JPEG, GIF, and WEBP are allowed'}), 400
+
+        # Check file size (10MB max before compression)
+        file.seek(0, os.SEEK_END)
+        file_size = file.tell()
+        file.seek(0)
+
+        if file_size > 10 * 1024 * 1024:
+            return jsonify({'error': 'File size too large. Maximum size is 10MB before compression'}), 400
+
+        # Validate that it's actually an image
+        if not validate_image(file.stream):
+            return jsonify({'error': 'Invalid image file'}), 400
+
+        # Generate unique filename
+        original_filename = secure_filename(file.filename)
+        file_extension = 'jpg'  # Always convert to JPEG for consistency
+        unique_filename = f"carousel_{uuid.uuid4().hex}.{file_extension}"
+
+        # Create upload directory if it doesn't exist
+        upload_path = os.path.join(current_app.root_path, UPLOAD_FOLDER)
+        carousel_images_path = os.path.join(upload_path, 'carousel_banners')
+
+        os.makedirs(upload_path, exist_ok=True)
+        os.makedirs(carousel_images_path, exist_ok=True)
+
+        # Optimize carousel image with aggressive compression
+        optimized_image = optimize_carousel_image(file.stream, max_width=1400, max_height=500, quality=75)
+        optimized_size = len(optimized_image.getvalue())
+
+        # Save file
+        file_path = os.path.join(carousel_images_path, unique_filename)
+        with open(file_path, 'wb') as f:
+            f.write(optimized_image.read())
+
+        # Generate URL for the uploaded file
+        base_url = request.host_url.rstrip('/')
+        image_url = f"{base_url}/api/uploads/carousel_banners/{unique_filename}"
+
+        compression_ratio = (1 - (optimized_size / file_size)) * 100 if file_size > 0 else 0
+
+        current_app.logger.info(
+            f"Carousel banner uploaded successfully: {unique_filename} "
+            f"({file_size/1024:.1f}KB → {optimized_size/1024:.1f}KB, {compression_ratio:.1f}% reduction)"
+        )
+
+        return jsonify({
+            'success': True,
+            'url': image_url,
+            'filename': unique_filename,
+            'original_size': file_size,
+            'optimized_size': optimized_size,
+            'compression_ratio': f"{compression_ratio:.1f}%",
+            'originalName': original_filename,
+            'uploadedBy': get_jwt_identity(),
+            'uploadedAt': datetime.now().isoformat()
+        }), 200
+
+    except Exception as e:
+        current_app.logger.error(f"Error uploading carousel banner: {str(e)}")
+        return jsonify({
+            'error': 'Failed to upload carousel banner',
             'details': str(e)
         }), 500
 
