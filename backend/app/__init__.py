@@ -492,6 +492,7 @@ def create_app(config_name=None, enable_socketio=True):
         'admin_order_routes': Blueprint('admin_order_routes', __name__),
         'admin_cart_routes': Blueprint('admin_cart_routes', __name__),
         'admin_cloudinary_routes': Blueprint('admin_cloudinary_routes', __name__),
+        'admin_upload_routes': Blueprint('admin_upload_routes', __name__),
         'admin_category_routes': Blueprint('admin_category_routes', __name__),
         'admin_shop_categories_routes': Blueprint('admin_categories_bp', __name__),
         'product_images_batch_bp': Blueprint('product_images_batch_bp', __name__),
@@ -537,6 +538,10 @@ def create_app(config_name=None, enable_socketio=True):
     @fallback_blueprints['admin_google_auth_routes'].route('/health', methods=['GET'])
     def fallback_admin_google_auth_health():
         return jsonify({"status": "ok", "message": "Fallback admin Google auth routes active"}), 200
+    
+    @fallback_blueprints['admin_upload_routes'].route('/health', methods=['GET'])
+    def fallback_admin_upload_health():
+        return jsonify({"status": "ok", "message": "Fallback admin upload routes active"}), 200
     
     @fallback_blueprints['dashboard_routes'].route('/dashboard', methods=['GET'])
     def fallback_dashboard_main():
@@ -720,6 +725,10 @@ def create_app(config_name=None, enable_socketio=True):
         'admin_cloudinary_routes': [
             ('app.routes.admin.admin_cloudinary_routes', 'admin_cloudinary_routes'),
             ('routes.admin.admin_cloudinary_routes', 'admin_cloudinary_routes')
+        ],
+        'admin_upload_routes': [
+            ('app.routes.admin.admin_upload_routes', 'admin_upload_routes'),
+            ('routes.admin.admin_upload_routes', 'admin_upload_routes')
         ],
         'admin_category_routes': [
             ('app.routes.admin.admin_category_routes', 'admin_category_routes'),
@@ -1010,6 +1019,7 @@ def create_app(config_name=None, enable_socketio=True):
         
         app.register_blueprint(final_blueprints['admin_cart_routes'], url_prefix='/api/admin/cart')
         app.register_blueprint(final_blueprints['admin_cloudinary_routes'], url_prefix='/api/admin/cloudinary')
+        app.register_blueprint(final_blueprints['admin_upload_routes'], url_prefix='/api/admin')
         app.register_blueprint(final_blueprints['admin_category_routes'], url_prefix='/api/admin/categories')
         app.register_blueprint(final_blueprints['admin_shop_categories_routes'], url_prefix='/api/admin/shop-categories')
         app.register_blueprint(final_blueprints['product_images_batch_bp'])

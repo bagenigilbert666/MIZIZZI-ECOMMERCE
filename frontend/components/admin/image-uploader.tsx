@@ -127,11 +127,34 @@ export function ImageUploader({ onUpload, currentImage, type = "product" }: Imag
 
       setUploadProgress(90)
 
-      // Send to backend or use as data URL
+      // Upload to backend
+      const formData = new FormData()
       const compressedFile = new File([compressedBlob], file.name, { type: "image/jpeg" })
-      const dataUrl = URL.createObjectURL(compressedFile)
-      onUpload(dataUrl)
+      formData.append("file", compressedFile)
 
+      let uploadEndpoint = "/api/admin/upload/image"
+      if (type === "carousel") {
+        uploadEndpoint = "/api/admin/upload/carousel-banner"
+      }
+
+      const response = await fetch(uploadEndpoint, {
+        method: "POST",
+        body: formData,
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
+        },
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || "Upload failed")
+      }
+
+      const data = await response.json()
+      console.log(`[v0] Image uploaded successfully: ${data.url}`)
+      console.log(`[v0] Compression ratio: ${data.compression_ratio || "N/A"}`)
+
+      onUpload(data.url || data.image_url)
       setUploadProgress(100)
       setIsUploading(false)
     } catch (error) {
