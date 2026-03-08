@@ -41,7 +41,7 @@ def get_homepage_premium_experiences() -> List[Dict[str, Any]]:
             SidePanel.is_active == True
         ).order_by(SidePanel.sort_order.asc()).all()
         
-        # Serialize panels
+        # Serialize panels with image support
         premium_experiences = []
         for panel in panels:
             premium_experiences.append({
@@ -50,10 +50,12 @@ def get_homepage_premium_experiences() -> List[Dict[str, Any]]:
                 "metric": panel.metric,
                 "description": panel.description,
                 "icon_name": panel.icon_name,
-                "image_url": panel.image_url,
-                "gradient": panel.gradient,
+                "image_url": panel.image_url or "",
+                "image": panel.image_url or "",  # Backward compatibility
+                "gradient": panel.gradient or "from-amber-500 to-orange-600",
                 "features": panel.features or [],
                 "position": panel.position,
+                "is_active": panel.is_active,
             })
         
         # Cache the result

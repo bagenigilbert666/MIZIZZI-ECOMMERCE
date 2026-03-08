@@ -45,14 +45,16 @@ def get_homepage_categories(limit: int = 20) -> List[Dict[str, Any]]:
          .limit(limit)\
          .all()
         
-        # Serialize from tuples directly
+        # Serialize from tuples directly with full image support
         result = [
             {
                 "id": row[0],
                 "name": row[1],
                 "slug": row[2],
-                "image": row[3],
-                "description": row[4] or ""
+                "image": row[3] or "",  # Direct image_url from query
+                "image_url": row[3] or "",  # Standard field name
+                "description": row[4] or "",
+                "is_active": True
             }
             for row in categories
         ]
