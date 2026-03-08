@@ -1,6 +1,6 @@
 "use client"
 
-import { MinimalistSpinner } from "@/components/ui/minimalist-spinner"
+import { AppleSpinner } from "@/components/ui/apple-spinner"
 
 interface SectionLoaderProps {
   title: string
@@ -14,8 +14,9 @@ export function SectionLoader({ title, height = "h-80" }: SectionLoaderProps) {
         <h2 className="font-bold text-sm sm:text-base md:text-lg whitespace-nowrap">{title}</h2>
       </div>
       <div className="flex-1 flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <MinimalistSpinner size="lg" message="Loading..." />
+        <div className="flex flex-col items-center gap-3">
+          <AppleSpinner size="lg" />
+          <p className="text-sm text-muted-foreground">Loading {title.toLowerCase()}...</p>
         </div>
       </div>
     </div>
