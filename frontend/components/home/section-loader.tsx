@@ -1,48 +1,24 @@
 "use client"
 
+import { AppleSpinner } from "@/components/ui/apple-spinner"
+
 interface SectionLoaderProps {
+  title: string
   height?: string
 }
 
-export function SectionLoader({ height = "h-80" }: SectionLoaderProps) {
+export function SectionLoader({ title, height = "h-80" }: SectionLoaderProps) {
   return (
-    <div className={`rounded-lg bg-white shadow-sm overflow-hidden flex items-center justify-center ${height}`}>
-      <svg
-        className="animate-spin"
-        width="64"
-        height="64"
-        viewBox="0 0 50 50"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-      >
-        <circle
-          cx="25"
-          cy="25"
-          r="20"
-          stroke="#6B0F2B"
-          strokeWidth="4"
-          strokeDasharray="31.4 125.6"
-          opacity="0.3"
-        />
-        <circle
-          cx="25"
-          cy="25"
-          r="20"
-          stroke="#8B1538"
-          strokeWidth="4"
-          strokeDasharray="31.4 125.6"
-          strokeLinecap="round"
-          style={{
-            animation: "spin 1.4s linear infinite",
-          }}
-        />
-        <style>{`
-          @keyframes spin {
-            from { transform: rotate(0deg); }
-            to { transform: rotate(360deg); }
-          }
-        `}</style>
-      </svg>
+    <div className={`rounded-lg bg-white shadow-sm overflow-hidden flex flex-col ${height}`}>
+      <div className="bg-[#8B1538] text-white flex items-center justify-between px-2 sm:px-4 py-1.5 sm:py-2">
+        <h2 className="font-bold text-sm sm:text-base md:text-lg whitespace-nowrap">{title}</h2>
+      </div>
+      <div className="flex-1 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <AppleSpinner size="lg" />
+          <p className="text-sm text-muted-foreground">Loading {title.toLowerCase()}...</p>
+        </div>
+      </div>
     </div>
   )
 }
