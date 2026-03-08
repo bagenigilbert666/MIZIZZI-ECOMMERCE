@@ -4,6 +4,8 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommer
 
 export const getHomepageData = cache(async () => {
   try {
+    console.log("[Homepage] Fetching from:", `${API_BASE_URL}/api/homepage`)
+    
     const response = await fetch(`${API_BASE_URL}/api/homepage`, {
       method: "GET",
       headers: {
@@ -19,15 +21,19 @@ export const getHomepageData = cache(async () => {
     }
 
     const result = await response.json()
+    console.log("[Homepage] API Response status:", result.status)
 
     if (result.status === "success" && result.data) {
+      console.log("[Homepage] Successfully loaded homepage data with sections:", 
+        Object.keys(result.data).filter(k => result.data[k] && (Array.isArray(result.data[k]) ? result.data[k].length > 0 : true))
+      )
       return result.data
     }
 
     console.error("[Homepage] Unexpected response structure:", JSON.stringify(result).slice(0, 200))
     return getHomepageDataFallback()
   } catch (error) {
-    console.error("[Homepage] Fetch error:", error)
+    console.error("[Homepage] Fetch error:", error instanceof Error ? error.message : String(error))
     return getHomepageDataFallback()
   }
 })

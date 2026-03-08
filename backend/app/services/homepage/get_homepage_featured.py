@@ -1,104 +1,132 @@
-"""Homepage Featured Products Loaders - Modular loaders for each featured section."""
+"""Homepage Feature Cards Loader - Loads feature cards for homepage display.
+
+Feature cards are shortcut buttons that highlight key navigation items and promotions.
+Each card includes:
+  - icon: Name of lucide-react icon (e.g., "Zap", "Crown", "Heart")
+  - title: Card title (uppercase, e.g., "FLASH SALES")
+  - description: Short description (e.g., "Limited Time Offers")
+  - href: Link destination (e.g., "/flash-sales")
+  - iconBg: Tailwind gradient class for icon background
+  - iconColor: Tailwind text color class for icon
+  - hoverBg: Tailwind class for hover state background color
+  - badge: Optional badge text (e.g., "HOT", "VIP")
+
+Frontend component: frontend/components/carousel/feature-cards.tsx
+"""
 import logging
 from typing import List, Dict, Any
-from app.models.models import Product
-from app.configuration.extensions import db
 from app.utils.redis_cache import product_cache
-from app.routes.products.serializers import serialize_product_minimal
-from sqlalchemy.orm import joinedload
 
 logger = logging.getLogger(__name__)
 
-# Cache configuration for each featured section
-FEATURED_CACHE_CONFIG = {
-    "luxury": {"key": "mizizzi:homepage:luxury", "ttl": 180, "flag": "is_luxury_deal"},
-    "new_arrivals": {"key": "mizizzi:homepage:new_arrivals", "ttl": 180, "flag": "is_new_arrival"},
-    "top_picks": {"key": "mizizzi:homepage:top_picks", "ttl": 120, "flag": "is_top_pick"},
-    "trending": {"key": "mizizzi:homepage:trending", "ttl": 120, "flag": "is_trending"},
-    "daily_finds": {"key": "mizizzi:homepage:daily_finds", "ttl": 300, "flag": "is_daily_find"},
-}
+FEATURE_CARDS_CACHE_KEY = "mizizzi:homepage:feature_cards"
+FEATURE_CARDS_CACHE_TTL = 900  # 15 minutes
+
+# Feature cards with complete styling information for frontend UI
+# Each card is designed to be a 2-column grid item (100px height on mobile)
+DEFAULT_FEATURE_CARDS = [
+    {
+        "icon": "Zap",
+        "title": "FLASH SALES",
+        "description": "Limited Time Offers",
+        "href": "/flash-sales",
+        "iconBg": "bg-gradient-to-br from-amber-100 via-yellow-50 to-orange-100",
+        "iconColor": "text-amber-600",
+        "hoverBg": "hover:bg-amber-50/80",
+        "badge": "HOT",
+    },
+    {
+        "icon": "Crown",
+        "title": "LUXURY DEALS",
+        "description": "Premium Collections",
+        "href": "/luxury",
+        "iconBg": "bg-gradient-to-br from-violet-100 via-purple-50 to-indigo-100",
+        "iconColor": "text-violet-600",
+        "hoverBg": "hover:bg-violet-50/80",
+        "badge": "VIP",
+    },
+    {
+        "icon": "Heart",
+        "title": "WISHLIST",
+        "description": "Save Your Favorites",
+        "href": "/wishlist",
+        "iconBg": "bg-gradient-to-br from-rose-100 via-pink-50 to-red-100",
+        "iconColor": "text-rose-600",
+        "hoverBg": "hover:bg-rose-50/80",
+    },
+    {
+        "icon": "Package",
+        "title": "ORDERS",
+        "description": "Track Your Purchases",
+        "href": "/orders",
+        "iconBg": "bg-gradient-to-br from-sky-100 via-blue-50 to-cyan-100",
+        "iconColor": "text-sky-600",
+        "hoverBg": "hover:bg-sky-50/80",
+    },
+    {
+        "icon": "HeadphonesIcon",
+        "title": "SUPPORT",
+        "description": "24/7 Assistance",
+        "href": "/help",
+        "iconBg": "bg-gradient-to-br from-emerald-100 via-green-50 to-teal-100",
+        "iconColor": "text-emerald-600",
+        "hoverBg": "hover:bg-emerald-50/80",
+    },
+    {
+        "icon": "Search",
+        "title": "PRODUCTS",
+        "description": "Browse All Items",
+        "href": "/products",
+        "iconBg": "bg-gradient-to-br from-slate-100 via-gray-50 to-zinc-100",
+        "iconColor": "text-slate-600",
+        "hoverBg": "hover:bg-slate-50/80",
+    },
+]
 
 
-def get_featured_products(section: str, limit: int = 20) -> List[Dict[str, Any]]:
+def get_homepage_feature_cards() -> List[Dict[str, Any]]:
     """
-    Generic loader for featured product sections with caching and N+1 prevention.
-    Uses eager loading to prevent N+1 queries on relationships.
-    Each section uses a dedicated database index for optimal performance.
+    Fetch feature cards for homepage display.
     
-    Args:
-        section: Featured section name (luxury, new_arrivals, top_picks, trending, daily_finds)
-        limit: Maximum number of products to return
-        
+    Feature cards are navigation shortcuts and promotion highlights displayed as a 
+    2x3 grid on the homepage. Each card includes complete styling information (gradient 
+    colors, hover states, badges) to render directly in the frontend.
+    
+    Uses Redis caching with 15-minute TTL.
+    
     Returns:
-        List of product dictionaries or empty list on error
+        List of 6 feature card dictionaries, each with icon, title, description, 
+        href, and complete UI styling properties (iconBg, iconColor, hoverBg, badge).
+        
+    Note:
+        Currently returns default hardcoded cards. Can be extended to load from
+        a database table (FeatureCard model) if dynamic management is needed.
     """
-    if section not in FEATURED_CACHE_CONFIG:
-        logger.warning(f"[Homepage] Unknown featured section: {section}")
-        return []
-    
-    config = FEATURED_CACHE_CONFIG[section]
-    cache_key = config["key"]
-    
     try:
-        # Try to get from Redis cache
+        # Check cache first
         if product_cache:
-            cached = product_cache.get(cache_key)
+            cached = product_cache.get(FEATURE_CARDS_CACHE_KEY)
             if cached:
-                logger.debug(f"[Homepage] {section} loaded from cache")
+                logger.debug("[Feature Cards] Loaded from cache")
                 return cached
         
-        # Build filter dynamically
-        filter_attr = getattr(Product, config["flag"], None)
-        if not filter_attr:
-            logger.error(f"[Homepage] Invalid filter attribute for section: {section}")
-            return []
+        logger.debug("[Feature Cards] Returning default feature cards")
         
-        # OPTIMIZATION: Use eager loading to prevent N+1 queries on relationships
-        # For minimal serialization, we don't need relationships, but it's good practice
-        # Query database - each uses its dedicated index
-        products = db.session.query(Product)\
-            .filter(filter_attr == True)\
-            .filter(Product.is_active == True)\
-            .order_by(Product.created_at.desc())\
-            .limit(limit)\
-            .all()
+        # For now, return default cards with complete styling
+        # In future, could load from DB: FeatureCard.query.filter(...).all()
+        feature_cards = DEFAULT_FEATURE_CARDS
         
-        # Serialize - now no N+1 on relationships since we use thumbnail_url directly
-        result = [serialize_product_minimal(p) for p in products]
-        
-        # Cache result
+        # Cache the result
         if product_cache:
-            product_cache.set(cache_key, result, config["ttl"])
+            product_cache.set(
+                FEATURE_CARDS_CACHE_KEY,
+                feature_cards,
+                FEATURE_CARDS_CACHE_TTL
+            )
         
-        logger.debug(f"[Homepage] Loaded {len(result)} {section} products")
-        return result
+        logger.debug(f"[Feature Cards] Loaded {len(feature_cards)} items")
+        return feature_cards
         
     except Exception as e:
-        logger.error(f"[Homepage] Error loading {section} products: {e}")
-        return []
-
-
-# Convenience functions for each section
-def get_homepage_luxury(limit: int = 12) -> List[Dict[str, Any]]:
-    """Load luxury deal products for homepage."""
-    return get_featured_products("luxury", limit)
-
-
-def get_homepage_new_arrivals(limit: int = 20) -> List[Dict[str, Any]]:
-    """Load new arrival products for homepage."""
-    return get_featured_products("new_arrivals", limit)
-
-
-def get_homepage_top_picks(limit: int = 20) -> List[Dict[str, Any]]:
-    """Load top pick products for homepage."""
-    return get_featured_products("top_picks", limit)
-
-
-def get_homepage_trending(limit: int = 20) -> List[Dict[str, Any]]:
-    """Load trending products for homepage."""
-    return get_featured_products("trending", limit)
-
-
-def get_homepage_daily_finds(limit: int = 20) -> List[Dict[str, Any]]:
-    """Load daily find products for homepage."""
-    return get_featured_products("daily_finds", limit)
+        logger.error(f"[Feature Cards] Error: {e}")
+        return DEFAULT_FEATURE_CARDS
