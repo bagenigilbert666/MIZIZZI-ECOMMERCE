@@ -5,7 +5,6 @@ Handles all cache invalidation operations with safety checks and rate limiting
 
 import logging
 import redis
-import os
 from typing import List, Dict, Tuple, Optional
 from datetime import datetime, timedelta
 from functools import wraps
@@ -49,9 +48,11 @@ def rate_limit_cache_operations(f):
         
         if not admin_id:
             return f(*args, **kwargs)
+
         # Try to get Redis connection for rate limiting
         try:
-            # Use module-level imports (redis and os are imported at module scope)
+            import redis
+            import os
             
             # Get Redis URL from environment
             redis_url = os.environ.get('REDIS_URL') or os.environ.get('UPSTASH_REDIS_REST_URL')
