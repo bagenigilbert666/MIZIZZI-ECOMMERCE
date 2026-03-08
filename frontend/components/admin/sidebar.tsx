@@ -34,6 +34,7 @@ import {
   ListTree,
   Megaphone,
   PhoneCall,
+  RefreshCw,
 } from "lucide-react"
 
 interface AdminSidebarProps {
@@ -177,6 +178,15 @@ const menuItems: MenuItem[] = [
       { title: "Theme Editor", path: "/admin/theme" },
       { title: "Color Palette", path: "/admin/theme" },
       { title: "Design Preview", path: "/admin/theme" },
+    ],
+  },
+  {
+    title: "Cache Management",
+    icon: <RefreshCw size={20} />,
+    path: "/admin/cache-management",
+    badge: null,
+    submenu: [
+      { title: "Cache Status", path: "/admin/cache-management" },
     ],
   },
 ]
