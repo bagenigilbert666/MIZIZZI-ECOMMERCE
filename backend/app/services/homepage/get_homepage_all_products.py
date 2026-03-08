@@ -33,7 +33,8 @@ def get_homepage_all_products(limit: int = 12, page: int = 1) -> Dict[str, Any]:
         # Try to get from Redis cache
         if product_cache:
             cached = product_cache.get(cache_key)
-            if cached:
+            # IMPORTANT: Use `is not None` NOT `if cached:` to handle empty/paginated responses
+            if cached is not None:
                 logger.debug(f"[Homepage] All products page {page} loaded from cache")
                 return cached
         

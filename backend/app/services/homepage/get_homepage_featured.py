@@ -43,7 +43,9 @@ def get_featured_products(section: str, limit: int = 20) -> List[Dict[str, Any]]
         # Try to get from Redis cache
         if product_cache:
             cached = product_cache.get(cache_key)
-            if cached:
+            # IMPORTANT: Use `is not None` NOT `if cached:` to handle empty arrays
+            # Empty arrays are falsy but valid cache hits - we must return them
+            if cached is not None:
                 logger.debug(f"[Homepage] {section} loaded from cache")
                 return cached
         

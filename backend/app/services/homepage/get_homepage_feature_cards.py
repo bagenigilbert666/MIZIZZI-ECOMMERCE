@@ -109,7 +109,8 @@ def get_homepage_feature_cards(bypass_cache: bool = False) -> List[Dict[str, Any
         # Check cache first (unless bypassing)
         if not bypass_cache and product_cache:
             cached = product_cache.get(FEATURE_CARDS_CACHE_KEY)
-            if cached:
+            # IMPORTANT: Use `is not None` NOT `if cached:` to handle empty arrays
+            if cached is not None:
                 logger.debug("[Feature Cards] Loaded from cache")
                 return cached
         

@@ -29,7 +29,8 @@ def get_homepage_premium_experiences() -> List[Dict[str, Any]]:
         # Check cache first
         if product_cache:
             cached = product_cache.get(PREMIUM_EXPERIENCES_CACHE_KEY)
-            if cached:
+            # IMPORTANT: Use `is not None` NOT `if cached:` to handle empty arrays
+            if cached is not None:
                 logger.debug("[Premium Experiences] Loaded from cache")
                 return cached
         
