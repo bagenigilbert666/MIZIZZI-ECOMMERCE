@@ -12,6 +12,8 @@ from flask_cors import CORS
 from flask_migrate import Migrate
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from limits.strategies import FixedWindowRateLimiter, MovingWindowRateLimiter
+from limits.storage import MemoryStorage
 import logging
 import os  # added
 
@@ -26,6 +28,8 @@ mail = Mail()
 cache = Cache()
 cors = CORS()
 migrate = Migrate()
+
+# Limiter - key_func is REQUIRED as first positional argument
 limiter = Limiter(
     key_func=get_remote_address,
     default_limits=["1000 per hour"]  # Default: 1000 requests per hour per IP
@@ -164,14 +168,17 @@ def init_extensions(app):
     # Migrations
     migrate.init_app(app, db)
     
-    # Rate limiting
+    # Rate limiting - Initialize with minimal parameters to match installed flask-limiter version
     try:
-        limiter_storage = app.config.get('RATELIMIT_STORAGE_URI', app.config.get('REDIS_URL', 'memory://'))
         limiter.init_app(app)
-        logger.info(f"Rate limiter initialized with default: {app.config.get('RATELIMIT_DEFAULT', '1000 per hour')}")
+        logger.info("Rate limiter initialized")
+        
+    except TypeError as e:
+        # If even simple init_app() fails, log but don't crash
+        logger.warning(f"Rate limiter init_app failed: {e} - rate limiting will use memory storage fallback")
     except Exception as e:
-        logger.error(f"Error initializing rate limiter: {e}")
-        # Continue anyway, limiter may already be initialized
+        logger.warning(f"Rate limiter init warning (non-critical): {e}")
+
     
     logger.info("All extensions initialized successfully")
     

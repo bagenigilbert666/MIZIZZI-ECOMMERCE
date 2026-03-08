@@ -189,9 +189,23 @@ class TestingConfig(Config):
 class ProductionConfig(Config):
     """Production configuration."""
     DEBUG = False
-    CACHE_TYPE = 'RedisCache'
-    CACHE_REDIS_URL = os.environ.get('REDIS_URL') or 'redis://localhost:6379/0'
-    RATELIMIT_STORAGE_URI = os.environ.get('REDIS_URL') or 'redis://localhost:6379/1'
+    
+    # Redis configuration - production-safe with fallback
+    # Support multiple env var names for flexibility (REDIS_URL, RATELIMIT_STORAGE_URI, CACHE_REDIS_URL)
+    # For Render + Upstash, use REDIS_URL which Render automatically sets from addon
+    _redis_url = os.environ.get('REDIS_URL') or os.environ.get('RATELIMIT_STORAGE_URI') or os.environ.get('CACHE_REDIS_URL')
+    
+    # If no Redis URL is configured, use memory:// fallback (better than hardcoding localhost)
+    # This allows production to work without Redis but with degraded performance
+    CACHE_TYPE = 'RedisCache' if _redis_url else 'SimpleCache'
+    CACHE_REDIS_URL = _redis_url or 'memory://'
+    
+    # Rate limiting - use same Redis URL or fallback to memory://
+    # This prevents 500 errors when Redis is unavailable
+    RATELIMIT_STORAGE_URI = _redis_url or 'memory://'
+    RATELIMIT_ENABLED = True
+    RATELIMIT_IN_MEMORY_FALLBACK_ENABLED = True
+    
     SESSION_COOKIE_SECURE = True
     SESSION_COOKIE_HTTPONLY = True
     SESSION_COOKIE_SAMESITE = 'Lax'

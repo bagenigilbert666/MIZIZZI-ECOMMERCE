@@ -205,7 +205,7 @@ export default function PremiumThemeCustomizer() {
       toast({
         title: isNetworkError ? "Backend Server Offline" : "Error",
         description: isNetworkError
-          ? "Cannot connect to backend server. Please ensure your Flask server is running on port 5000."
+          ? "Cannot connect to backend server. Please ensure the backend is running and accessible."
           : `Failed to save theme: ${errorMessage}`,
         variant: "destructive",
       })

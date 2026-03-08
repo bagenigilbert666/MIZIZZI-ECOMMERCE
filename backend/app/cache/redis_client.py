@@ -59,7 +59,18 @@ class UpstashRedisClient:
     
     Connects to Upstash Redis without requiring the upstash-redis SDK.
     All commands are sent as HTTP POST requests with proper formatting.
+    
+    TIMEOUT STRATEGY (DIFFERENTIATED BY OPERATION):
+    - GET operations: 500ms timeout (fail-fast for cache misses)
+    - SET operations: 2000ms timeout (allow time for large JSON serialization)
+    
+    This prevents slow cache READS from blocking requests while ensuring
+    cache WRITES have enough time to complete.
     """
+    
+    # Different timeouts for reads vs writes
+    REDIS_TIMEOUT_READ = 0.5   # 500ms - fail fast on cache miss
+    REDIS_TIMEOUT_WRITE = 2.0  # 2 seconds - allow time for large JSON
     
     def __init__(self, url: str, token: str):
         """
@@ -79,14 +90,18 @@ class UpstashRedisClient:
     
     def _execute_command(self, *args, **kwargs) -> Any:
         """
-        Execute a Redis command via HTTP REST API.
+        Execute a Redis command via HTTP REST API with appropriate timeout.
         
         Args:
             *args: Redis command and its arguments
             **kwargs: Optional parameters like 'ex' for expiration
         
         Returns:
-            The command result
+            The command result on success, None on timeout or error
+            
+        NOTE: This method NEVER throws - all exceptions are caught and logged.
+              None return means "cache miss" or "operation failed" - caller should
+              handle gracefully by falling back to database.
         """
         try:
             # Build the command payload
@@ -97,18 +112,22 @@ class UpstashRedisClient:
                 # Append EX and TTL to the command: SET key value EX ttl
                 command.extend(['EX', str(kwargs['ex'])])
             
-            # Send to Upstash REST API
+            # Determine timeout based on command type
+            is_write = len(args) > 0 and args[0].upper() in ('SET', 'DEL', 'INCR', 'APPEND', 'LPUSH', 'HSET')
+            timeout = self.REDIS_TIMEOUT_WRITE if is_write else self.REDIS_TIMEOUT_READ
+            
+            # Send to Upstash REST API with operation-appropriate timeout
             response = requests.post(
                 self.url,
                 headers=self.headers,
                 json=command,
-                timeout=10
+                timeout=timeout
             )
             
             # Check for errors
             if response.status_code != 200:
-                logger.error(
-                    f"Redis command failed: {response.status_code} - {response.text}"
+                logger.warning(
+                    f"Redis command failed: {response.status_code} - {response.text[:100]}"
                 )
                 return None
             
@@ -120,11 +139,18 @@ class UpstashRedisClient:
             
             return result
             
+        except requests.exceptions.Timeout:
+            # Log timeout but don't crash - caller will do database fallback
+            operation = "write" if (len(args) > 0 and args[0].upper() in ('SET', 'DEL')) else "read"
+            logger.warning(f"Redis {operation} timeout - falling back to database")
+            return None
         except requests.exceptions.RequestException as e:
-            logger.error(f"Redis HTTP request failed: {e}")
+            # Network errors, connection refused, etc.
+            logger.warning(f"Redis HTTP request failed: {type(e).__name__} - falling back")
             return None
         except Exception as e:
-            logger.error(f"Redis command execution error: {e}")
+            # Catch-all for any other errors
+            logger.warning(f"Redis command error: {e} - falling back to database")
             return None
     
     def ping(self) -> bool:

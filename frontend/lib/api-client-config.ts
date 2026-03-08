@@ -80,7 +80,7 @@ export async function checkBackendHealth(): Promise<{
  */
 export function getErrorMessage(error: any): string {
   if (error.message === "Network Error" || error.code === "ERR_NETWORK") {
-    return `Cannot connect to backend server at ${API_CONFIG.BASE_URL}. Please ensure the backend is running on port 5000.`
+    return `Cannot connect to backend server at ${API_CONFIG.BASE_URL}. Please ensure the backend is running and accessible.`
   }
 
   if (error.message?.includes("CORS")) {

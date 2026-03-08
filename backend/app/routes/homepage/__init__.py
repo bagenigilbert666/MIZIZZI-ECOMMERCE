@@ -130,7 +130,8 @@ def get_homepage():
                 cached_data = None
         
         # Use cached data if available, otherwise run aggregation
-        if cache_hit and cached_data:
+        if cache_hit:
+            # cache_hit is already verified, so cached_data is not None
             homepage_data = cached_data
             # Build minimal metadata for cached response
             metadata = {

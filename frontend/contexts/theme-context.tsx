@@ -163,21 +163,26 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const refreshTheme = useCallback(async () => {
     try {
       setIsLoading(true)
+      console.log("[v0] Attempting to fetch theme from API...")
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"}/api/theme/active`,
       )
 
       if (!response.ok) {
-        throw new Error("Failed to fetch theme")
+        console.warn(`[v0] Theme API returned status ${response.status}, using cached theme or default`)
+        // Don't throw error on failed requests - just skip updating
+        return
       }
 
       const data = await response.json()
+      console.log("[v0] Theme fetched successfully:", data.theme?.name || "unknown")
 
       if (data.success && data.theme) {
         applyTheme(data.theme)
       }
     } catch (error) {
-      console.error("[v0] Error fetching theme:", error)
+      console.error("[v0] Error fetching theme (non-critical):", error instanceof Error ? error.message : String(error))
+      // Don't re-throw - theme API failure should not break the app
     } finally {
       setIsLoading(false)
     }

@@ -22,7 +22,8 @@ def get_homepage_contact_cta_slides() -> List[Dict[str, Any]]:
         # Try to get from Redis cache
         if product_cache:
             cached = product_cache.get(CACHE_KEY)
-            if cached:
+            # IMPORTANT: Use `is not None` NOT `if cached:` to handle empty arrays
+            if cached is not None:
                 logger.debug("[Homepage] Contact CTA slides loaded from cache")
                 return cached
         

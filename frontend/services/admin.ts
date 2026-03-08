@@ -677,15 +677,16 @@ export const adminService = {
       // Build the URL with query parameters
       let url = `${baseUrl}/api/admin/products`
 
-      // Create a new params object with a very large per_page value to get all products
+      // Use params directly, but ensure per_page is set to a large default if not specified
+      // Only override per_page if it wasn't explicitly provided
       const updatedParams = {
         ...params,
-        per_page: 10000, // Set a very large number to get all products
+        per_page: params?.per_page || 10000, // Default to 10000 only if not specified
       }
 
       const queryParams = new URLSearchParams()
       Object.entries(updatedParams).forEach(([key, value]) => {
-        if (value !== undefined) {
+        if (value !== undefined && value !== null) {
           queryParams.append(key, value.toString())
         }
       })
@@ -695,7 +696,7 @@ export const adminService = {
         url += `?${queryString}`
       }
 
-      console.log("Fetching all products with URL:", url)
+      console.log("[v0] Fetching products with params:", updatedParams)
 
       const response = await fetch(url, {
         method: "GET",
@@ -706,11 +707,17 @@ export const adminService = {
         credentials: "include",
       })
 
+      console.log("[v0] Products response status:", response.status)
+
       if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error("[v0] Products API error:", errorData)
         throw new Error(`Products request failed with status: ${response.status}`)
       }
 
-      return await response.json()
+      const data = await response.json()
+      console.log("[v0] Products fetched successfully, count:", data.items?.length || 0, "Total:", data.total)
+      return data
     } catch (error) {
       console.error("Error fetching products:", error)
       throw error
@@ -772,28 +779,53 @@ export const adminService = {
   },
 
   async getFeaturedProducts(): Promise<Product[]> {
-    const response = await this.getProducts({ featured: true })
-    return response.items
+    try {
+      const response = await this.getProducts({ featured: true })
+      return response.items || []
+    } catch (error) {
+      console.error("[v0] Error fetching featured products:", error)
+      return []
+    }
   },
 
   async getNewProducts(): Promise<Product[]> {
-    const response = await this.getProducts({ new: true })
-    return response.items
+    try {
+      const response = await this.getProducts({ new: true })
+      return response.items || []
+    } catch (error) {
+      console.error("[v0] Error fetching new products:", error)
+      return []
+    }
   },
 
   async getSaleProducts(): Promise<Product[]> {
-    const response = await this.getProducts({ sale: true })
-    return response.items
+    try {
+      const response = await this.getProducts({ sale: true })
+      return response.items || []
+    } catch (error) {
+      console.error("[v0] Error fetching sale products:", error)
+      return []
+    }
   },
 
   async getFlashSaleProducts(): Promise<Product[]> {
-    const response = await this.getProducts({ flash_sale: true })
-    return response.items
+    try {
+      const response = await this.getProducts({ flash_sale: true })
+      return response.items || []
+    } catch (error) {
+      console.error("[v0] Error fetching flash sale products:", error)
+      return []
+    }
   },
 
   async getLuxuryDealProducts(): Promise<Product[]> {
-    const response = await this.getProducts({ luxury_deal: true })
-    return response.items
+    try {
+      const response = await this.getProducts({ luxury_deal: true })
+      return response.items || []
+    } catch (error) {
+      console.error("[v0] Error fetching luxury deal products:", error)
+      return []
+    }
   },
 
   async getProductsByIds(productIds: number[]): Promise<Product[]> {

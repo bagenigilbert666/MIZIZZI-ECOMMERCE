@@ -198,6 +198,7 @@ def serialize_product_minimal(product):
     """
     Ultra-minimal serialization for fast endpoints (trending, featured sections).
     Returns only 6 essential fields for maximum speed. OPTIMIZED: No JSON parsing per product.
+    SAFE: Handles missing fields gracefully.
     
     Args:
         product: Product instance
@@ -211,13 +212,17 @@ def serialize_product_minimal(product):
         # If thumbnail is needed, it should be pre-selected at query time
         image_url = product.thumbnail_url
         
+        # Safe access to rating
+        rating = getattr(product, 'rating', 0)
+        
         return {
             'id': product.id,
             'name': product.name,
             'slug': product.slug,
             'price': float(product.price) if product.price else 0,
             'sale_price': float(product.sale_price) if product.sale_price else None,
-            'image': image_url
+            'image': image_url,
+            'rating': rating,  # Safe default to 0
         }
     except Exception as e:
         current_app.logger.error(f"Error in serialize_product_minimal: {e}")
@@ -228,6 +233,7 @@ def serialize_product_with_images(product):
     """
     Serialization for homepage products with proper image support.
     Returns essential fields plus complete image data for frontend display.
+    SAFE: Handles missing optional fields like rating gracefully.
     
     Args:
         product: Product instance
@@ -259,6 +265,11 @@ def serialize_product_with_images(product):
                 ((product.price - product.sale_price) / product.price) * 100
             )
         
+        # Safe access to rating field - use getattr with default value
+        rating = getattr(product, 'rating', None)
+        if rating is None:
+            rating = 0  # Default to 0 if rating field doesn't exist
+        
         return {
             'id': product.id,
             'name': product.name,
@@ -270,7 +281,7 @@ def serialize_product_with_images(product):
             'image_urls': image_urls,  # New field for full image array
             'thumbnail_url': thumbnail_url,  # Explicit thumbnail
             'stock': product.stock,
-            'rating': product.rating,
+            'rating': rating,  # Now safely defaults to 0 if missing
             # Feature flags for UI badges
             'is_featured': product.is_featured,
             'is_new': product.is_new,

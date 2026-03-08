@@ -29,14 +29,15 @@ def get_homepage_premium_experiences() -> List[Dict[str, Any]]:
         # Check cache first
         if product_cache:
             cached = product_cache.get(PREMIUM_EXPERIENCES_CACHE_KEY)
-            if cached:
+            # IMPORTANT: Use `is not None` NOT `if cached:` to handle empty arrays
+            if cached is not None:
                 logger.debug("[Premium Experiences] Loaded from cache")
                 return cached
         
         logger.debug("[Premium Experiences] Querying database...")
         
         # Query active premium experience panels sorted by position
-        panels = db.session.query(SidePanel).filter(
+        panels = SidePanel.query.filter(
             SidePanel.panel_type == 'premium_experience',
             SidePanel.is_active == True
         ).order_by(SidePanel.sort_order.asc()).all()
