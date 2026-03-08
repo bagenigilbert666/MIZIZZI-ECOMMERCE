@@ -30,9 +30,11 @@ cors = CORS()
 migrate = Migrate()
 
 # Limiter - key_func is REQUIRED as first positional argument
+# Use memory storage as default to avoid Redis dependency
 limiter = Limiter(
     key_func=get_remote_address,
-    default_limits=["1000 per hour"]  # Default: 1000 requests per hour per IP
+    default_limits=["1000 per hour"],  # Default: 1000 requests per hour per IP
+    storage_uri="memory://"  # Use in-memory storage to avoid Redis dependency
 )
 
 def ensure_db_bound(app):
@@ -168,14 +170,26 @@ def init_extensions(app):
     # Migrations
     migrate.init_app(app, db)
     
-    # Rate limiting - Initialize with minimal parameters to match installed flask-limiter version
+    # Rate limiting - Initialize with memory storage to avoid Redis dependency
     try:
-        limiter.init_app(app)
-        logger.info("Rate limiter initialized")
+        # Configure limiter to use memory storage explicitly
+        # This prevents the limiter from trying to connect to Redis
+        limiter.init_app(
+            app,
+            key_func=get_remote_address,
+            default_limits=["1000 per hour"],
+            storage_uri="memory://"
+        )
+        logger.info("Rate limiter initialized with memory storage")
         
-    except TypeError as e:
-        # If even simple init_app() fails, log but don't crash
-        logger.warning(f"Rate limiter init_app failed: {e} - rate limiting will use memory storage fallback")
+    except TypeError:
+        # If init_app() doesn't accept those parameters, try without them
+        # (different flask-limiter versions have different signatures)
+        try:
+            limiter.init_app(app)
+            logger.info("Rate limiter initialized (basic mode)")
+        except Exception as e:
+            logger.warning(f"Rate limiter init failed: {e} - rate limiting may be unavailable")
     except Exception as e:
         logger.warning(f"Rate limiter init warning (non-critical): {e}")
 
