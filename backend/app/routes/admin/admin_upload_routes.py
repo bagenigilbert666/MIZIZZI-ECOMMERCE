@@ -425,7 +425,7 @@ def delete_image():
 @cross_origin()
 @jwt_required()
 def upload_carousel_banner():
-    """Upload a carousel banner image with aggressive compression (1400x500, ~300KB target)"""
+    """Upload a carousel banner image to Cloudinary with automatic optimization"""
     if request.method == 'OPTIONS':
         response = jsonify({'status': 'ok'})
         response.headers.add('Access-Control-Allow-Methods', 'POST, OPTIONS')
@@ -439,81 +439,55 @@ def upload_carousel_banner():
         return auth_check
 
     try:
-        current_app.logger.info(f"Carousel upload request files: {list(request.files.keys())}")
+        current_app.logger.info(f"[v0] Carousel upload request received, files: {list(request.files.keys())}")
 
         # Check if file is present
         file = None
         for field_name in ['file', 'image', 'banner_image']:
             if field_name in request.files:
                 file = request.files[field_name]
-                current_app.logger.info(f"Found carousel file in field: {field_name}")
+                current_app.logger.info(f"[v0] Found carousel file in field: {field_name}")
                 break
 
         if not file or file.filename == '':
             return jsonify({'error': 'No carousel banner image provided'}), 400
 
-        # Validate file type
-        if not allowed_file(file.filename):
-            return jsonify({'error': 'Invalid file type. Only PNG, JPG, JPEG, GIF, and WEBP are allowed'}), 400
+        # Get banner_id from request args if provided
+        banner_id = request.args.get('banner_id', None)
+        if banner_id and banner_id.isdigit():
+            banner_id = int(banner_id)
+        else:
+            banner_id = None
 
-        # Check file size (10MB max before compression)
-        file.seek(0, os.SEEK_END)
-        file_size = file.tell()
-        file.seek(0)
+        # Import Cloudinary service
+        from ...services.cloudinary_service import CloudinaryService
+        cloudinary_service = CloudinaryService()
 
-        if file_size > 10 * 1024 * 1024:
-            return jsonify({'error': 'File size too large. Maximum size is 10MB before compression'}), 400
+        # Upload to Cloudinary (automatic optimization)
+        upload_result = cloudinary_service.upload_carousel_banner(file, banner_id=banner_id)
 
-        # Validate that it's actually an image
-        if not validate_image(file.stream):
-            return jsonify({'error': 'Invalid image file'}), 400
-
-        # Generate unique filename
-        original_filename = secure_filename(file.filename)
-        file_extension = 'jpg'  # Always convert to JPEG for consistency
-        unique_filename = f"carousel_{uuid.uuid4().hex}.{file_extension}"
-
-        # Create upload directory if it doesn't exist
-        upload_path = os.path.join(current_app.root_path, UPLOAD_FOLDER)
-        carousel_images_path = os.path.join(upload_path, 'carousel_banners')
-
-        os.makedirs(upload_path, exist_ok=True)
-        os.makedirs(carousel_images_path, exist_ok=True)
-
-        # Optimize carousel image with aggressive compression
-        optimized_image = optimize_carousel_image(file.stream, max_width=1400, max_height=500, quality=75)
-        optimized_size = len(optimized_image.getvalue())
-
-        # Save file
-        file_path = os.path.join(carousel_images_path, unique_filename)
-        with open(file_path, 'wb') as f:
-            f.write(optimized_image.read())
-
-        # Generate URL for the uploaded file
-        base_url = request.host_url.rstrip('/')
-        image_url = f"{base_url}/api/uploads/carousel_banners/{unique_filename}"
-
-        compression_ratio = (1 - (optimized_size / file_size)) * 100 if file_size > 0 else 0
+        if not upload_result.get('success'):
+            return jsonify({'error': upload_result.get('error', 'Upload failed')}), 400
 
         current_app.logger.info(
-            f"Carousel banner uploaded successfully: {unique_filename} "
-            f"({file_size/1024:.1f}KB → {optimized_size/1024:.1f}KB, {compression_ratio:.1f}% reduction)"
+            f"[v0] Carousel banner uploaded successfully to Cloudinary: {upload_result['public_id']}"
         )
 
         return jsonify({
             'success': True,
-            'url': image_url,
-            'filename': unique_filename,
-            'original_size': file_size,
-            'optimized_size': optimized_size,
-            'compression_ratio': f"{compression_ratio:.1f}%",
-            'originalName': original_filename,
+            'url': upload_result['secure_url'],  # Main URL for display
+            'display_url': upload_result['secure_url'],
+            'public_id': upload_result['public_id'],
+            'filename': secure_filename(file.filename),
+            'size': upload_result['bytes'],
+            'format': upload_result['format'],
+            'responsive_urls': upload_result['responsive_urls'],
             'uploadedBy': get_jwt_identity(),
             'uploadedAt': datetime.now().isoformat()
         }), 200
 
     except Exception as e:
-        current_app.logger.error(f"Error uploading carousel banner: {str(e)}")
+        current_app.logger.error(f"[v0] Error uploading carousel banner: {str(e)}")
         return jsonify({
             'error': 'Failed to upload carousel banner',
             'details': str(e)

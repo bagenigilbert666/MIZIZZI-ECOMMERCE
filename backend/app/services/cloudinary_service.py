@@ -594,7 +594,133 @@ class CloudinaryService:
                 'error': str(e)
             }
 
-    def create_image_archive(self, public_ids: List[str], archive_name: str = None) -> Dict:
+    def upload_carousel_banner(self, file: FileStorage, banner_id: int = None, alt_text: str = None) -> Dict:
+        """
+        Upload carousel banner image to Cloudinary with optimizations for carousel display
+        
+        Args:
+            file: Image file (FileStorage)
+            banner_id: Optional banner ID for organizing images
+            alt_text: Alternative text for accessibility
+            
+        Returns:
+            Dict containing upload result with URLs and metadata
+        """
+        try:
+            # Generate unique public ID for carousel banner
+            banner_id_str = str(banner_id) if banner_id else "new"
+            public_id = f"carousel_banner_{banner_id_str}_{uuid.uuid4().hex[:8]}"
+
+            # Configure upload options specifically for carousel images
+            upload_options = {
+                'public_id': public_id,
+                'folder': 'mizizzi/carousel_banners',
+                'resource_type': 'image',
+                'overwrite': True,
+                'invalidate': True,
+                'transformation': [
+                    {
+                        'width': 1400,
+                        'height': 500,
+                        'crop': 'fill',
+                        'gravity': 'auto',
+                        'quality': 'auto:good',
+                        'fetch_format': 'auto'
+                    }
+                ],
+                'context': {
+                    'type': 'carousel_banner',
+                    'banner_id': str(banner_id) if banner_id else 'new',
+                    'alt_text': alt_text or 'Carousel banner image'
+                },
+                'tags': ['carousel_banner', 'mizizzi_carousel']
+            }
+
+            # Validate file
+            if not self._validate_image_file(file):
+                raise ValueError("Invalid image file")
+
+            # Reset file pointer
+            file.seek(0)
+
+            # Upload file to Cloudinary
+            result = cloudinary.uploader.upload(file, **upload_options)
+
+            # Generate optimized URLs for different devices
+            responsive_urls = self._generate_carousel_responsive_urls(result['public_id'])
+
+            # Prepare response
+            response = {
+                'success': True,
+                'public_id': result['public_id'],
+                'secure_url': result['secure_url'],
+                'url': result['url'],
+                'width': result['width'],
+                'height': result['height'],
+                'format': result['format'],
+                'bytes': result['bytes'],
+                'created_at': result['created_at'],
+                'alt_text': alt_text,
+                'responsive_urls': responsive_urls,
+                'display_url': result['secure_url']  # Primary URL for display
+            }
+
+            logger.info(f"Successfully uploaded carousel banner: {result['public_id']} ({result['bytes']} bytes)")
+            return response
+
+        except Exception as e:
+            logger.error(f"Error uploading carousel banner: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+
+    def _generate_carousel_responsive_urls(self, public_id: str) -> Dict:
+        """Generate responsive carousel image URLs for different screen sizes"""
+        try:
+            carousel_sizes = {
+                'mobile': {'width': 800, 'height': 300, 'crop': 'fill'},      # Mobile
+                'tablet': {'width': 1000, 'height': 400, 'crop': 'fill'},      # Tablet
+                'desktop': {'width': 1400, 'height': 500, 'crop': 'fill'},     # Desktop
+                'ultrawide': {'width': 1920, 'height': 600, 'crop': 'fill'}    # 4K
+            }
+
+            urls = {}
+            for size_name, transformation in carousel_sizes.items():
+                urls[size_name] = self.generate_transformation_url(
+                    public_id,
+                    width=transformation['width'],
+                    height=transformation['height'],
+                    crop=transformation['crop'],
+                    quality='auto',
+                    format='auto'
+                )
+
+            return urls
+
+        except Exception as e:
+            logger.error(f"Error generating carousel responsive URLs: {str(e)}")
+            return {}
+
+    def delete_carousel_banner(self, public_id: str) -> Dict:
+        """Delete a carousel banner image from Cloudinary"""
+        try:
+            result = cloudinary.uploader.destroy(public_id)
+
+            logger.info(f"Successfully deleted carousel banner: {public_id}")
+            return {
+                'success': True,
+                'result': result['result'],
+                'public_id': public_id
+            }
+
+        except Exception as e:
+            logger.error(f"Error deleting carousel banner {public_id}: {str(e)}")
+            return {
+                'success': False,
+                'error': str(e)
+            }
+
         """Create a downloadable archive of images"""
         try:
             if not archive_name:
