@@ -8,7 +8,7 @@ import { Upload, X, Loader2 } from "lucide-react"
 import Image from "next/image"
 
 interface ImageUploaderProps {
-  onUpload: (url: string) => void
+  onUpload: (url: string) => void | Promise<void>
   currentImage?: string
   type?: "carousel" | "product" // Type determines compression level
 }
@@ -190,7 +190,8 @@ export function ImageUploader({ onUpload, currentImage, type = "product" }: Imag
       
       console.log(`[v0] Using Cloudinary CDN URL: ${cloudinaryUrl}`)
       
-      onUpload(cloudinaryUrl)
+      // Call onUpload and await if it's async
+      await Promise.resolve(onUpload(cloudinaryUrl))
       setUploadProgress(100)
       setIsUploading(false)
     } catch (error) {

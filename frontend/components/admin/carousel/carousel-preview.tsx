@@ -40,9 +40,23 @@ export function CarouselPreview({ banner }: CarouselPreviewProps) {
     
     try {
       const url = new URL(imageUrl)
-      const pathParts = url.pathname.split("/")
-      const imageFileName = pathParts[pathParts.length - 1]
-      const cloudName = url.hostname.split(".")[0]
+      const pathParts = url.pathname.split("/").filter(Boolean)
+      
+      // Extract cloud name from URL
+      let cloudName = ""
+      if (url.hostname.startsWith("res.cloudinary.com")) {
+        // Extract from path for res.cloudinary.com URLs
+        cloudName = pathParts[0] || "da35rsdl0"
+      } else {
+        // Extract from subdomain for {cloud-name}.cloudinary.com URLs
+        cloudName = url.hostname.split(".")[0]
+      }
+      
+      // Find the image file name (after "upload/" transformation params)
+      const uploadIndex = pathParts.indexOf("upload")
+      const imageFileName = uploadIndex >= 0 ? pathParts[uploadIndex + 1] : pathParts[pathParts.length - 1]
+      
+      if (!imageFileName) return imageUrl
       
       // Optimized for preview display
       return `https://res.cloudinary.com/${cloudName}/image/upload/w_800,h_300,c_fill,q_auto,f_auto/${imageFileName}`
