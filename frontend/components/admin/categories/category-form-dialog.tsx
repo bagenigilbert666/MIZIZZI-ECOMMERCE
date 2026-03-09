@@ -201,21 +201,29 @@ export function CategoryFormDialog({
         sort_order: formData.sort_order,
       }
 
-      // Add image data if it's a new upload (base64 format)
+      // Add image data if it's a new upload or if the URL has changed
       if (imageData && imageData !== editingCategory?.image_url) {
         if (imageData.includes("base64") || !imageData.startsWith("http")) {
+          // Base64 encoded data - send as base64
           payload.image_data = imageData
           payload.image_mimetype = imageMimetype
           payload.image_filename = "category_image.jpg"
+        } else {
+          // URL-based image (e.g., from Cloudinary) - send as URL
+          payload.image_url = imageData
         }
       }
 
-      // Add banner data if it's a new upload (base64 format)
+      // Add banner data if it's a new upload or if the URL has changed
       if (bannerData && bannerData !== editingCategory?.banner_url) {
         if (bannerData.includes("base64") || !bannerData.startsWith("http")) {
+          // Base64 encoded data - send as base64
           payload.banner_data = bannerData
           payload.banner_mimetype = bannerMimetype
           payload.banner_filename = "category_banner.jpg"
+        } else {
+          // URL-based image - send as URL
+          payload.banner_url = bannerData
         }
       }
 
