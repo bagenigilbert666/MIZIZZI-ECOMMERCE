@@ -27,19 +27,23 @@ const CategoryCard = ({
     }
 
     const img = new Image()
-    img.onload = () => setImageLoaded(true)
-    img.onerror = () => setImageFailed(true)
+    img.crossOrigin = "anonymous"
+    img.onload = () => {
+      setImageLoaded(true)
+      setImageFailed(false)
+    }
+    img.onerror = () => {
+      console.log("[v0] Failed to load category image:", imageUrl)
+      setImageFailed(true)
+      setImageLoaded(false)
+    }
     img.src = imageUrl
 
-    // If image loads within 100ms, mark as loaded immediately
-    const timeout = setTimeout(() => {
-      if (!imageLoaded && !imageFailed) {
-        // Image is taking too long, show it anyway (it will appear when ready)
-        setImageLoaded(true)
-      }
-    }, 100)
-
-    return () => clearTimeout(timeout)
+    return () => {
+      // Cleanup
+      img.onload = null
+      img.onerror = null
+    }
   }, [imageUrl])
 
   return (
@@ -51,18 +55,23 @@ const CategoryCard = ({
       <div className="group relative overflow-hidden rounded-lg w-full h-full bg-white shadow-sm hover:shadow-md hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200">
         <div className="aspect-square w-full overflow-hidden relative bg-gradient-to-br from-gray-200 to-gray-300">
           {imageUrl && !imageFailed && (
-            <div
-              className="absolute inset-0 bg-cover bg-center transition-opacity duration-200"
-              style={{
-                backgroundImage: `url(${imageUrl})`,
-                opacity: 1,
-              }}
+            <img
+              src={imageUrl}
+              alt={category.name}
+              crossOrigin="anonymous"
+              className="w-full h-full object-cover transition-opacity duration-200"
+              loading="lazy"
+              onError={() => setImageFailed(true)}
+              onLoad={() => setImageLoaded(true)}
             />
           )}
 
           {(!imageUrl || imageFailed) && (
-            <div className="absolute inset-0 flex items-center justify-center p-8">
-              <img src="/logo.png" alt={category.name} className="w-full h-full object-contain opacity-50" />
+            <div className="absolute inset-0 flex items-center justify-center p-8 bg-gradient-to-br from-gray-300 to-gray-400">
+              <div className="text-center">
+                <div className="text-5xl mb-2 opacity-30">🛍️</div>
+                <p className="text-xs text-gray-600 font-medium">{category.name}</p>
+              </div>
             </div>
           )}
         </div>
@@ -91,13 +100,14 @@ export function CategoryGrid({ categories = [] }: CategoryGridProps) {
   useEffect(() => {
     if (categories.length === 0) return
 
-    // Preload first 12 category images
+    // Preload first 12 category images with CORS
     categories.slice(0, 12).forEach((category) => {
       if (category.image_url) {
         const link = document.createElement("link")
         link.rel = "preload"
         link.as = "image"
         link.href = category.image_url
+        link.crossOrigin = "anonymous"
         document.head.appendChild(link)
       }
     })
