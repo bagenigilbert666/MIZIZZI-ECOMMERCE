@@ -8,23 +8,30 @@ import { useToast } from "@/hooks/use-toast"
 import { CategoryFormDialog } from "@/components/admin/categories/category-form-dialog"
 import { CategoryDeleteDialog } from "@/components/admin/categories/category-delete-dialog"
 
-const getValidImageUrl = (url: string | null | undefined): string => {
+const getValidImageUrl = (url: string | null | undefined, bustCache: boolean = false): string => {
   if (!url) return "/placeholder.svg"
 
   if (url.startsWith("data:")) {
     return url
   }
 
+  let finalUrl = url
   if (url.startsWith("http://") || url.startsWith("https://")) {
-    return url
-  }
-
-  if (url.startsWith("/")) {
+    finalUrl = url
+  } else if (url.startsWith("/")) {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
-    return `${baseUrl}${url}`
+    finalUrl = `${baseUrl}${url}`
+  } else {
+    return "/placeholder.svg"
   }
 
-  return "/placeholder.svg"
+  // Add cache-busting parameter for Cloudinary URLs to force fresh images
+  if (bustCache && (finalUrl.includes("cloudinary.com") || finalUrl.includes("res.cloudinary.com"))) {
+    const separator = finalUrl.includes("?") ? "&" : "?"
+    finalUrl = `${finalUrl}${separator}t=${Date.now()}`
+  }
+
+  return finalUrl
 }
 
 interface Category {
@@ -74,10 +81,11 @@ export default function ShopCategoriesAdminPage() {
       if (!response.ok) throw new Error("Failed to fetch categories")
 
       const data = await response.json()
+      // Use cache busting for image URLs to ensure fresh images after updates
       const normalizedCategories = (data.items || []).map((cat: Category) => ({
         ...cat,
-        image_url: cat.image_url ? getValidImageUrl(cat.image_url) : undefined,
-        banner_url: cat.banner_url ? getValidImageUrl(cat.banner_url) : undefined,
+        image_url: cat.image_url ? getValidImageUrl(cat.image_url, true) : undefined,
+        banner_url: cat.banner_url ? getValidImageUrl(cat.banner_url, true) : undefined,
       }))
       setCategories(normalizedCategories)
     } catch (error) {

@@ -249,11 +249,15 @@ export function CategoryFormDialog({
         category: payload,
       })
 
+      // Clear caches and force a full refresh of categories
       categoryService.clearCache()
       mutate((key: any) => typeof key === "string" && key.includes("categories"), undefined, { revalidate: true })
       
+      // Close dialog and refetch with a small delay to ensure backend is updated
       onOpenChange(false)
-      onSaveSuccess()
+      setTimeout(() => {
+        onSaveSuccess()
+      }, 100)
     } catch (error) {
       console.error("Error saving category:", error)
       toast({
