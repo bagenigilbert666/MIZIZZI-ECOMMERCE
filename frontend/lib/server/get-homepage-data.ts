@@ -60,6 +60,19 @@ export const getHomepageData = cache(async () => {
       // Normalize category images to absolute URLs
       const normalizedCategories = (data.categories || []).map(normalizeCategoryImages)
       
+      // Debug log first 3 categories and their image URLs
+      console.log("[Homepage] First category raw:", JSON.stringify(data.categories?.[0], null, 2))
+      console.log("[Homepage] First category normalized:", JSON.stringify(normalizedCategories?.[0], null, 2))
+      if (normalizedCategories.length > 0) {
+        normalizedCategories.slice(0, 3).forEach((cat, idx) => {
+          console.log(`[Homepage] Category ${idx}:`, {
+            name: cat.name,
+            image_url: cat.image_url,
+            imageExists: !!cat.image_url,
+          })
+        })
+      }
+      
       // Transform API response to match frontend expectations
       return {
         categories: normalizedCategories,

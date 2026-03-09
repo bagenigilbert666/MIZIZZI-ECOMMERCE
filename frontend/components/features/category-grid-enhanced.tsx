@@ -21,19 +21,30 @@ const CategoryCard = ({
   const imageUrl = category.image_url && category.image_url.trim() !== "" ? category.image_url : null
 
   useEffect(() => {
+    console.log("[v0] CategoryCard rendered:", {
+      name: category.name,
+      imageUrl: imageUrl,
+      hasImageUrl: !!imageUrl,
+      isValid: imageUrl ? imageUrl.trim() !== "" : false,
+    })
+
     if (!imageUrl) {
+      console.log("[v0] No image URL for category:", category.name)
       setImageFailed(true)
       return
     }
 
+    console.log("[v0] Attempting to preload image:", imageUrl)
+
     const img = new Image()
     img.crossOrigin = "anonymous"
     img.onload = () => {
+      console.log("[v0] Image loaded successfully:", imageUrl)
       setImageLoaded(true)
       setImageFailed(false)
     }
-    img.onerror = () => {
-      console.log("[v0] Failed to load category image:", imageUrl)
+    img.onerror = (error) => {
+      console.log("[v0] Failed to load category image:", { url: imageUrl, error: error })
       setImageFailed(true)
       setImageLoaded(false)
     }
@@ -44,7 +55,7 @@ const CategoryCard = ({
       img.onload = null
       img.onerror = null
     }
-  }, [imageUrl])
+  }, [imageUrl, category.name])
 
   return (
     <Link
