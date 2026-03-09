@@ -2,6 +2,28 @@ import { cache } from "react"
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "https://mizizzi-ecommerce-1.onrender.com"
 
+// Normalize image URLs - convert relative URLs to absolute URLs
+const normalizeImageUrl = (url: string | undefined | null): string | undefined => {
+  if (!url) return undefined
+  // Already absolute URL or data URL - return as is
+  if (url.startsWith("http") || url.startsWith("data:")) return url
+  // Relative URL starting with / - prepend base URL
+  if (url.startsWith("/")) {
+    return `${API_BASE_URL}${url}`
+  }
+  return url
+}
+
+// Normalize category images recursively
+const normalizeCategoryImages = (category: any): any => {
+  return {
+    ...category,
+    image_url: normalizeImageUrl(category.image_url),
+    banner_url: normalizeImageUrl(category.banner_url),
+    subcategories: category.subcategories?.map(normalizeCategoryImages) || undefined,
+  }
+}
+
 export const getHomepageData = cache(async () => {
   try {
     console.log("[Homepage] Fetching from:", `${API_BASE_URL}/api/homepage`)
@@ -35,9 +57,12 @@ export const getHomepageData = cache(async () => {
       console.log("[Homepage] Luxury Products:", data.luxury_products?.length || 0)
       console.log("[Homepage] Contact CTA Slides:", data.contact_cta_slides?.length || 0)
       
+      // Normalize category images to absolute URLs
+      const normalizedCategories = (data.categories || []).map(normalizeCategoryImages)
+      
       // Transform API response to match frontend expectations
       return {
-        categories: data.categories || [],
+        categories: normalizedCategories,
         carousel_items: data.carousel_items || [], // Some backends return this
         banner_slides: data.banner_slides || [], // Some backends return this instead
         contact_cta_slides: data.contact_cta_slides || [],
