@@ -14,14 +14,14 @@ CACHE_TTL = 300  # 5 minutes
 def get_homepage_categories(limit: int = 20) -> List[Dict[str, Any]]:
     """
     Fetch categories for homepage with Redis caching.
-    OPTIMIZATION: Uses column-specific query to load only 5 needed fields (no full model).
-    This avoids loading large binary image_data, banner_data, and relationships.
+    OPTIMIZATION: Uses column-specific query to load only needed fields (no full model).
+    This avoids loading large binary relationships while still getting image data paths.
     
     Args:
         limit: Maximum number of categories to return
         
     Returns:
-        List of category dictionaries with id, name, slug, image, description
+        List of category dictionaries with id, name, slug, image_url, description
     """
     try:
         # Try to get from Redis cache
@@ -32,41 +32,36 @@ def get_homepage_categories(limit: int = 20) -> List[Dict[str, Any]]:
                 logger.debug("[Homepage] Categories loaded from cache")
                 return cached
         
-        # OPTIMIZATION: Query only 5 needed columns, not full model
-        # This avoids loading image_data (LargeBinary), banner_data, and subcategories relationship
-        # Explicit filter for active categories for future index support
-        categories = db.session.query(
-            Category.id,
-            Category.name,
-            Category.slug,
-            Category.image_url,
-            Category.description
-        ).filter(Category.is_active == True)\
+        # Query full Category objects to access both image_url and image_data for proper URL generation
+        # We need the image_data field to know if stored image exists, to generate correct API endpoint
+        categories = db.session.query(Category)\
+         .filter(Category.is_active == True)\
          .order_by(Category.sort_order.asc(), Category.created_at.desc())\
          .limit(limit)\
          .all()
         
-        # Serialize from tuples directly with full image support
+        # Serialize using to_dict() which handles image_url generation correctly:
+        # - If image_data exists: returns API endpoint `/api/admin/shop-categories/categories/{id}/image`
+        # - Otherwise: returns image_url field from database
         result = [
             {
-                "id": row[0],
-                "name": row[1],
-                "slug": row[2],
-                "image": row[3] or "",  # Direct image_url from query
-                "image_url": row[3] or "",  # Standard field name
-                "description": row[4] or "",
+                "id": cat.id,
+                "name": cat.name,
+                "slug": cat.slug,
+                "image_url": cat.to_dict()["image_url"],  # Use to_dict() for proper image URL generation
+                "description": cat.description or "",
                 "is_active": True
             }
-            for row in categories
+            for cat in categories
         ]
         
         # Cache result
         if product_cache:
             product_cache.set(CACHE_KEY, result, CACHE_TTL)
         
-        logger.debug(f"[Homepage] Loaded {len(result)} categories")
+        logger.info(f"[Homepage] Loaded {len(result)} categories with images")
         return result
         
     except Exception as e:
-        logger.error(f"[Homepage] Error loading categories: {e}")
+        logger.error(f"[Homepage] Error loading categories: {e}", exc_info=True)
         return []
