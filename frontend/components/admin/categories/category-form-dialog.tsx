@@ -103,8 +103,6 @@ export function CategoryFormDialog({
   const handleImageUpload = async (file: File, type: "category" | "banner") => {
     if (!file) return
 
-    console.log(`[v0] Starting upload for ${type} image:`, { fileName: file.name, fileSize: file.size, fileType: file.type })
-
     try {
       setUploadingImage(type)
       const formDataObj = new FormData()
@@ -112,8 +110,6 @@ export function CategoryFormDialog({
 
       const token = localStorage.getItem("admin_token") || localStorage.getItem("mizizzi_token")
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
-
-      console.log(`[v0] Uploading to: ${baseUrl}/api/admin/shop-categories/categories/upload-image`)
 
       const response = await fetch(`${baseUrl}/api/admin/shop-categories/categories/upload-image`, {
         method: "POST",
@@ -123,37 +119,27 @@ export function CategoryFormDialog({
         body: formDataObj,
       })
 
-      console.log(`[v0] Upload response status:`, response.status)
-
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
         throw new Error(errorData.error || "Upload failed")
       }
 
       const data = await response.json()
-      console.log(`[v0] Upload response data:`, data)
-      console.log(`[v0] Image URL from response:`, data.url || data.data)
 
       const fieldName = type === "category" ? "image_url" : "banner_url"
       const imageUrl = data.url || data.data
       
-      console.log(`[v0] Setting form data field '${fieldName}' to:`, imageUrl)
-      
-      setFormData((prev) => {
-        const updated = {
-          ...prev,
-          [fieldName]: imageUrl,
-        }
-        console.log(`[v0] Form data updated:`, { fieldName, newValue: imageUrl, fullFormData: updated })
-        return updated
-      })
+      setFormData((prev) => ({
+        ...prev,
+        [fieldName]: imageUrl,
+      }))
 
       toast({
         title: "Success",
         description: `${type === "category" ? "Category" : "Banner"} image uploaded`,
       })
     } catch (error) {
-      console.error("[v0] Error uploading image:", error)
+      console.error("Error uploading image:", error)
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to upload image",
@@ -165,9 +151,6 @@ export function CategoryFormDialog({
   }
 
   const handleSave = async () => {
-    console.log("[v0] Save initiated with form data:", formData)
-    console.log("[v0] Editing category:", editingCategory)
-
     if (!formData.name.trim()) {
       toast({
         title: "Validation Error",
@@ -191,8 +174,6 @@ export function CategoryFormDialog({
       const token = localStorage.getItem("admin_token") || localStorage.getItem("mizizzi_token")
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
-      console.log("[v0] Base URL:", baseUrl)
-
       // Extract base64 data from data URLs if they exist
       let imageData = formData.image_url
       let imageMimetype = "image/jpeg"
@@ -204,14 +185,6 @@ export function CategoryFormDialog({
         }
       }
 
-      console.log("[v0] Image data (after base64 extraction):", {
-        originalUrl: formData.image_url,
-        extractedData: imageData,
-        isBase64: imageData.includes("base64"),
-        startsWithHttp: imageData.startsWith("http"),
-        changedFromOriginal: imageData !== editingCategory?.image_url,
-      })
-
       let bannerData = formData.banner_url
       let bannerMimetype = "image/jpeg"
       if (formData.banner_url?.startsWith("data:")) {
@@ -221,14 +194,6 @@ export function CategoryFormDialog({
           bannerData = matches[2]
         }
       }
-
-      console.log("[v0] Banner data (after base64 extraction):", {
-        originalUrl: formData.banner_url,
-        extractedData: bannerData,
-        isBase64: bannerData.includes("base64"),
-        startsWithHttp: bannerData.startsWith("http"),
-        changedFromOriginal: bannerData !== editingCategory?.banner_url,
-      })
 
       const payload: Record<string, any> = {
         name: formData.name.trim(),
@@ -242,43 +207,31 @@ export function CategoryFormDialog({
       if (imageData && imageData !== editingCategory?.image_url) {
         if (imageData.includes("base64") || !imageData.startsWith("http")) {
           // Base64 encoded data - send as base64
-          console.log("[v0] Adding image as base64 data")
           payload.image_data = imageData
           payload.image_mimetype = imageMimetype
           payload.image_filename = "category_image.jpg"
         } else {
           // URL-based image (e.g., from Cloudinary) - send as URL
-          console.log("[v0] Adding image as URL:", imageData)
           payload.image_url = imageData
         }
-      } else {
-        console.log("[v0] Image not changed, skipping image update")
       }
 
       // Add banner data if it's a new upload or if the URL has changed
       if (bannerData && bannerData !== editingCategory?.banner_url) {
         if (bannerData.includes("base64") || !bannerData.startsWith("http")) {
           // Base64 encoded data - send as base64
-          console.log("[v0] Adding banner as base64 data")
           payload.banner_data = bannerData
           payload.banner_mimetype = bannerMimetype
           payload.banner_filename = "category_banner.jpg"
         } else {
           // URL-based image - send as URL
-          console.log("[v0] Adding banner as URL:", bannerData)
           payload.banner_url = bannerData
         }
-      } else {
-        console.log("[v0] Banner not changed, skipping banner update")
       }
-
-      console.log("[v0] Final payload to send:", payload)
 
       const url = editingCategory
         ? `${baseUrl}/api/admin/shop-categories/categories/${editingCategory.id}`
         : `${baseUrl}/api/admin/shop-categories/categories`
-
-      console.log("[v0] Sending request to:", url, "Method:", editingCategory ? "PUT" : "POST")
 
       const response = await fetch(url, {
         method: editingCategory ? "PUT" : "POST",
@@ -289,16 +242,12 @@ export function CategoryFormDialog({
         body: JSON.stringify(payload),
       })
 
-      console.log("[v0] Response status:", response.status)
-
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}))
-        console.log("[v0] Error response data:", errorData)
         throw new Error(errorData.error || "Failed to save category")
       }
 
-      const savedData = await response.json()
-      console.log("[v0] Saved category data:", savedData)
+      await response.json()
 
       toast({
         title: "Success",
@@ -314,12 +263,11 @@ export function CategoryFormDialog({
       categoryService.clearCache()
       mutate((key: any) => typeof key === "string" && key.includes("categories"), undefined, { revalidate: true })
       
-      console.log("[v0] Calling onSaveSuccess with bypassCache=true")
       // Close dialog and refetch immediately with cache busting to get updated image URLs
       onOpenChange(false)
       onSaveSuccess(true)
     } catch (error) {
-      console.error("[v0] Error saving category:", error)
+      console.error("Error saving category:", error)
       toast({
         title: "Error",
         description: error instanceof Error ? error.message : "Failed to save category",
