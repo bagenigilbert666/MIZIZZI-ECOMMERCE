@@ -66,15 +66,19 @@ export default function ShopCategoriesAdminPage() {
   const paginatedCategories = categories.slice(startIndex, endIndex)
 
   // Fetch categories
-  const fetchCategories = async () => {
+  const fetchCategories = async (bypassCache = false) => {
     try {
       setLoading(true)
       const token = localStorage.getItem("admin_token") || localStorage.getItem("mizizzi_token")
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
-      const response = await fetch(`${baseUrl}/api/admin/shop-categories/categories?per_page=100`, {
+      // Add timestamp to bypass browser cache when forcing refresh
+      const cacheParam = bypassCache ? `&_t=${Date.now()}` : ""
+      const response = await fetch(`${baseUrl}/api/admin/shop-categories/categories?per_page=100${cacheParam}`, {
         headers: {
           Authorization: `Bearer ${token}`,
+          "Cache-Control": "no-cache, no-store, must-revalidate",
+          "Pragma": "no-cache",
         },
       })
 
@@ -298,7 +302,7 @@ export default function ShopCategoriesAdminPage() {
         open={isFormDialogOpen}
         onOpenChange={setIsFormDialogOpen}
         editingCategory={editingCategory}
-        onSaveSuccess={fetchCategories}
+        onSaveSuccess={(bypassCache) => fetchCategories(bypassCache)}
       />
 
       {/* Category Delete Dialog */}

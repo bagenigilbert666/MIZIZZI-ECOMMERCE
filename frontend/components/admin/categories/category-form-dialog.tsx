@@ -42,7 +42,7 @@ interface CategoryFormDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   editingCategory: Category | null
-  onSaveSuccess: () => void
+  onSaveSuccess: (bypassCache?: boolean) => void
 }
 
 export function CategoryFormDialog({
@@ -253,11 +253,9 @@ export function CategoryFormDialog({
       categoryService.clearCache()
       mutate((key: any) => typeof key === "string" && key.includes("categories"), undefined, { revalidate: true })
       
-      // Close dialog and refetch with a small delay to ensure backend is updated
+      // Close dialog and refetch immediately with cache busting to get updated image URLs
       onOpenChange(false)
-      setTimeout(() => {
-        onSaveSuccess()
-      }, 100)
+      onSaveSuccess(true)
     } catch (error) {
       console.error("Error saving category:", error)
       toast({
