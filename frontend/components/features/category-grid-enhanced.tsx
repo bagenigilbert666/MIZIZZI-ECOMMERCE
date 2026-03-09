@@ -9,6 +9,38 @@ interface CategoryGridProps {
   categories?: Category[]
 }
 
+// Fallback images for categories without images
+const CATEGORY_FALLBACK_IMAGES: Record<string, string> = {
+  fashion: "https://images.unsplash.com/photo-1445205170230-053b83016050?w=800&q=80",
+  beauty: "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=800&q=80",
+  "home & living": "https://images.unsplash.com/photo-1616046229478-9901c5536a45?w=800&q=80",
+  electronics: "https://images.unsplash.com/photo-1498049794561-7780e7231661?w=800&q=80",
+  sports: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=800&q=80",
+  computers: "https://images.unsplash.com/photo-1517433456452-f06a01e2c894?w=800&q=80",
+  handbags: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=800&q=80",
+  jewelry: "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=800&q=80",
+  shoes: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80",
+  accessories: "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=800&q=80",
+}
+
+const getFallbackImageUrl = (categoryName: string): string | null => {
+  const normalized = categoryName.toLowerCase().trim()
+  
+  // Direct match
+  if (CATEGORY_FALLBACK_IMAGES[normalized]) {
+    return CATEGORY_FALLBACK_IMAGES[normalized]
+  }
+  
+  // Partial match
+  for (const [key, url] of Object.entries(CATEGORY_FALLBACK_IMAGES)) {
+    if (normalized.includes(key) || key.includes(normalized)) {
+      return url
+    }
+  }
+  
+  return null
+}
+
 const CategoryCard = ({
   category,
   index,
@@ -18,7 +50,12 @@ const CategoryCard = ({
 }) => {
   const [imageLoaded, setImageLoaded] = useState(false)
   const [imageFailed, setImageFailed] = useState(false)
-  const imageUrl = category.image_url && category.image_url.trim() !== "" ? category.image_url : null
+  
+  // Use Cloudinary image from database, or fallback for missing images
+  const isCloudinaryUrl = category.image_url?.includes('res.cloudinary.com')
+  const imageUrl = category.image_url && category.image_url.trim() !== "" 
+    ? category.image_url 
+    : getFallbackImageUrl(category.name)
 
   useEffect(() => {
     if (!imageUrl) {
@@ -26,21 +63,30 @@ const CategoryCard = ({
       return
     }
 
+    // For Cloudinary images, trust they will load (they're optimized)
+    if (isCloudinaryUrl) {
+      setImageLoaded(true)
+      return
+    }
+
+    // For other images, preload and verify
     const img = new Image()
-    img.onload = () => setImageLoaded(true)
-    img.onerror = () => setImageFailed(true)
+    img.crossOrigin = "anonymous"
+    img.onload = () => {
+      setImageLoaded(true)
+      setImageFailed(false)
+    }
+    img.onerror = () => {
+      setImageFailed(true)
+      setImageLoaded(false)
+    }
     img.src = imageUrl
 
-    // If image loads within 100ms, mark as loaded immediately
-    const timeout = setTimeout(() => {
-      if (!imageLoaded && !imageFailed) {
-        // Image is taking too long, show it anyway (it will appear when ready)
-        setImageLoaded(true)
-      }
-    }, 100)
-
-    return () => clearTimeout(timeout)
-  }, [imageUrl])
+    return () => {
+      img.onload = null
+      img.onerror = null
+    }
+  }, [imageUrl, isCloudinaryUrl])
 
   return (
     <Link
@@ -51,18 +97,24 @@ const CategoryCard = ({
       <div className="group relative overflow-hidden rounded-lg w-full h-full bg-white shadow-sm hover:shadow-md hover:scale-[1.02] hover:-translate-y-1 transition-all duration-200">
         <div className="aspect-square w-full overflow-hidden relative bg-gradient-to-br from-gray-200 to-gray-300">
           {imageUrl && !imageFailed && (
-            <div
-              className="absolute inset-0 bg-cover bg-center transition-opacity duration-200"
-              style={{
-                backgroundImage: `url(${imageUrl})`,
-                opacity: 1,
-              }}
+            <img
+              src={imageUrl}
+              alt={category.name}
+              crossOrigin="anonymous"
+              className="w-full h-full object-cover transition-opacity duration-200"
+              loading="lazy"
+              sizes={isCloudinaryUrl ? "(max-width: 640px) 120px, (max-width: 768px) 150px, 180px" : "100%"}
+              onError={() => setImageFailed(true)}
+              onLoad={() => setImageLoaded(true)}
             />
           )}
 
           {(!imageUrl || imageFailed) && (
-            <div className="absolute inset-0 flex items-center justify-center p-8">
-              <img src="/logo.png" alt={category.name} className="w-full h-full object-contain opacity-50" />
+            <div className="absolute inset-0 flex items-center justify-center p-8 bg-gradient-to-br from-gray-300 to-gray-400">
+              <div className="text-center">
+                <div className="text-5xl mb-2 opacity-30">🛍️</div>
+                <p className="text-xs text-gray-600 font-medium">{category.name}</p>
+              </div>
             </div>
           )}
         </div>
@@ -91,13 +143,14 @@ export function CategoryGrid({ categories = [] }: CategoryGridProps) {
   useEffect(() => {
     if (categories.length === 0) return
 
-    // Preload first 12 category images
+    // Preload first 12 category images with CORS
     categories.slice(0, 12).forEach((category) => {
       if (category.image_url) {
         const link = document.createElement("link")
         link.rel = "preload"
         link.as = "image"
         link.href = category.image_url
+        link.crossOrigin = "anonymous"
         document.head.appendChild(link)
       }
     })

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
-import { Plus, Pencil, Trash2, Loader, ImageIcon, ChevronLeft, ChevronRight } from "lucide-react"
+import { Plus, Pencil, Trash2, Loader, ImageIcon } from "lucide-react"
 import Image from "next/image"
 import { useToast } from "@/hooks/use-toast"
 import { CategoryFormDialog } from "@/components/admin/categories/category-form-dialog"
@@ -43,20 +43,12 @@ export default function ShopCategoriesAdminPage() {
   const { toast } = useToast()
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
-  const [currentPage, setCurrentPage] = useState(1)
-  const ITEMS_PER_PAGE = 6
 
   // Dialog states
   const [isFormDialogOpen, setIsFormDialogOpen] = useState(false)
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
   const [categoryToDelete, setCategoryToDelete] = useState<Category | null>(null)
-
-  // Pagination calculations
-  const totalPages = Math.ceil(categories.length / ITEMS_PER_PAGE)
-  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE
-  const endIndex = startIndex + ITEMS_PER_PAGE
-  const paginatedCategories = categories.slice(startIndex, endIndex)
 
   // Fetch categories
   const fetchCategories = async () => {
@@ -163,10 +155,9 @@ export default function ShopCategoriesAdminPage() {
             </div>
           </div>
         ) : (
-          <div className="space-y-6">
-            <div className="space-y-3">
-              {/* Apple-style List View */}
-              {paginatedCategories.map((category) => (
+          <div className="space-y-3">
+            {/* Apple-style List View */}
+            {categories.map((category) => (
               <div
                 key={category.id}
                 className="group flex items-center gap-4 px-5 py-4 rounded-2xl border border-border/40 bg-card hover:bg-muted/30 transition-all duration-200 hover:border-border/60 hover:shadow-sm"
@@ -228,59 +219,7 @@ export default function ShopCategoriesAdminPage() {
                   </Button>
                 </div>
               </div>
-              ))}
-            </div>
-
-            {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div className="flex items-center justify-between gap-4 rounded-xl border border-border/40 bg-card p-4">
-                <div className="flex items-center gap-2">
-                  <p className="text-sm text-muted-foreground">
-                    Showing <span className="font-semibold text-foreground">{startIndex + 1}</span> to{" "}
-                    <span className="font-semibold text-foreground">{Math.min(endIndex, categories.length)}</span> of{" "}
-                    <span className="font-semibold text-foreground">{categories.length}</span> categories
-                  </p>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(currentPage - 1)}
-                    disabled={currentPage === 1}
-                    className="gap-1.5 rounded-lg"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                    <span className="hidden sm:inline">Previous</span>
-                  </Button>
-
-                  <div className="flex items-center gap-1 px-2">
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                      <Button
-                        key={page}
-                        variant={currentPage === page ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setCurrentPage(page)}
-                        className="h-8 w-8 rounded-lg p-0"
-                      >
-                        {page}
-                      </Button>
-                    ))}
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setCurrentPage(currentPage + 1)}
-                    disabled={currentPage === totalPages}
-                    className="gap-1.5 rounded-lg"
-                  >
-                    <span className="hidden sm:inline">Next</span>
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-            )}
+            ))}
           </div>
         )}
       </div>

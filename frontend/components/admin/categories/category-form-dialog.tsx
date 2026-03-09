@@ -111,6 +111,7 @@ export function CategoryFormDialog({
       const token = localStorage.getItem("admin_token") || localStorage.getItem("mizizzi_token")
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
+      // Upload to backend which now uploads to Cloudinary CDN
       const response = await fetch(`${baseUrl}/api/admin/shop-categories/categories/upload-image`, {
         method: "POST",
         headers: {
@@ -126,15 +127,20 @@ export function CategoryFormDialog({
 
       const data = await response.json()
 
+      if (!data.success || !data.url) {
+        throw new Error(data.error || "No URL returned from upload")
+      }
+
+      // Store Cloudinary URL directly
       const fieldName = type === "category" ? "image_url" : "banner_url"
       setFormData((prev) => ({
         ...prev,
-        [fieldName]: data.url || data.data, // Use url from response or fallback to base64 data
+        [fieldName]: data.url, // Cloudinary secure URL
       }))
 
       toast({
         title: "Success",
-        description: `${type === "category" ? "Category" : "Banner"} image uploaded`,
+        description: `${type === "category" ? "Category" : "Banner"} image uploaded to CDN`,
       })
     } catch (error) {
       console.error("Error uploading image:", error)
@@ -172,27 +178,6 @@ export function CategoryFormDialog({
       const token = localStorage.getItem("admin_token") || localStorage.getItem("mizizzi_token")
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
-      // Extract base64 data from data URLs if they exist
-      let imageData = formData.image_url
-      let imageMimetype = "image/jpeg"
-      if (formData.image_url?.startsWith("data:")) {
-        const matches = formData.image_url.match(/^data:([^;]+);base64,(.+)$/)
-        if (matches) {
-          imageMimetype = matches[1]
-          imageData = matches[2]
-        }
-      }
-
-      let bannerData = formData.banner_url
-      let bannerMimetype = "image/jpeg"
-      if (formData.banner_url?.startsWith("data:")) {
-        const matches = formData.banner_url.match(/^data:([^;]+);base64,(.+)$/)
-        if (matches) {
-          bannerMimetype = matches[1]
-          bannerData = matches[2]
-        }
-      }
-
       const payload: Record<string, any> = {
         name: formData.name.trim(),
         slug: formData.slug || formData.name.toLowerCase().replace(/\s+/g, "-"),
@@ -201,22 +186,14 @@ export function CategoryFormDialog({
         sort_order: formData.sort_order,
       }
 
-      // Add image data if it's a new upload (base64 format)
-      if (imageData && imageData !== editingCategory?.image_url) {
-        if (imageData.includes("base64") || !imageData.startsWith("http")) {
-          payload.image_data = imageData
-          payload.image_mimetype = imageMimetype
-          payload.image_filename = "category_image.jpg"
-        }
+      // Add Cloudinary image URL if it's a valid CDN URL
+      if (formData.image_url && formData.image_url.startsWith("https://res.cloudinary.com/")) {
+        payload.image_url = formData.image_url
       }
 
-      // Add banner data if it's a new upload (base64 format)
-      if (bannerData && bannerData !== editingCategory?.banner_url) {
-        if (bannerData.includes("base64") || !bannerData.startsWith("http")) {
-          payload.banner_data = bannerData
-          payload.banner_mimetype = bannerMimetype
-          payload.banner_filename = "category_banner.jpg"
-        }
+      // Add Cloudinary banner URL if it's a valid CDN URL
+      if (formData.banner_url && formData.banner_url.startsWith("https://res.cloudinary.com/")) {
+        payload.banner_url = formData.banner_url
       }
 
       const url = editingCategory
