@@ -194,7 +194,11 @@ export function ImageUploader({ onUpload, currentImage, type = "product" }: Imag
         {preview ? (
           <div className="space-y-3">
             <div className={`relative w-full ${previewHeight} rounded-lg overflow-hidden bg-muted`}>
-              <Image src={preview || "/placeholder.svg"} alt="Preview" fill className="object-cover" />
+              {preview.startsWith("blob:") ? (
+                <img src={preview} alt="Preview" className="w-full h-full object-cover" />
+              ) : (
+                <Image src={preview || "/placeholder.svg"} alt="Preview" fill className="object-cover" />
+              )}
             </div>
             <div className="space-y-2">
               <div className="text-xs text-muted-foreground text-center">

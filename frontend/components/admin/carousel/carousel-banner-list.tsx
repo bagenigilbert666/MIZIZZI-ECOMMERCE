@@ -119,12 +119,13 @@ export function CarouselBannerList({
 
                   <div className="relative w-32 h-24 rounded-lg overflow-hidden flex-shrink-0 bg-muted group">
                     <Image
-                      src={banner.image_url || "/placeholder.svg"}
+                      src={banner.image_url && !banner.image_url.startsWith("blob:") ? banner.image_url : "/placeholder.svg"}
                       alt={banner.title}
                       fill
                       className="object-cover transition-transform duration-300 group-hover:scale-110"
-                      quality={80}
+                      quality={75}
                       sizes="(max-width: 768px) 128px, 128px"
+                      onError={() => console.log("[v0] Error loading image:", banner.image_url)}
                     />
                     {hoveredBanner === banner.id && (
                       <motion.div

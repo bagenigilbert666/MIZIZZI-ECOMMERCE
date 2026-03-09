@@ -31,7 +31,12 @@ export function CarouselPreview({ banner }: CarouselPreviewProps) {
 
   // Optimize Cloudinary URL for preview
   const getOptimizedUrl = (imageUrl: string) => {
-    if (!imageUrl || !imageUrl.includes("cloudinary.com")) return imageUrl
+    if (!imageUrl) return "/placeholder.svg"
+    if (imageUrl.startsWith("blob:")) {
+      console.log("[v0] Blob URL detected, using placeholder")
+      return "/placeholder.svg"
+    }
+    if (!imageUrl.includes("cloudinary.com")) return imageUrl
     
     try {
       const url = new URL(imageUrl)
@@ -42,6 +47,7 @@ export function CarouselPreview({ banner }: CarouselPreviewProps) {
       // Optimized for preview display
       return `https://res.cloudinary.com/${cloudName}/image/upload/w_800,h_300,c_fill,q_auto,f_auto/${imageFileName}`
     } catch (error) {
+      console.log("[v0] Error optimizing Cloudinary URL:", error)
       return imageUrl
     }
   }
@@ -74,7 +80,7 @@ export function CarouselPreview({ banner }: CarouselPreviewProps) {
             fill
             className="object-cover transition-transform duration-300 group-hover:scale-105"
             priority={true}
-            quality={85}
+            quality={75}
           />
           {/* Overlay with gradient */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
