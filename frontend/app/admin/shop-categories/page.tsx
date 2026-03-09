@@ -8,30 +8,23 @@ import { useToast } from "@/hooks/use-toast"
 import { CategoryFormDialog } from "@/components/admin/categories/category-form-dialog"
 import { CategoryDeleteDialog } from "@/components/admin/categories/category-delete-dialog"
 
-const getValidImageUrl = (url: string | null | undefined, bustCache: boolean = false): string => {
+const getValidImageUrl = (url: string | null | undefined): string => {
   if (!url) return "/placeholder.svg"
 
   if (url.startsWith("data:")) {
     return url
   }
 
-  let finalUrl = url
   if (url.startsWith("http://") || url.startsWith("https://")) {
-    finalUrl = url
-  } else if (url.startsWith("/")) {
+    return url
+  }
+
+  if (url.startsWith("/")) {
     const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
-    finalUrl = `${baseUrl}${url}`
-  } else {
-    return "/placeholder.svg"
+    return `${baseUrl}${url}`
   }
 
-  // Add cache-busting parameter for Cloudinary URLs to force fresh images
-  if (bustCache && (finalUrl.includes("cloudinary.com") || finalUrl.includes("res.cloudinary.com"))) {
-    const separator = finalUrl.includes("?") ? "&" : "?"
-    finalUrl = `${finalUrl}${separator}t=${Date.now()}`
-  }
-
-  return finalUrl
+  return "/placeholder.svg"
 }
 
 interface Category {
@@ -66,46 +59,29 @@ export default function ShopCategoriesAdminPage() {
   const paginatedCategories = categories.slice(startIndex, endIndex)
 
   // Fetch categories
-  const fetchCategories = async (bypassCache = false) => {
+  const fetchCategories = async () => {
     try {
-      console.log("[v0] Fetching categories, bypassCache:", bypassCache)
       setLoading(true)
       const token = localStorage.getItem("admin_token") || localStorage.getItem("mizizzi_token")
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000"
 
-      // Add timestamp to bypass browser cache when forcing refresh
-      const cacheParam = bypassCache ? `&_t=${Date.now()}` : ""
-      const fetchUrl = `${baseUrl}/api/admin/shop-categories/categories?per_page=100${cacheParam}`
-      console.log("[v0] Fetch URL:", fetchUrl)
-
-      const response = await fetch(fetchUrl, {
+      const response = await fetch(`${baseUrl}/api/admin/shop-categories/categories?per_page=100`, {
         headers: {
           Authorization: `Bearer ${token}`,
-          "Cache-Control": "no-cache, no-store, must-revalidate",
-          "Pragma": "no-cache",
         },
       })
-
-      console.log("[v0] Fetch response status:", response.status)
 
       if (!response.ok) throw new Error("Failed to fetch categories")
 
       const data = await response.json()
-      console.log("[v0] Categories fetched from API, count:", data.items?.length)
-      console.log("[v0] Raw categories data:", data.items)
-
-      // Use cache busting for image URLs to ensure fresh images after updates
       const normalizedCategories = (data.items || []).map((cat: Category) => ({
         ...cat,
-        image_url: cat.image_url ? getValidImageUrl(cat.image_url, true) : undefined,
-        banner_url: cat.banner_url ? getValidImageUrl(cat.banner_url, true) : undefined,
+        image_url: cat.image_url ? getValidImageUrl(cat.image_url) : undefined,
+        banner_url: cat.banner_url ? getValidImageUrl(cat.banner_url) : undefined,
       }))
-      console.log("[v0] Normalized categories with cache-busted URLs:", normalizedCategories)
-      
       setCategories(normalizedCategories)
-      console.log("[v0] Categories state updated")
     } catch (error) {
-      console.error("[v0] Error fetching categories:", error)
+      console.error("Error fetching categories:", error)
       toast({
         title: "Error",
         description: "Failed to load categories",
@@ -314,7 +290,7 @@ export default function ShopCategoriesAdminPage() {
         open={isFormDialogOpen}
         onOpenChange={setIsFormDialogOpen}
         editingCategory={editingCategory}
-        onSaveSuccess={(bypassCache) => fetchCategories(bypassCache)}
+        onSaveSuccess={fetchCategories}
       />
 
       {/* Category Delete Dialog */}
