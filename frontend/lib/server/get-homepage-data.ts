@@ -27,14 +27,14 @@ const normalizeCategoryImages = (category: any): any => {
 export const getHomepageData = cache(async () => {
   try {
     console.log("[Homepage] Fetching from:", `${API_BASE_URL}/api/homepage`)
-    
+
     const response = await fetch(`${API_BASE_URL}/api/homepage`, {
       method: "GET",
       headers: {
         "Content-Type": "application/json",
         Accept: "application/json",
       },
-      next: { 
+      next: {
         revalidate: 30, // Reduced from 60 to 30 seconds for faster updates
         tags: ["homepage", "feature-cards"] // Allow targeted invalidation
       },
@@ -56,15 +56,15 @@ export const getHomepageData = cache(async () => {
       console.log("[Homepage] Flash Sales:", data.flash_sale_products?.length || 0)
       console.log("[Homepage] Luxury Products:", data.luxury_products?.length || 0)
       console.log("[Homepage] Contact CTA Slides:", data.contact_cta_slides?.length || 0)
-      
+
       // Normalize category images to absolute URLs
       const normalizedCategories = (data.categories || []).map(normalizeCategoryImages)
-      
+
       // Debug log first 3 categories and their image URLs
       console.log("[Homepage] First category raw:", JSON.stringify(data.categories?.[0], null, 2))
       console.log("[Homepage] First category normalized:", JSON.stringify(normalizedCategories?.[0], null, 2))
       if (normalizedCategories.length > 0) {
-        normalizedCategories.slice(0, 3).forEach((cat, idx) => {
+        normalizedCategories.slice(0, 3).forEach((cat: any, idx: number) => {
           console.log(`[Homepage] Category ${idx}:`, {
             name: cat.name,
             image_url: cat.image_url,
@@ -72,7 +72,7 @@ export const getHomepageData = cache(async () => {
           })
         })
       }
-      
+
       // Transform API response to match frontend expectations
       return {
         categories: normalizedCategories,
