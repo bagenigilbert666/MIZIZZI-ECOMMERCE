@@ -145,12 +145,11 @@ export function ImageUploader({ onUpload, currentImage, type = "product" }: Imag
         return
       }
 
-      let uploadEndpoint = "/api/admin/upload/image"
-      if (type === "carousel") {
-        uploadEndpoint = "/api/admin/upload/carousel-banner"
-      }
+      // Use backend API URL directly (no Next.js API routes)
+      const backendUrl = process.env.NEXT_PUBLIC_API_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "https://mizizzi-ecommerce-1.onrender.com"
+      const uploadEndpoint = `${backendUrl}/api/admin/cloudinary/upload`
 
-      console.log(`[v0] Uploading to ${uploadEndpoint} with token: ${token.substring(0, 10)}...`)
+      console.log(`[v0] Uploading to backend: ${uploadEndpoint} with token: ${token.substring(0, 10)}...`)
 
       const response = await fetch(uploadEndpoint, {
         method: "POST",
