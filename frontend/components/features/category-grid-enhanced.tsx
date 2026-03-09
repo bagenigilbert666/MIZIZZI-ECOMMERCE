@@ -9,6 +9,38 @@ interface CategoryGridProps {
   categories?: Category[]
 }
 
+// Fallback images for categories without images
+const CATEGORY_FALLBACK_IMAGES: Record<string, string> = {
+  fashion: "https://images.unsplash.com/photo-1445205170230-053b83016050?w=800&q=80",
+  beauty: "https://images.unsplash.com/photo-1596462502278-27bfdc403348?w=800&q=80",
+  "home & living": "https://images.unsplash.com/photo-1616046229478-9901c5536a45?w=800&q=80",
+  electronics: "https://images.unsplash.com/photo-1498049794561-7780e7231661?w=800&q=80",
+  sports: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=800&q=80",
+  computers: "https://images.unsplash.com/photo-1517433456452-f06a01e2c894?w=800&q=80",
+  handbags: "https://images.unsplash.com/photo-1548036328-c9fa89d128fa?w=800&q=80",
+  jewelry: "https://images.unsplash.com/photo-1599643478518-a784e5dc4c8f?w=800&q=80",
+  shoes: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=800&q=80",
+  accessories: "https://images.unsplash.com/photo-1535632066927-ab7c9ab60908?w=800&q=80",
+}
+
+const getFallbackImageUrl = (categoryName: string): string | null => {
+  const normalized = categoryName.toLowerCase().trim()
+  
+  // Direct match
+  if (CATEGORY_FALLBACK_IMAGES[normalized]) {
+    return CATEGORY_FALLBACK_IMAGES[normalized]
+  }
+  
+  // Partial match
+  for (const [key, url] of Object.entries(CATEGORY_FALLBACK_IMAGES)) {
+    if (normalized.includes(key) || key.includes(normalized)) {
+      return url
+    }
+  }
+  
+  return null
+}
+
 const CategoryCard = ({
   category,
   index,
@@ -18,44 +50,35 @@ const CategoryCard = ({
 }) => {
   const [imageLoaded, setImageLoaded] = useState(false)
   const [imageFailed, setImageFailed] = useState(false)
-  const imageUrl = category.image_url && category.image_url.trim() !== "" ? category.image_url : null
+  
+  // Use provided image or fallback
+  const imageUrl = category.image_url && category.image_url.trim() !== "" 
+    ? category.image_url 
+    : getFallbackImageUrl(category.name)
 
   useEffect(() => {
-    console.log("[v0] CategoryCard rendered:", {
-      name: category.name,
-      imageUrl: imageUrl,
-      hasImageUrl: !!imageUrl,
-      isValid: imageUrl ? imageUrl.trim() !== "" : false,
-    })
-
     if (!imageUrl) {
-      console.log("[v0] No image URL for category:", category.name)
       setImageFailed(true)
       return
     }
 
-    console.log("[v0] Attempting to preload image:", imageUrl)
-
     const img = new Image()
     img.crossOrigin = "anonymous"
     img.onload = () => {
-      console.log("[v0] Image loaded successfully:", imageUrl)
       setImageLoaded(true)
       setImageFailed(false)
     }
-    img.onerror = (error) => {
-      console.log("[v0] Failed to load category image:", { url: imageUrl, error: error })
+    img.onerror = () => {
       setImageFailed(true)
       setImageLoaded(false)
     }
     img.src = imageUrl
 
     return () => {
-      // Cleanup
       img.onload = null
       img.onerror = null
     }
-  }, [imageUrl, category.name])
+  }, [imageUrl])
 
   return (
     <Link
