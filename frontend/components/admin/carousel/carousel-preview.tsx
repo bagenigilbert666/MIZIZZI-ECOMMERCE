@@ -74,14 +74,24 @@ export function CarouselPreview({ banner }: CarouselPreviewProps) {
           animate={{ opacity: 1, scale: 1 }}
           className="relative w-full h-56 rounded-lg overflow-hidden bg-muted group"
         >
-          <Image
-            src={getOptimizedUrl(banner.image_url) || "/placeholder.svg"}
-            alt={banner.title}
-            fill
-            className="object-cover transition-transform duration-300 group-hover:scale-105"
-            priority={true}
-            quality={75}
-          />
+          {banner.image_url && banner.image_url.includes("cloudinary.com") ? (
+            // Use native img for Cloudinary URLs - they're already optimized CDN URLs
+            <img
+              src={getOptimizedUrl(banner.image_url)}
+              alt={banner.title}
+              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+            />
+          ) : (
+            // Use Next.js Image for other URLs
+            <Image
+              src={getOptimizedUrl(banner.image_url) || "/placeholder.svg"}
+              alt={banner.title}
+              fill
+              className="object-cover transition-transform duration-300 group-hover:scale-105"
+              priority={true}
+              quality={75}
+            />
+          )}
           {/* Overlay with gradient */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
 

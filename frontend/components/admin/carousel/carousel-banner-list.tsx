@@ -118,15 +118,24 @@ export function CarouselBannerList({
                   </div>
 
                   <div className="relative w-32 h-24 rounded-lg overflow-hidden flex-shrink-0 bg-muted group">
-                    <Image
-                      src={banner.image_url && !banner.image_url.startsWith("blob:") ? banner.image_url : "/placeholder.svg"}
-                      alt={banner.title}
-                      fill
-                      className="object-cover transition-transform duration-300 group-hover:scale-110"
-                      quality={75}
-                      sizes="(max-width: 768px) 128px, 128px"
-                      onError={() => console.log("[v0] Error loading image:", banner.image_url)}
-                    />
+                    {banner.image_url && banner.image_url.includes("cloudinary.com") ? (
+                      // Use native img for Cloudinary URLs - they're already optimized
+                      <img
+                        src={banner.image_url}
+                        alt={banner.title}
+                        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                      />
+                    ) : (
+                      // Use Next.js Image for other URLs
+                      <Image
+                        src={banner.image_url && !banner.image_url.startsWith("blob:") ? banner.image_url : "/placeholder.svg"}
+                        alt={banner.title}
+                        fill
+                        className="object-cover transition-transform duration-300 group-hover:scale-110"
+                        quality={75}
+                        sizes="(max-width: 768px) 128px, 128px"
+                      />
+                    )}
                     {hoveredBanner === banner.id && (
                       <motion.div
                         initial={{ opacity: 0 }}

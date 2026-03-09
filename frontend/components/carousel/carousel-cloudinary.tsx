@@ -116,19 +116,15 @@ export function CarouselCloudinary({
     >
       {/* Carousel Image with responsive URLs */}
       <div className="relative w-full h-64 sm:h-96 md:h-[500px]">
-        <Image
+        {/* Use native img for Cloudinary URLs - they're already optimized CDN URLs */}
+        <img
           src={responsiveUrls.desktop}
           alt={currentBanner.title || "Carousel banner"}
-          fill
           className={cn(
-            "object-cover transition-opacity duration-700",
+            "w-full h-full object-cover transition-opacity duration-700",
             imageLoaded[currentIndex] ? "opacity-100" : "opacity-0"
           )}
-          priority={currentIndex === 0}
           onLoad={() => setImageLoaded((prev) => ({ ...prev, [currentIndex]: true }))}
-          sizes="(max-width: 640px) 100vw, (max-width: 1024px) 100vw, 1400px"
-          quality={85}
-          unoptimized={false}
         />
 
         {/* Placeholder blur - shows while image loads */}
