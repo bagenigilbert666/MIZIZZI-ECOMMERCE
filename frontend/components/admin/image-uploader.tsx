@@ -166,11 +166,28 @@ export function ImageUploader({ onUpload, currentImage, type = "product" }: Imag
       }
 
       const data = await response.json()
-      console.log(`[v0] Image uploaded successfully: ${data.url}`)
-      console.log(`[v0] Compression ratio: ${data.compression_ratio || "N/A"}`)
-
-      // Use Cloudinary URL directly for instant CDN delivery
-      const cloudinaryUrl = data.url || data.image_url || data.display_url || ""
+      
+      // Extract URL from backend response structure
+      let cloudinaryUrl = ""
+      
+      // Try different response structures from backend
+      if (data.uploaded_images && data.uploaded_images.length > 0) {
+        cloudinaryUrl = data.uploaded_images[0].secure_url || data.uploaded_images[0].url
+      } else if (data.uploaded && data.uploaded.length > 0) {
+        cloudinaryUrl = data.uploaded[0].secure_url || data.uploaded[0].url
+      } else if (data.secure_url) {
+        cloudinaryUrl = data.secure_url
+      } else if (data.url) {
+        cloudinaryUrl = data.url
+      }
+      
+      console.log(`[v0] Image uploaded successfully: ${cloudinaryUrl}`)
+      console.log(`[v0] Backend response:`, data)
+      
+      if (!cloudinaryUrl) {
+        throw new Error("No image URL returned from server")
+      }
+      
       console.log(`[v0] Using Cloudinary CDN URL: ${cloudinaryUrl}`)
       
       onUpload(cloudinaryUrl)
