@@ -29,6 +29,43 @@ export function CarouselPreview({ banner }: CarouselPreviewProps) {
     )
   }
 
+  // Optimize Cloudinary URL for preview
+  const getOptimizedUrl = (imageUrl: string) => {
+    if (!imageUrl) return "/placeholder.svg"
+    if (imageUrl.startsWith("blob:")) {
+      console.log("[v0] Blob URL detected, using placeholder")
+      return "/placeholder.svg"
+    }
+    if (!imageUrl.includes("cloudinary.com")) return imageUrl
+    
+    try {
+      const url = new URL(imageUrl)
+      const pathParts = url.pathname.split("/").filter(Boolean)
+      
+      // Extract cloud name from URL
+      let cloudName = ""
+      if (url.hostname.startsWith("res.cloudinary.com")) {
+        // Extract from path for res.cloudinary.com URLs
+        cloudName = pathParts[0] || "da35rsdl0"
+      } else {
+        // Extract from subdomain for {cloud-name}.cloudinary.com URLs
+        cloudName = url.hostname.split(".")[0]
+      }
+      
+      // Find the image file name (after "upload/" transformation params)
+      const uploadIndex = pathParts.indexOf("upload")
+      const imageFileName = uploadIndex >= 0 ? pathParts[uploadIndex + 1] : pathParts[pathParts.length - 1]
+      
+      if (!imageFileName) return imageUrl
+      
+      // Optimized for preview display
+      return `https://res.cloudinary.com/${cloudName}/image/upload/w_800,h_300,c_fill,q_auto,f_auto/${imageFileName}`
+    } catch (error) {
+      console.log("[v0] Error optimizing Cloudinary URL:", error)
+      return imageUrl
+    }
+  }
+
   return (
     <Card className="sticky top-4">
       <CardHeader>
@@ -51,12 +88,24 @@ export function CarouselPreview({ banner }: CarouselPreviewProps) {
           animate={{ opacity: 1, scale: 1 }}
           className="relative w-full h-56 rounded-lg overflow-hidden bg-muted group"
         >
-          <Image
-            src={banner.image_url || "/placeholder.svg"}
-            alt={banner.title}
-            fill
-            className="object-cover transition-transform duration-300 group-hover:scale-105"
-          />
+          {banner.image_url && banner.image_url.includes("cloudinary.com") ? (
+            // Use native img for Cloudinary URLs - they're already optimized CDN URLs
+            <img
+              src={getOptimizedUrl(banner.image_url)}
+              alt={banner.title}
+              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+            />
+          ) : (
+            // Use Next.js Image for other URLs
+            <Image
+              src={getOptimizedUrl(banner.image_url) || "/placeholder.svg"}
+              alt={banner.title}
+              fill
+              className="object-cover transition-transform duration-300 group-hover:scale-105"
+              priority={true}
+              quality={75}
+            />
+          )}
           {/* Overlay with gradient */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
 

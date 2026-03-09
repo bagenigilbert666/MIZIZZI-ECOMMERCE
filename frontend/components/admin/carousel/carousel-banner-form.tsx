@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { X, Loader2, Calendar, BarChart3 } from "lucide-react"
 import { ImageUploader } from "@/components/admin/image-uploader"
+import { useToast } from "@/hooks/use-toast"
 import type { CarouselBanner } from "@/types/carousel-admin"
 
 interface CarouselBannerFormProps {
@@ -19,6 +20,8 @@ interface CarouselBannerFormProps {
 }
 
 export function CarouselBannerForm({ banner, onClose, onSubmit }: CarouselBannerFormProps) {
+  const { toast } = useToast()
+  
   const [formData, setFormData] = useState<Partial<CarouselBanner>>({
     name: banner?.name || "",
     title: banner?.title || "",
@@ -45,12 +48,45 @@ export function CarouselBannerForm({ banner, onClose, onSubmit }: CarouselBanner
     }))
   }
 
-  const handleImageUpload = (url: string) => {
-    setImageUrl(url)
-    setFormData((prev) => ({
-      ...prev,
-      image_url: url,
-    }))
+  const handleImageUpload = async (url: string) => {
+    // Use Cloudinary URL directly - it's already optimized for CDN delivery
+    const optimizedUrl = url || ""
+    console.log(`[v0] Image uploaded with Cloudinary URL: ${optimizedUrl}`)
+    
+    setImageUrl(optimizedUrl)
+    const updatedFormData = {
+      ...formData,
+      image_url: optimizedUrl,
+    }
+    setFormData(updatedFormData)
+    
+    // Auto-save image URL if banner already exists (editing mode)
+    if (banner?.id) {
+      console.log(`[v0] Auto-saving image for banner ID: ${banner.id}`)
+      setIsSubmitting(true)
+      try {
+        await onSubmit({ image_url: optimizedUrl })
+        toast({
+          title: "Image Saved",
+          description: "Banner image updated successfully",
+        })
+      } catch (error) {
+        console.error(`[v0] Auto-save failed:`, error)
+        toast({
+          title: "Auto-save Failed",
+          description: "Image uploaded but couldn't save to banner. Please click Update Banner.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsSubmitting(false)
+      }
+    } else {
+      console.log(`[v0] New banner - image URL ready for create`)
+      toast({
+        title: "Image Ready",
+        description: "Image uploaded. Fill in other details and click Create Banner to save.",
+      })
+    }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -101,7 +137,7 @@ export function CarouselBannerForm({ banner, onClose, onSubmit }: CarouselBanner
                   Banner Image
                   <span className="text-xs text-muted-foreground font-normal">(Required)</span>
                 </Label>
-                <ImageUploader onUpload={handleImageUpload} currentImage={imageUrl} />
+                <ImageUploader onUpload={handleImageUpload} currentImage={imageUrl} type="carousel" />
               </div>
 
               {/* Name */}
