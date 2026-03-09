@@ -276,11 +276,6 @@ def update_category(category_id):
                 category.image_url = None  # Clear old URL
             except Exception as e:
                 current_app.logger.error(f"Error decoding image data: {str(e)}")
-        elif 'image_url' in data and data['image_url']:
-            # Handle image URL (e.g., from Cloudinary) - store the URL directly
-            category.image_url = data['image_url']
-            category.image_data = None  # Clear binary data if switching to URL
-            current_app.logger.info(f"Category {category_id} image URL updated to: {data['image_url']}")
         
         # Handle banner updates
         if 'banner_data' in data and data['banner_data']:
@@ -292,11 +287,6 @@ def update_category(category_id):
                 category.banner_url = None  # Clear old URL
             except Exception as e:
                 current_app.logger.error(f"Error decoding banner data: {str(e)}")
-        elif 'banner_url' in data and data['banner_url']:
-            # Handle banner URL (e.g., from Cloudinary) - store the URL directly
-            category.banner_url = data['banner_url']
-            category.banner_data = None  # Clear binary data if switching to URL
-            current_app.logger.info(f"Category {category_id} banner URL updated to: {data['banner_url']}")
         
         if 'is_featured' in data:
             category.is_featured = data['is_featured']
