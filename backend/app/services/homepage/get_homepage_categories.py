@@ -1,4 +1,4 @@
-"""Homepage Categories Loader - Fetches categories for homepage display."""
+"""Homepage Categories Loader - Fetches categories for homepage display with Cloudinary optimization."""
 import logging
 from typing import List, Dict, Any
 from app.models.models import Category
@@ -9,6 +9,42 @@ logger = logging.getLogger(__name__)
 
 CACHE_KEY = "mizizzi:homepage:categories"
 CACHE_TTL = 300  # 5 minutes
+
+def optimize_cloudinary_url(url: str) -> str:
+    """
+    Add Cloudinary transformation parameters for optimized delivery:
+    - w_600: Responsive width (600px for category cards)
+    - q_auto: Auto quality based on browser
+    - f_auto: Auto format (WebP for browsers that support it)
+    - c_fill: Crop to fill the space
+    - ar_1: Aspect ratio 1:1 (square)
+    
+    Args:
+        url: Original Cloudinary URL
+        
+    Returns:
+        Optimized URL with transformation parameters
+    """
+    if not url or not isinstance(url, str):
+        return url
+    
+    # Only optimize Cloudinary URLs
+    if 'res.cloudinary.com' not in url:
+        return url
+    
+    # If URL already has transformations, don't add more
+    if '/upload/' in url and any(param in url for param in ['w_', 'q_', 'f_', 'c_', 'ar_']):
+        return url
+    
+    # Insert transformation parameters before the filename
+    # Example: https://res.cloudinary.com/account/image/upload/v1234/filename.jpg
+    # Becomes: https://res.cloudinary.com/account/image/upload/w_600,q_auto,f_auto,c_fill,ar_1/v1234/filename.jpg
+    if '/upload/' in url:
+        parts = url.split('/upload/')
+        if len(parts) == 2:
+            return f"{parts[0]}/upload/w_600,q_auto,f_auto,c_fill,ar_1/{parts[1]}"
+    
+    return url
 
 
 def get_homepage_categories(limit: int = 20) -> List[Dict[str, Any]]:
@@ -41,14 +77,14 @@ def get_homepage_categories(limit: int = 20) -> List[Dict[str, Any]]:
          .all()
         
         # Serialize using to_dict() which handles image_url generation correctly:
-        # - If image_data exists: returns API endpoint `/api/admin/shop-categories/categories/{id}/image`
-        # - Otherwise: returns image_url field from database
+        # - If image_url contains Cloudinary URL: optimize with transformation parameters
+        # - Otherwise: return image_url field from database as-is
         result = [
             {
                 "id": cat.id,
                 "name": cat.name,
                 "slug": cat.slug,
-                "image_url": cat.to_dict()["image_url"],  # Use to_dict() for proper image URL generation
+                "image_url": optimize_cloudinary_url(cat.to_dict()["image_url"]),  # Optimize Cloudinary URLs
                 "description": cat.description or "",
                 "is_active": True
             }
@@ -59,7 +95,7 @@ def get_homepage_categories(limit: int = 20) -> List[Dict[str, Any]]:
         if product_cache:
             product_cache.set(CACHE_KEY, result, CACHE_TTL)
         
-        logger.info(f"[Homepage] Loaded {len(result)} categories with images")
+        logger.info(f"[Homepage] Loaded {len(result)} categories with optimized images")
         return result
         
     except Exception as e:

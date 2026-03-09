@@ -51,7 +51,8 @@ const CategoryCard = ({
   const [imageLoaded, setImageLoaded] = useState(false)
   const [imageFailed, setImageFailed] = useState(false)
   
-  // Use provided image or fallback
+  // Use Cloudinary image from database, or fallback for missing images
+  const isCloudinaryUrl = category.image_url?.includes('res.cloudinary.com')
   const imageUrl = category.image_url && category.image_url.trim() !== "" 
     ? category.image_url 
     : getFallbackImageUrl(category.name)
@@ -62,6 +63,13 @@ const CategoryCard = ({
       return
     }
 
+    // For Cloudinary images, trust they will load (they're optimized)
+    if (isCloudinaryUrl) {
+      setImageLoaded(true)
+      return
+    }
+
+    // For other images, preload and verify
     const img = new Image()
     img.crossOrigin = "anonymous"
     img.onload = () => {
@@ -78,7 +86,7 @@ const CategoryCard = ({
       img.onload = null
       img.onerror = null
     }
-  }, [imageUrl])
+  }, [imageUrl, isCloudinaryUrl])
 
   return (
     <Link
@@ -95,6 +103,7 @@ const CategoryCard = ({
               crossOrigin="anonymous"
               className="w-full h-full object-cover transition-opacity duration-200"
               loading="lazy"
+              sizes={isCloudinaryUrl ? "(max-width: 640px) 120px, (max-width: 768px) 150px, 180px" : "100%"}
               onError={() => setImageFailed(true)}
               onLoad={() => setImageLoaded(true)}
             />
